@@ -36,6 +36,8 @@ import { markdown } from "@codemirror/lang-markdown"
 export default function MarkdownEditor() {
   const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\nStart typing your markdown here...")
   const previewRef = useRef<HTMLDivElement>(null)
+  const splitPreviewRef = useRef<HTMLDivElement>(null)
+  const tabPreviewRef = useRef<HTMLDivElement>(null)
 
   const insertText = (before: string, after = "") => {
     // For CodeMirror, we'll need to use the editor's API
@@ -71,6 +73,13 @@ export default function MarkdownEditor() {
   const handlePrint = () => {
     const printWindow = window.open("", "_blank")
     if (!printWindow) return
+
+    // 表示中のプレビュー要素を取得
+    const currentPreviewContent = 
+      document.querySelector('.tabs-content[data-state="active"] .prose')?.innerHTML || 
+      splitPreviewRef.current?.innerHTML ||
+      tabPreviewRef.current?.innerHTML ||
+      ""
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -173,7 +182,7 @@ export default function MarkdownEditor() {
       </head>
       <body>
         <div id="content">
-          ${previewRef.current?.innerHTML || ""}
+          ${currentPreviewContent}
         </div>
         <script>
           window.onload = function() {
@@ -190,132 +199,140 @@ export default function MarkdownEditor() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-2 sm:gap-4">
+      <div className="flex flex-wrap items-center justify-between">
         <TooltipProvider>
-          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("# ", "\n")}>
-                  <Heading1 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Heading 1</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("## ", "\n")}>
-                  <Heading2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Heading 2</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("### ", "\n")}>
-                  <Heading3 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Heading 3</TooltipContent>
-            </Tooltip>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Headings */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("# ", "\n")}>
+                    <Heading1 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Heading 1</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("## ", "\n")}>
+                    <Heading2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Heading 2</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("### ", "\n")}>
+                    <Heading3 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Heading 3</TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Text formatting */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("**", "**")}>
+                    <Bold className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Bold</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("*", "*")}>
+                    <Italic className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Italic</TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Lists */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- ", "\n")}>
+                    <List className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Bullet List</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("1. ", "\n")}>
+                    <ListOrdered className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Numbered List</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- [ ] ", "\n")}>
+                    <CheckSquare className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Task List</TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Block elements */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("> ", "\n")}>
+                    <Quote className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Quote</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```\n", "\n```")}>
+                    <Code className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Code Block</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}>
+                    <Table className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Table</TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Links and images */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("[", "](url)")}>
+                    <Link className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Link</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("![", "](url)")}>
+                    <Image className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Image</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
+          {/* Actions */}
+          <div className="flex items-center space-x-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("**", "**")}>
-                  <Bold className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Bold</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("*", "*")}>
-                  <Italic className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Italic</TooltipContent>
-            </Tooltip>
-          </div>
-
-          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("- ", "\n")}>
-                  <List className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Bullet List</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("1. ", "\n")}>
-                  <ListOrdered className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Numbered List</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("- [ ] ", "\n")}>
-                  <CheckSquare className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Task List</TooltipContent>
-            </Tooltip>
-          </div>
-
-          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("> ", "\n")}>
-                  <Quote className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Quote</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("```\n", "\n```")}>
-                  <Code className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Code Block</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}>
-                  <Table className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Table</TooltipContent>
-            </Tooltip>
-          </div>
-
-          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("[", "](url)")}>
-                  <Link className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Link</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("![", "](url)")}>
-                  <Image className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Image</TooltipContent>
-            </Tooltip>
-          </div>
-
-          <div className="flex items-center gap-1 ml-auto">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleSave} className="gap-1">
+                <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1">
                   <Save className="h-4 w-4" />
                   <span className="hidden sm:inline">Save</span>
                 </Button>
@@ -324,7 +341,7 @@ export default function MarkdownEditor() {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1">
+                <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1">
                   <Printer className="h-4 w-4" />
                   <span className="hidden sm:inline">Print</span>
                 </Button>
@@ -336,29 +353,29 @@ export default function MarkdownEditor() {
       </div>
 
       <Tabs defaultValue="split" className="w-full">
-        <TabsList className="grid grid-cols-3 w-[300px]">
+        <TabsList className="grid grid-cols-3 w-full max-w-[300px]">
           <TabsTrigger value="split">Split</TabsTrigger>
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="preview">Preview</TabsTrigger>
         </TabsList>
 
         <TabsContent value="split" className="mt-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="h-full">
+              <CardContent className="p-4 h-full">
                 <CodeMirror
                   value={markdownContent}
                   onChange={(value) => setMarkdownContent(value)}
-                  height="500px"
+                  height="calc(100vh - 230px)"
                   extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
                   theme={vscodeDark}
                   className="border-none"
                 />
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div ref={previewRef} className="prose prose-gray max-w-none min-h-[500px] overflow-auto">
+            <Card className="h-full">
+              <CardContent className="p-4 h-full">
+                <div ref={splitPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -385,12 +402,12 @@ export default function MarkdownEditor() {
         </TabsContent>
 
         <TabsContent value="edit" className="mt-4">
-          <Card>
-            <CardContent className="p-4">
+          <Card className="h-full">
+            <CardContent className="p-4 h-full">
               <CodeMirror
                 value={markdownContent}
                 onChange={(value) => setMarkdownContent(value)}
-                height="500px"
+                height="calc(100vh - 230px)"
                 extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
                 theme={vscodeDark}
                 className="border-none"
@@ -400,9 +417,9 @@ export default function MarkdownEditor() {
         </TabsContent>
 
         <TabsContent value="preview" className="mt-4">
-          <Card>
-            <CardContent className="p-4">
-              <div ref={previewRef} className="prose prose-gray max-w-none min-h-[500px] overflow-auto">
+          <Card className="h-full">
+            <CardContent className="p-4 h-full">
+              <div ref={tabPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
