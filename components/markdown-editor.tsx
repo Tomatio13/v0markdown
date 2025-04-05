@@ -1,10 +1,8 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { useTheme } from "next-themes"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
@@ -23,39 +21,43 @@ import {
   Heading3,
   Table,
   CheckSquare,
-  Moon,
-  Sun,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import CodeMirror from '@uiw/react-codemirror'
-import { vscodeDark } from '@uiw/codemirror-theme-vscode'
-import { xcodeLight } from '@uiw/codemirror-theme-xcode'
-import { javascript } from '@codemirror/lang-javascript'
-import { EditorView } from '@codemirror/view'
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
+import CodeMirror from "@uiw/react-codemirror"
+import { markdownLanguage } from "@codemirror/lang-markdown"
+import { languages } from "@codemirror/language-data"
+import { vscodeDark } from "@uiw/codemirror-theme-vscode"
+import { EditorView } from "@codemirror/view"
+import { markdown } from "@codemirror/lang-markdown"
 
 export default function MarkdownEditor() {
-  const [markdown, setMarkdown] = useState(
-    "# Hello, World!\n\nStart typing your markdown here...\n\n```javascript\nconsole.log(\"Hello, highlighter!\");\n```"
-  )
+  const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\nStart typing your markdown here...")
   const previewRef = useRef<HTMLDivElement>(null)
-  const { theme, setTheme } = useTheme()
-  const [isMounted, setIsMounted] = useState(false)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   const insertText = (before: string, after = "") => {
-    setMarkdown((prev) => {
-      return prev + before + after;
-    });
+    // For CodeMirror, we'll need to use the editor's API
+    // This is a simplified approach - in a real app, you might want to use a ref
+    const selection = window.getSelection()?.toString() || ""
+    const newText = before + selection + after
+
+    // Insert at cursor position or replace selection
+    setMarkdownContent((prev) => {
+      if (selection && window.getSelection) {
+        const selectionStart = prev.indexOf(selection)
+        if (selectionStart !== -1) {
+          return prev.substring(0, selectionStart) + newText + prev.substring(selectionStart + selection.length)
+        }
+      }
+      // If no selection or selection not found, append to end
+      return prev + newText
+    })
   }
 
   const handleSave = () => {
-    const blob = new Blob([markdown], { type: "text/markdown" })
+    const blob = new Blob([markdownContent], { type: "text/markdown" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -71,411 +73,310 @@ export default function MarkdownEditor() {
     if (!printWindow) return
 
     const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Markdown Preview</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 800px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            pre {
-              background-color: #f6f8fa;
-              border-radius: 3px;
-              padding: 16px;
-              overflow: auto;
-            }
-            code {
-              background-color: #f6f8fa;
-              border-radius: 3px;
-              padding: 0.2em 0.4em;
-              font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
-            }
-            table {
-              border-collapse: collapse;
-              width: 100%;
-              margin-bottom: 16px;
-            }
-            table, th, td {
-              border: 1px solid #ddd;
-            }
-            th, td {
-              padding: 8px 12px;
-              text-align: left;
-            }
-            blockquote {
-              border-left: 4px solid #ddd;
-              padding-left: 16px;
-              margin-left: 0;
-              color: #666;
-            }
-            img {
-              max-width: 100%;
-            }
-            h1, h2, h3, h4, h5, h6 {
-              margin-top: 24px;
-              margin-bottom: 16px;
-              font-weight: 600;
-              line-height: 1.25;
-            }
-            h1 {
-              font-size: 2em;
-              border-bottom: 1px solid #eaecef;
-              padding-bottom: 0.3em;
-            }
-            h2 {
-              font-size: 1.5em;
-              border-bottom: 1px solid #eaecef;
-              padding-bottom: 0.3em;
-            }
-            h3 {
-              font-size: 1.25em;
-            }
-            ul, ol {
-              padding-left: 2em;
-            }
-            hr {
-              height: 0.25em;
-              padding: 0;
-              margin: 24px 0;
-              background-color: #e1e4e8;
-              border: 0;
-            }
-            a {
-              color: #0366d6;
-              text-decoration: none;
-            }
-            a:hover {
-              text-decoration: underline;
-            }
-            .task-list-item {
-              list-style-type: none;
-            }
-            .task-list-item input {
-              margin: 0 0.2em 0.25em -1.6em;
-              vertical-align: middle;
-            }
-          </style>
-        </head>
-        <body>
-          <div id="content">
-            ${previewRef.current?.innerHTML || ""}
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            }
-          </script>
-        </body>
-      </html>
-    `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Markdown Preview</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          pre {
+            background-color: #1E1E1E;
+            border-radius: 3px;
+            padding: 16px;
+            overflow: auto;
+            color: #D4D4D4;
+          }
+          code {
+            font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+          }
+          /* VS Code-like syntax highlighting */
+          .token.comment { color: #6A9955; }
+          .token.string { color: #CE9178; }
+          .token.keyword { color: #569CD6; }
+          .token.function { color: #DCDCAA; }
+          .token.number { color: #B5CEA8; }
+          .token.operator { color: #D4D4D4; }
+          .token.class-name { color: #4EC9B0; }
+          /* Other styles remain the same */
+          table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 16px;
+          }
+          table, th, td {
+            border: 1px solid #ddd;
+          }
+          th, td {
+            padding: 8px 12px;
+            text-align: left;
+          }
+          blockquote {
+            border-left: 4px solid #ddd;
+            padding-left: 16px;
+            margin-left: 0;
+            color: #666;
+          }
+          img {
+            max-width: 100%;
+          }
+          h1, h2, h3, h4, h5, h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+          }
+          h1 {
+            font-size: 2em;
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+          }
+          h2 {
+            font-size: 1.5em;
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+          }
+          h3 {
+            font-size: 1.25em;
+          }
+          ul, ol {
+            padding-left: 2em;
+          }
+          hr {
+            height: 0.25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: #e1e4e8;
+            border: 0;
+          }
+          a {
+            color: #0366d6;
+            text-decoration: none;
+          }
+          a:hover {
+            text-decoration: underline;
+          }
+          .task-list-item {
+            list-style-type: none;
+          }
+          .task-list-item input {
+            margin: 0 0.2em 0.25em -1.6em;
+            vertical-align: middle;
+          }
+        </style>
+      </head>
+      <body>
+        <div id="content">
+          ${previewRef.current?.innerHTML || ""}
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+    </html>
+  `
 
     printWindow.document.open()
     printWindow.document.write(htmlContent)
     printWindow.document.close()
   }
 
-  // CodeMirrorの拡張機能
-  const extensions = [
-    EditorView.lineWrapping,
-    javascript()
-  ]
-
   return (
     <div className="flex flex-col gap-4">
-      <style jsx global>{`
-        /* コードブロックの枠を強制的に削除するスタイル */
-        .prose {
-          overflow: visible;
-        }
-        .prose pre {
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          border-radius: 0 !important;
-          overflow: visible !important;
-        }
-        .prose pre > div {
-          border: none !important;
-          box-shadow: none !important;
-          background: transparent !important;
-          border-radius: 0 !important;
-        }
-        .prose pre > div > pre {
-          border: none !important;
-          box-shadow: none !important;
-          background: transparent !important;
-          border-radius: 0 !important;
-        }
-        .prose div[class*="language-"] {
-          border: none !important;
-          box-shadow: none !important;
-          border-radius: 0 !important;
-          background: transparent !important;
-        }
-        .prose pre.prism-code {
-          border: none !important;
-          box-shadow: none !important;
-          border-radius: 0 !important;
-          background: transparent !important;
-        }
-        /* コード自体の背景色だけを設定 */
-        .prose .syntax-highlighter-pre {
-          background: ${theme === 'dark' ? '#1E1E1E' : '#FFFFFF'} !important;
-          border-radius: 4px !important;
-          margin: 0 !important;
-          padding: 16px !important;
-        }
-      `}</style>
-      
       <div className="flex flex-wrap gap-2">
         <TooltipProvider>
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="見出しツール">
+          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("# ", "\n")} aria-label="見出し1">
+                <Button variant="ghost" size="icon" onClick={() => insertText("# ", "\n")}>
                   <Heading1 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>見出し1</TooltipContent>
+              <TooltipContent>Heading 1</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("## ", "\n")} aria-label="見出し2">
+                <Button variant="ghost" size="icon" onClick={() => insertText("## ", "\n")}>
                   <Heading2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>見出し2</TooltipContent>
+              <TooltipContent>Heading 2</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("### ", "\n")} aria-label="見出し3">
+                <Button variant="ghost" size="icon" onClick={() => insertText("### ", "\n")}>
                   <Heading3 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>見出し3</TooltipContent>
+              <TooltipContent>Heading 3</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="テキスト書式ツール">
+          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("**", "**")} aria-label="太字">
+                <Button variant="ghost" size="icon" onClick={() => insertText("**", "**")}>
                   <Bold className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>太字</TooltipContent>
+              <TooltipContent>Bold</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("*", "*")} aria-label="斜体">
+                <Button variant="ghost" size="icon" onClick={() => insertText("*", "*")}>
                   <Italic className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>斜体</TooltipContent>
+              <TooltipContent>Italic</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="リストツール">
+          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("- ", "\n")} aria-label="箇条書きリスト">
+                <Button variant="ghost" size="icon" onClick={() => insertText("- ", "\n")}>
                   <List className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>箇条書きリスト</TooltipContent>
+              <TooltipContent>Bullet List</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("1. ", "\n")} aria-label="番号付きリスト">
+                <Button variant="ghost" size="icon" onClick={() => insertText("1. ", "\n")}>
                   <ListOrdered className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>番号付きリスト</TooltipContent>
+              <TooltipContent>Numbered List</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("- [ ] ", "\n")} aria-label="タスクリスト">
+                <Button variant="ghost" size="icon" onClick={() => insertText("- [ ] ", "\n")}>
                   <CheckSquare className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>タスクリスト</TooltipContent>
+              <TooltipContent>Task List</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="特殊要素ツール">
+          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("> ", "\n")} aria-label="引用">
+                <Button variant="ghost" size="icon" onClick={() => insertText("> ", "\n")}>
                   <Quote className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>引用</TooltipContent>
+              <TooltipContent>Quote</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("```javascript\n", "\n```")} aria-label="コードブロック">
+                <Button variant="ghost" size="icon" onClick={() => insertText("```\n", "\n```")}>
                   <Code className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>コードブロック</TooltipContent>
+              <TooltipContent>Code Block</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")} aria-label="表">
+                <Button variant="ghost" size="icon" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}>
                   <Table className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>表</TooltipContent>
+              <TooltipContent>Table</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="リンクツール">
+          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-md">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("[", "](url)")} aria-label="リンク">
+                <Button variant="ghost" size="icon" onClick={() => insertText("[", "](url)")}>
                   <Link className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>リンク</TooltipContent>
+              <TooltipContent>Link</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("![", "](url)")} aria-label="画像">
+                <Button variant="ghost" size="icon" onClick={() => insertText("![", "](url)")}>
                   <Image className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>画像</TooltipContent>
+              <TooltipContent>Image</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 ml-auto" role="toolbar" aria-label="ドキュメント操作">
+          <div className="flex items-center gap-1 ml-auto">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleSave} className="gap-1" aria-label="保存">
+                <Button variant="outline" size="sm" onClick={handleSave} className="gap-1">
                   <Save className="h-4 w-4" />
                   <span className="hidden sm:inline">Save</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>マークダウンを保存</TooltipContent>
+              <TooltipContent>Save Markdown</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1" aria-label="印刷">
+                <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1">
                   <Printer className="h-4 w-4" />
                   <span className="hidden sm:inline">Print</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>プレビュー印刷</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  aria-label={theme === 'dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
-                >
-                  {isMounted ? (
-                    theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
-                  ) : (
-                    <span className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">テーマ切り替え</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>テーマ切り替え</TooltipContent>
+              <TooltipContent>Print Preview</TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>
       </div>
 
       <Tabs defaultValue="split" className="w-full">
-        <TabsList className="grid grid-cols-3 w-full">
-          <TabsTrigger value="split" aria-label="分割表示">Split</TabsTrigger>
-          <TabsTrigger value="edit" aria-label="編集のみ表示">Edit</TabsTrigger>
-          <TabsTrigger value="preview" aria-label="プレビューのみ表示">Preview</TabsTrigger>
+        <TabsList className="grid grid-cols-3 w-[300px]">
+          <TabsTrigger value="split">Split</TabsTrigger>
+          <TabsTrigger value="edit">Edit</TabsTrigger>
+          <TabsTrigger value="preview">Preview</TabsTrigger>
         </TabsList>
 
         <TabsContent value="split" className="mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             <Card>
               <CardContent className="p-4">
                 <CodeMirror
-                  value={markdown}
-                  onChange={(value) => setMarkdown(value)}
-                  height="calc(100vh - 250px)"
-                  className="min-h-[calc(100vh-250px)]"
-                  theme={theme === 'dark' ? vscodeDark : xcodeLight}
-                  extensions={extensions}
-                  aria-label="マークダウンエディタ"
+                  value={markdownContent}
+                  onChange={(value) => setMarkdownContent(value)}
+                  height="500px"
+                  extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
+                  theme={vscodeDark}
+                  className="border-none"
                 />
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 h-full">
-                <div ref={previewRef} className="prose prose-gray max-w-none min-h-[calc(100vh-250px)] overflow-auto h-full">
+              <CardContent className="p-4">
+                <div ref={previewRef} className="prose prose-gray max-w-none min-h-[500px] overflow-auto">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      code({ className, children, ...props }) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        const style = theme === 'dark' ? vscDarkPlus : vs
-                        
-                        if (!match) {
-                          return <code className={className} {...props}>{children}</code>
-                        }
-                        
-                        // ReactMarkdownから渡されるpropsからrefを除外
-                        const { ref, ...syntaxProps } = props
-                        
-                        return (
-                          <div style={{ 
-                            border: 'none', 
-                            background: 'none', 
-                            padding: 0, 
-                            margin: 0, 
-                            boxShadow: 'none',
-                            borderRadius: 0
-                          }}>
-                            <SyntaxHighlighter
-                              language={match[1]}
-                              style={theme === 'dark' ? vscDarkPlus : vs}
-                              PreTag="div"
-                              wrapLines={false}
-                              showLineNumbers={false}
-                              customStyle={{
-                                border: 'none',
-                                borderRadius: 0,
-                                padding: '16px',
-                                margin: '0',
-                                background: theme === 'dark' ? '#1E1E1E' : '#FFFFFF',
-                                boxShadow: 'none'
-                              }}
-                              codeTagProps={{
-                                style: {
-                                  border: 'none',
-                                  background: 'transparent',
-                                  boxShadow: 'none'
-                                }
-                              }}
-                              {...syntaxProps}
-                            >
-                              {children ? children.toString() : ''}
-                            </SyntaxHighlighter>
-                          </div>
+                      code({ node, inline, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || "")
+                        return !inline && match ? (
+                          <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                            {String(children).replace(/\n$/, "")}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
                         )
-                      }
+                      },
                     }}
                   >
-                    {markdown}
+                    {markdownContent}
                   </ReactMarkdown>
                 </div>
               </CardContent>
@@ -487,13 +388,12 @@ export default function MarkdownEditor() {
           <Card>
             <CardContent className="p-4">
               <CodeMirror
-                value={markdown}
-                onChange={(value) => setMarkdown(value)}
-                height="calc(100vh - 250px)"
-                className="min-h-[calc(100vh-250px)]"
-                theme={theme === 'dark' ? vscodeDark : xcodeLight}
-                extensions={extensions}
-                aria-label="マークダウンエディタ"
+                value={markdownContent}
+                onChange={(value) => setMarkdownContent(value)}
+                height="500px"
+                extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
+                theme={vscodeDark}
+                className="border-none"
               />
             </CardContent>
           </Card>
@@ -501,62 +401,26 @@ export default function MarkdownEditor() {
 
         <TabsContent value="preview" className="mt-4">
           <Card>
-            <CardContent className="p-4 h-full">
-              <div ref={previewRef} className="prose prose-gray max-w-none min-h-[calc(100vh-250px)] overflow-auto h-full">
+            <CardContent className="p-4">
+              <div ref={previewRef} className="prose prose-gray max-w-none min-h-[500px] overflow-auto">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    code({ className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || '')
-                      const style = theme === 'dark' ? vscDarkPlus : vs
-                      
-                      if (!match) {
-                        return <code className={className} {...props}>{children}</code>
-                      }
-                      
-                      // ReactMarkdownから渡されるpropsからrefを除外
-                      const { ref, ...syntaxProps } = props
-                      
-                      return (
-                        <div style={{ 
-                          border: 'none', 
-                          background: 'none', 
-                          padding: 0, 
-                          margin: 0, 
-                          boxShadow: 'none',
-                          borderRadius: 0
-                        }}>
-                          <SyntaxHighlighter
-                            language={match[1]}
-                            style={theme === 'dark' ? vscDarkPlus : vs}
-                            PreTag="div"
-                            wrapLines={false}
-                            showLineNumbers={false}
-                            customStyle={{
-                              border: 'none',
-                              borderRadius: 0,
-                              padding: '16px',
-                              margin: '0',
-                              background: theme === 'dark' ? '#1E1E1E' : '#FFFFFF',
-                              boxShadow: 'none'
-                            }}
-                            codeTagProps={{
-                              style: {
-                                border: 'none',
-                                background: 'transparent',
-                                boxShadow: 'none'
-                              }
-                            }}
-                            {...syntaxProps}
-                          >
-                            {children ? children.toString() : ''}
-                          </SyntaxHighlighter>
-                        </div>
+                    code({ node, inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || "")
+                      return !inline && match ? (
+                        <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                          {String(children).replace(/\n$/, "")}
+                        </SyntaxHighlighter>
+                      ) : (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
                       )
-                    }
+                    },
                   }}
                 >
-                  {markdown}
+                  {markdownContent}
                 </ReactMarkdown>
               </div>
             </CardContent>
