@@ -65,7 +65,7 @@ export default function MarkdownEditor() {
   const splitPreviewRef = useRef<HTMLDivElement>(null)
   const tabPreviewRef = useRef<HTMLDivElement>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
-  const editorRef = useRef<any>(null)
+  const editorRef = useRef<EditorView | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
   const [isSaving, setIsSaving] = useState(false)
@@ -115,11 +115,11 @@ export default function MarkdownEditor() {
 
   const insertEmoji = useCallback((emoji: string) => {
     console.log("絵文字を挿入:", emoji);
-    
+
     try {
       // 1. viewRefを経由した挿入を試みる
       if (viewRef.current) {
-        // @ts-ignore - TypeScriptエラーを無視
+        // @ts-ignore - TypeScriptエラーを無視 (必要であれば型アサーションを検討)
         viewRef.current.dispatch({
           changes: {
             from: cursorPosRef.current,
@@ -127,12 +127,14 @@ export default function MarkdownEditor() {
             insert: emoji
           }
         });
+        // カーソル位置を更新
+        cursorPosRef.current += emoji.length;
         return;
       }
-      
-      // 2. エディタのコンテンツエリアを探して挿入を試みる
+
+      // 2. エディタのコンテンツエリアを探して挿入を試みる (型ガードを追加)
       const contentArea = document.querySelector('.cm-content');
-      if (contentArea && contentArea.isContentEditable) {
+      if (contentArea instanceof HTMLElement && contentArea.isContentEditable) {
         // contentEditableな要素に絵文字を挿入
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
@@ -140,16 +142,18 @@ export default function MarkdownEditor() {
           range.deleteContents();
           range.insertNode(document.createTextNode(emoji));
           selection.collapseToEnd();
-          
+
           // エディタの内容を取得して状態を更新
           if (contentArea.textContent !== null) {
             setMarkdownContent(contentArea.textContent);
+            // カーソル位置の更新は難しいが、試みる
+            // cursorPosRef.current = ???
           }
           return;
         }
       }
-      
-      // 3. DOMからエディタビューを取得する方法
+
+      // 3. DOMからエディタビューを取得する方法 (現状維持)
       const editorElement = document.querySelector('.cm-editor');
       if (editorElement) {
         // @ts-ignore - CodeMirror内部実装にアクセス
@@ -162,25 +166,37 @@ export default function MarkdownEditor() {
           view.dispatch({
             changes: { from: pos, to: pos, insert: emoji }
           });
+          // カーソル位置を更新
+          cursorPosRef.current = pos + emoji.length;
           return;
         }
       }
-      
+
       // 4. 最終手段: カーソル位置をトラッキングして直接テキストを更新
       setMarkdownContent(prev => {
         const pos = cursorPosRef.current;
         if (pos >= 0 && pos <= prev.length) {
-          return prev.substring(0, pos) + emoji + prev.substring(pos);
+          const newContent = prev.substring(0, pos) + emoji + prev.substring(pos);
+          // カーソル位置を更新
+          cursorPosRef.current = pos + emoji.length;
+          return newContent;
         }
-        return prev + emoji; // どうしてもダメな場合は最後に追加
+        // どうしてもダメな場合は最後に追加
+        const newContent = prev + emoji;
+        cursorPosRef.current = newContent.length;
+        return newContent;
       });
-      
+
     } catch (error) {
       console.error("絵文字挿入エラー:", error);
       // フォールバック: テキストの最後に追加
-      setMarkdownContent(prev => prev + emoji);
+      setMarkdownContent(prev => {
+         const newContent = prev + emoji;
+         cursorPosRef.current = newContent.length;
+         return newContent;
+      });
     }
-  }, [cursorPosRef.current]);
+  }, [cursorPosRef.current]); // 依存配列に cursorPosRef.current を含めるか検討
 
   const handleSave = async () => {
     try {
@@ -246,11 +262,15 @@ export default function MarkdownEditor() {
     if (!printWindow) return
 
     // 表示中のプレビュー要素を取得
-    const currentPreviewContent = 
-      document.querySelector('.tabs-content[data-state="active"] .prose')?.innerHTML || 
-      splitPreviewRef.current?.innerHTML ||
-      tabPreviewRef.current?.innerHTML ||
-      ""
+    // MermaidがレンダリングしたSVGを含む可能性のある要素を優先的に試す
+    const activePreviewElement =
+      document.querySelector('.tabs-content[data-state="active"] .prose') ||
+      splitPreviewRef.current || // Split view のプレビュー
+      tabPreviewRef.current;     // Tab view のプレビュー
+
+    // innerHTML を取得 (レンダリング済み SVG が含まれることを期待)
+    const currentPreviewContent = activePreviewElement?.innerHTML || "";
+
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -267,16 +287,29 @@ export default function MarkdownEditor() {
             padding: 20px;
           }
           pre {
-            background-color: #1E1E1E;
+            background-color: #1E1E1E; /* Use a specific background for code blocks */
             border-radius: 3px;
             padding: 16px;
             overflow: auto;
-            color: #D4D4D4;
+            color: #D4D4D4; /* Light text color for dark background */
           }
-          code {
+          /* Ensure code within pre also uses monospace font */
+          pre code {
             font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+            background: none; /* Remove background from inline code inside pre */
+            padding: 0; /* Remove padding from inline code inside pre */
+            color: inherit; /* Inherit color from pre */
           }
-          /* VS Code-like syntax highlighting */
+          /* Style for inline code */
+          code:not(pre > code) {
+             font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+             background-color: rgba(27,31,35,.05); /* Subtle background for inline code */
+             padding: .2em .4em;
+             margin: 0;
+             font-size: 85%;
+             border-radius: 3px;
+          }
+          /* VS Code-like syntax highlighting (placeholder, actual highlighting depends on react-syntax-highlighter's output structure) */
           .token.comment { color: #6A9955; }
           .token.string { color: #CE9178; }
           .token.keyword { color: #569CD6; }
@@ -284,49 +317,49 @@ export default function MarkdownEditor() {
           .token.number { color: #B5CEA8; }
           .token.operator { color: #D4D4D4; }
           .token.class-name { color: #4EC9B0; }
-          /* Other styles remain the same */
+          /* Table styles */
           table {
             border-collapse: collapse;
             width: 100%;
             margin-bottom: 16px;
+            border-spacing: 0;
           }
-          table, th, td {
+          table th, table td {
             border: 1px solid #ddd;
-          }
-          th, td {
             padding: 8px 12px;
             text-align: left;
           }
+          table tr:nth-child(even) {
+            background-color: #f6f8fa; /* Zebra striping for table rows */
+          }
           blockquote {
-            border-left: 4px solid #ddd;
-            padding-left: 16px;
+            border-left: 4px solid #dfe2e5; /* Adjusted color */
+            padding: 0 1em; /* Adjusted padding */
             margin-left: 0;
-            color: #666;
+            color: #6a737d; /* Adjusted color */
           }
           img {
             max-width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            display: block; /* Prevent extra space below image */
           }
+          /* Heading styles */
           h1, h2, h3, h4, h5, h6 {
             margin-top: 24px;
             margin-bottom: 16px;
             font-weight: 600;
             line-height: 1.25;
           }
-          h1 {
-            font-size: 2em;
-            border-bottom: 1px solid #eaecef;
-            padding-bottom: 0.3em;
-          }
-          h2 {
-            font-size: 1.5em;
-            border-bottom: 1px solid #eaecef;
-            padding-bottom: 0.3em;
-          }
-          h3 {
-            font-size: 1.25em;
-          }
+          h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+          h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+          h3 { font-size: 1.25em; }
+          h4 { font-size: 1em; }
+          h5 { font-size: .875em; }
+          h6 { font-size: .85em; color: #6a737d; }
           ul, ol {
             padding-left: 2em;
+            margin-top: 0; /* Consistent list spacing */
+            margin-bottom: 16px; /* Consistent list spacing */
           }
           hr {
             height: 0.25em;
@@ -342,64 +375,53 @@ export default function MarkdownEditor() {
           a:hover {
             text-decoration: underline;
           }
+          /* Task list styles */
           .task-list-item {
             list-style-type: none;
           }
-          .task-list-item input {
+          .task-list-item label {
+            font-weight: normal; /* Override potential bolding */
+          }
+          .task-list-item.enabled label {
+             cursor: pointer;
+          }
+          .task-list-item + .task-list-item {
+             margin-top: 3px;
+          }
+          .task-list-item input[type=checkbox] {
             margin: 0 0.2em 0.25em -1.6em;
             vertical-align: middle;
           }
-          /* Mermaid図表のスタイル */
+          /* Mermaid図表のスタイル (SVGが直接埋め込まれることを想定) */
           .mermaid {
-            text-align: center;
+            text-align: center; /* Center the container */
+            margin-bottom: 16px; /* Add space below diagram */
           }
           .mermaid svg {
-            max-width: 100%;
-            height: auto !important;
+            max-width: 100%; /* Ensure SVG scales down */
+            height: auto !important; /* Maintain aspect ratio */
+            display: block; /* Prevent extra space */
+            margin: 0 auto; /* Center SVG within the container */
+          }
+          /* Add specific styles if MermaidDiagram component wraps SVG */
+          .mermaid > svg { /* Target direct SVG child if applicable */
+             /* Add styles here if needed */
           }
         </style>
-        <!-- Mermaid スクリプトの追加 -->
-        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-        <script>
-          // Mermaidの初期化を遅延させる
-          document.addEventListener('DOMContentLoaded', function() {
-            mermaid.initialize({
-              startOnLoad: true,
-              theme: 'default',
-              fontFamily: '"Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", Meiryo, メイリオ, sans-serif',
-              securityLevel: 'loose'
-            });
-            
-            // すべてのmermaidブロックを手動で処理
-            setTimeout(function() {
-              const mermaidBlocks = document.querySelectorAll('.mermaid');
-              console.log('Found ' + mermaidBlocks.length + ' mermaid blocks');
-              
-              if (mermaidBlocks.length > 0) {
-                // mermaid.initがない場合（古いバージョン）はinitialize後に自動実行されるはず
-                if (typeof mermaid.init === 'function') {
-                  try {
-                    mermaid.init(undefined, mermaidBlocks);
-                  } catch (e) {
-                    console.error('Mermaid initialization error:', e);
-                  }
-                }
-              }
-            }, 500);
-          });
-        </script>
       </head>
       <body>
         <div id="content">
           ${currentPreviewContent}
         </div>
         <script>
+          // No need to run mermaid.initialize or mermaid.run here
+          // as the content should already contain the rendered SVG.
+          // Just trigger print once the content is loaded.
           window.onload = function() {
-            // Mermaid図表を初期化
-            setTimeout(function() {
-              // 印刷を実行
-              window.print();
-            }, 1500); // Mermaidの初期化を待つために少し遅延させる
+            console.log('Content loaded, triggering print...');
+            window.print();
+            // Optionally close the window after printing/cancellation
+            // setTimeout(() => { window.close(); }, 500);
           }
         </script>
       </body>
@@ -408,7 +430,7 @@ export default function MarkdownEditor() {
 
     printWindow.document.open()
     printWindow.document.write(htmlContent)
-    printWindow.document.close()
+    printWindow.document.close() // close() is important for window.onload to fire
   }
 
   const toggleDarkMode = () => {
@@ -619,7 +641,7 @@ export default function MarkdownEditor() {
           <Card className="h-full">
             <CardContent className="p-4 h-full">
               <ContextMenu>
-                <ContextMenuTrigger 
+                <ContextMenuTrigger
                   onContextMenu={() => {
                     // 右クリック時にカーソル位置を保存
                     if (viewRef.current) {
@@ -638,50 +660,50 @@ export default function MarkdownEditor() {
                     }}
                     height="calc(100vh - 230px)"
                     extensions={[
-                      markdown({ base: markdownLanguage, codeLanguages: languages }), 
+                      markdown({ base: markdownLanguage, codeLanguages: languages }),
                       EditorView.lineWrapping,
                       EditorView.updateListener.of(update => {
                         // カーソル位置やセレクションが変更されたとき
-                        if (update.selectionSet) {
+                        if (update.selectionSet || update.docChanged) { // ドキュメント変更時も更新
                           handleCursorUpdate(update.view);
                         }
                       })
                     ]}
                     theme={isDarkMode ? vscodeDark : xcodeLight}
                     className="border-none"
-                    onCreateEditor={(editor) => {
+                    // onCreateEditor の引数を修正
+                    onCreateEditor={(view, state) => {
                       console.log("エディタが作成されました");
-                      editorRef.current = editor;
-                      
+                      editorRef.current = view; // editorRef に view を設定 (用途に応じて)
+
                       // エディタビューを取得して保存
-                      if (editor && editor.view) {
+                      if (view) {
                         console.log("エディタビューを取得しました");
-                        viewRef.current = editor.view;
-                        
+                        viewRef.current = view;
+
                         // 初期カーソル位置をテキスト末尾に設定
-                        cursorPosRef.current = markdownContent.length;
+                        cursorPosRef.current = state.doc.length; // state からドキュメント長を取得
+                        // 必要であれば初期フォーカスを設定
+                        // view.focus();
                       } else {
                         console.warn("エディタビューを取得できませんでした");
-                        
-                        // DOMを介してビューを探す（フォールバック）
+                        // フォールバック処理 (現状維持または改善)
                         setTimeout(() => {
-                          const editorElement = document.querySelector('.cm-editor');
-                          if (editorElement) {
-                            try {
-                              // @ts-ignore - CodeMirror内部実装
-                              const view = editorElement['__view'];
-                              if (view) {
-                                console.log("DOMからエディタビューを取得しました");
-                                viewRef.current = view;
-                                
-                                // 初期カーソル位置を更新
-                                handleCursorUpdate(view);
-                              }
-                            } catch (error) {
-                              console.error("DOMからのビュー取得エラー:", error);
-                            }
-                          }
-                        }, 200);
+                           const editorElement = document.querySelector('.cm-editor');
+                           if (editorElement) {
+                             try {
+                               // @ts-ignore - CodeMirror内部実装
+                               const fallbackView = editorElement['__view'];
+                               if (fallbackView) {
+                                 console.log("DOMからエディタビューを取得しました");
+                                 viewRef.current = fallbackView;
+                                 handleCursorUpdate(fallbackView);
+                               }
+                             } catch (error) {
+                               console.error("DOMからのビュー取得エラー:", error);
+                             }
+                           }
+                         }, 200);
                       }
                     }}
                   />
@@ -701,10 +723,9 @@ export default function MarkdownEditor() {
                     // @ts-ignore - ライブラリの型定義の問題を無視
                     code({ node, inline, className, children, ...props }) {
                       const match = /language-(\w+)/.exec(className || "")
-                      
+
                       // Mermaidダイアグラムの処理
                       if (!inline && match && match[1] === 'mermaid') {
-                        // 空のチャートを避ける
                         const chartContent = String(children).replace(/\n$/, "").trim();
                         if (!chartContent) {
                           return (
@@ -713,16 +734,19 @@ export default function MarkdownEditor() {
                             </div>
                           );
                         }
+                        // ここで MermaidDiagram コンポーネントを使う
                         return (
-                          <MermaidDiagram chart={chartContent} />
+                           <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
+                            <MermaidDiagram chart={chartContent} />
+                           </div>
                         )
                       }
-                      
+
                       return !inline && match ? (
                         // @ts-ignore - ライブラリの型定義の問題を無視
                         <SyntaxHighlighter
                           // @ts-ignore - ライブラリの型定義の問題を無視
-                          style={vscDarkPlus}
+                          style={vscDarkPlus} // Use dark mode theme directly for now
                           language={match[1]}
                           PreTag="div"
                           {...props}
@@ -749,7 +773,7 @@ export default function MarkdownEditor() {
         <Card className="h-full">
           <CardContent className="p-4 h-full">
             <ContextMenu>
-              <ContextMenuTrigger 
+              <ContextMenuTrigger
                 onContextMenu={() => {
                   // 右クリック時にカーソル位置を保存
                   handleCursorUpdate(viewRef.current)
@@ -766,49 +790,47 @@ export default function MarkdownEditor() {
                   }}
                   height="calc(100vh - 230px)"
                   extensions={[
-                    markdown({ base: markdownLanguage, codeLanguages: languages }), 
+                    markdown({ base: markdownLanguage, codeLanguages: languages }),
                     EditorView.lineWrapping,
                     EditorView.updateListener.of(update => {
                       // カーソル位置やセレクションが変更されたとき
-                      if (update.selectionSet) {
+                      if (update.selectionSet || update.docChanged) { // ドキュメント変更時も更新
                         handleCursorUpdate(update.view);
                       }
                     })
                   ]}
                   theme={isDarkMode ? vscodeDark : xcodeLight}
                   className="border-none"
-                  onCreateEditor={(editor) => {
-                    editorRef.current = editor;
-                    
+                  // onCreateEditor の引数を修正
+                  onCreateEditor={(view, state) => {
+                    editorRef.current = view; // editorRef に view を設定 (用途に応じて)
+
                     // エディタビューを取得して保存
-                    if (editor && editor.view) {
+                    if (view) {
                       console.log("エディタビューを取得しました");
-                      viewRef.current = editor.view;
-                      
+                      viewRef.current = view;
+
                       // 初期カーソル位置をテキスト末尾に設定
-                      cursorPosRef.current = markdownContent.length;
+                      cursorPosRef.current = state.doc.length; // state からドキュメント長を取得
                     } else {
                       console.warn("エディタビューを取得できませんでした");
-                      
-                      // DOMを介してビューを探す（フォールバック）
+                      // フォールバック処理 (現状維持または改善)
                       setTimeout(() => {
-                        const editorElement = document.querySelector('.cm-editor');
-                        if (editorElement) {
-                          try {
-                            // @ts-ignore - CodeMirror内部実装
-                            const view = editorElement['__view'];
-                            if (view) {
-                              console.log("DOMからエディタビューを取得しました");
-                              viewRef.current = view;
-                              
-                              // 初期カーソル位置を更新
-                              handleCursorUpdate(view);
-                            }
-                          } catch (error) {
-                            console.error("DOMからのビュー取得エラー:", error);
-                          }
-                        }
-                      }, 200);
+                         const editorElement = document.querySelector('.cm-editor');
+                         if (editorElement) {
+                           try {
+                             // @ts-ignore - CodeMirror内部実装
+                             const fallbackView = editorElement['__view'];
+                             if (fallbackView) {
+                               console.log("DOMからエディタビューを取得しました");
+                               viewRef.current = fallbackView;
+                               handleCursorUpdate(fallbackView);
+                             }
+                           } catch (error) {
+                             console.error("DOMからのビュー取得エラー:", error);
+                           }
+                         }
+                       }, 200);
                     }
                   }}
                 />
@@ -831,10 +853,9 @@ export default function MarkdownEditor() {
                   // @ts-ignore - ライブラリの型定義の問題を無視
                   code({ node, inline, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || "")
-                    
+
                     // Mermaidダイアグラムの処理
                     if (!inline && match && match[1] === 'mermaid') {
-                      // 空のチャートを避ける
                       const chartContent = String(children).replace(/\n$/, "").trim();
                       if (!chartContent) {
                         return (
@@ -843,16 +864,19 @@ export default function MarkdownEditor() {
                           </div>
                         );
                       }
+                      // ここで MermaidDiagram コンポーネントを使う
                       return (
-                        <MermaidDiagram chart={chartContent} />
+                         <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
+                           <MermaidDiagram chart={chartContent} />
+                         </div>
                       )
                     }
-                    
+
                     return !inline && match ? (
                       // @ts-ignore - ライブラリの型定義の問題を無視
                       <SyntaxHighlighter
                         // @ts-ignore - ライブラリの型定義の問題を無視
-                        style={vscDarkPlus}
+                        style={vscDarkPlus} // Use dark mode theme directly for now
                         language={match[1]}
                         PreTag="div"
                         {...props}
