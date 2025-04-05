@@ -208,7 +208,7 @@ export default function MarkdownEditor() {
   }
 
   return (
-    <div className="flex flex-col gap-2 sm:gap-4">
+    <Tabs defaultValue="split" className="w-full flex flex-col gap-2 sm:gap-4">
       <div className="flex flex-wrap items-center justify-between">
         <TooltipProvider>
           <div className="flex flex-wrap items-center gap-2">
@@ -337,89 +337,51 @@ export default function MarkdownEditor() {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center space-x-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1">
-                  <Save className="h-4 w-4" />
-                  <span className="hidden sm:inline">Save</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Save Markdown</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1">
-                  <Printer className="h-4 w-4" />
-                  <span className="hidden sm:inline">Print</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Print Preview</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={toggleDarkMode} className="h-8 gap-1">
-                  {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                  <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{isDarkMode ? "ライトモードに切り替え" : "ダークモードに切り替え"}</TooltipContent>
-            </Tooltip>
+          {/* Tabs and Actions */}
+          <div className="flex items-center space-x-3">
+            {/* Tab controls */}
+            <TabsList className="bg-gray-50 dark:bg-gray-800 h-8">
+              <TabsTrigger value="split" className="px-2 text-xs">Split</TabsTrigger>
+              <TabsTrigger value="edit" className="px-2 text-xs">Edit</TabsTrigger>
+              <TabsTrigger value="preview" className="px-2 text-xs">Preview</TabsTrigger>
+            </TabsList>
+
+            {/* Actions */}
+            <div className="flex items-center space-x-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1">
+                    <Save className="h-4 w-4" />
+                    <span className="hidden sm:inline">Save</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save Markdown</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1">
+                    <Printer className="h-4 w-4" />
+                    <span className="hidden sm:inline">Print</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Print Preview</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={toggleDarkMode} className="h-8 gap-1">
+                    {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isDarkMode ? "ライトモードに切り替え" : "ダークモードに切り替え"}</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </TooltipProvider>
       </div>
 
-      <Tabs defaultValue="split" className="w-full">
-        <TabsList className="grid grid-cols-3 w-full max-w-[300px]">
-          <TabsTrigger value="split">Split</TabsTrigger>
-          <TabsTrigger value="edit">Edit</TabsTrigger>
-          <TabsTrigger value="preview">Preview</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="split" className="mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="h-full">
-              <CardContent className="p-4 h-full">
-                <CodeMirror
-                  value={markdownContent}
-                  onChange={(value) => setMarkdownContent(value)}
-                  height="calc(100vh - 230px)"
-                  extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
-                  theme={isDarkMode ? vscodeDark : xcodeLight}
-                  className="border-none"
-                />
-              </CardContent>
-            </Card>
-            <Card className="h-full">
-              <CardContent className="p-4 h-full">
-                <div ref={splitPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      code({ node, inline, className, children, ...props }) {
-                        const match = /language-(\w+)/.exec(className || "")
-                        return !inline && match ? (
-                          <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
-                            {String(children).replace(/\n$/, "")}
-                          </SyntaxHighlighter>
-                        ) : (
-                          <code className={className} {...props}>
-                            {children}
-                          </code>
-                        )
-                      },
-                    }}
-                  >
-                    {markdownContent}
-                  </ReactMarkdown>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="edit" className="mt-4">
+      <TabsContent value="split" className="mt-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="h-full">
             <CardContent className="p-4 h-full">
               <CodeMirror
@@ -432,12 +394,9 @@ export default function MarkdownEditor() {
               />
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="preview" className="mt-4">
           <Card className="h-full">
             <CardContent className="p-4 h-full">
-              <div ref={tabPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
+              <div ref={splitPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -460,9 +419,52 @@ export default function MarkdownEditor() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="edit" className="mt-0">
+        <Card className="h-full">
+          <CardContent className="p-4 h-full">
+            <CodeMirror
+              value={markdownContent}
+              onChange={(value) => setMarkdownContent(value)}
+              height="calc(100vh - 230px)"
+              extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
+              theme={isDarkMode ? vscodeDark : xcodeLight}
+              className="border-none"
+            />
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="preview" className="mt-0">
+        <Card className="h-full">
+          <CardContent className="p-4 h-full">
+            <div ref={tabPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ node, inline, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || "")
+                    return !inline && match ? (
+                      <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                        {String(children).replace(/\n$/, "")}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    )
+                  },
+                }}
+              >
+                {markdownContent}
+              </ReactMarkdown>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   )
 }
 
