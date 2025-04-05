@@ -32,6 +32,7 @@ import CodeMirror from "@uiw/react-codemirror"
 import { markdownLanguage } from "@codemirror/lang-markdown"
 import { languages } from "@codemirror/language-data"
 import { vscodeDark } from "@uiw/codemirror-theme-vscode"
+import { xcodeLight } from "@uiw/codemirror-theme-xcode"
 import { EditorView } from "@codemirror/view"
 import { markdown } from "@codemirror/lang-markdown"
 
@@ -385,7 +386,7 @@ export default function MarkdownEditor() {
                   onChange={(value) => setMarkdownContent(value)}
                   height="calc(100vh - 230px)"
                   extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
-                  theme={vscodeDark}
+                  theme={isDarkMode ? vscodeDark : xcodeLight}
                   className="border-none"
                 />
               </CardContent>
@@ -426,7 +427,7 @@ export default function MarkdownEditor() {
                 onChange={(value) => setMarkdownContent(value)}
                 height="calc(100vh - 230px)"
                 extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
-                theme={vscodeDark}
+                theme={isDarkMode ? vscodeDark : xcodeLight}
                 className="border-none"
               />
             </CardContent>
