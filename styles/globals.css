@@ -15,7 +15,7 @@ body {
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 0 0% 20%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
@@ -50,7 +50,7 @@ body {
   }
   .dark {
     --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
+    --foreground: 0 0% 83.1%;
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 3.9%;
@@ -91,4 +91,273 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Custom Markdown Styles */
+@layer components {
+  .prose {
+    /* Use theme variables for base text color */
+    color: hsl(var(--foreground));
+
+    /* Override code block styling */
+    pre {
+      background-color: transparent !important; 
+      border: none !important;
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    pre > code {
+      background-color: transparent !important;
+      color: inherit !important;
+      padding: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Code blocks handled by react-syntax-highlighter */
+    pre > div {
+      border: none !important;
+      background: transparent !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+    }
+    
+    /* 黒枠を完全に削除するための追加ルール */
+    .react-syntax-highlighter-line-number,
+    .react-syntax-highlighter-pre,
+    pre, 
+    pre *,
+    div[style*="overflow:auto"],
+    div[style*="overflow: auto"],
+    div[class*="syntaxHighlighter"],
+    code[class*="language-"],
+    pre[class*="language-"],
+    div[class*="codeStyle"] {
+      border: none !important;
+      box-shadow: none !important;
+      background-color: transparent !important;
+    }
+    
+    /* プレビュー部分の枠を明示的に削除 */
+    div[class*="prose"] pre,
+    div[class*="prose"] pre > div,
+    div[class*="prose"] pre > div > pre {
+      border: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      color: #569CD6; /* Brighter blue for headings */
+    }
+
+    a {
+      color: #569CD6; /* Same blue for links */
+      text-decoration: none;
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    /* Inline code */
+    code:not(pre > code) {
+        color: #CE9178; /* Orange-ish for inline code text */
+        background-color: hsl(var(--muted) / 0.5); /* Slightly lighter background based on theme */
+        border-radius: 0.25rem;
+        padding: 0.2em 0.4em;
+        font-weight: normal; /* Reset prose bold */
+    }
+
+    /* Ensure list markers use foreground color */
+    ul > li::marker,
+    ol > li::marker {
+        color: hsl(var(--foreground));
+    }
+
+    blockquote {
+        color: #608B4E; /* Darker green for blockquote text */
+        border-left-color: #6A9955; /* Green border for blockquote */
+        font-style: normal; /* Reset prose italic */
+    }
+
+    /* --- Dark Mode Overrides --- */
+    &.dark:prose-invert {
+      /* Reset prose styles for code blocks in dark mode */
+      pre {
+          background-color: transparent !important;
+          border: none !important;
+      }
+      pre > code {
+          background-color: transparent !important;
+          color: inherit !important;
+          border: none !important;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        color: #569CD6; /* Keep the same blue */
+      }
+
+      a {
+        color: #569CD6; /* Keep the same blue */
+      }
+
+      code:not(pre > code) {
+          color: #CE9178; /* Keep the same orange */
+          background-color: hsl(var(--muted) / 0.5);
+      }
+
+      blockquote {
+          color: #6A9955; /* Slightly lighter green for dark mode text */
+          border-left-color: #6A9955; /* Keep the green border */
+      }
+    }
+  }
+}
+
+/* グローバルスタイルで枠を強制的に削除 */
+.prose pre,
+.prose pre > div,
+.prose pre > div > pre,
+.prose pre code,
+.prose [class*="language-"],
+.prose [class*="prism-code"],
+.prose [style*="overflow:auto"],
+.prose [style*="overflow: auto"],
+.prose [class*="code-toolbar"],
+.prose [class*="line-numbers"],
+.prose [data-language],
+.prose [class*="react-syntax-highlighter"] {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 黒枠の原因となる可能性のあるすべての要素を対象に */
+[class*="codeStyle"],
+[class*="syntaxHighlighter"],
+pre[class*="language-"],
+code[class*="language-"],
+[data-language],
+[class*="react-syntax-highlighter"],
+[class*="code-toolbar"],
+[class*="line-numbers"],
+[style*="overflow:auto"],
+[style*="overflow: auto"],
+pre > div > pre,
+div > pre {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+/* div要素のすべての枠線を削除 */
+div[class*="prose"] div,
+div[class*="prose"] pre,
+div[class*="prose"] pre > *,
+div[class*="prose"] > div > pre,
+div[class*="prose"] > div > pre > *,
+div[class*="prose"] > div > div > pre,
+div[class*="prose"] > div > div > div > pre {
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* シンタックスハイライターの外側の枠を削除 */
+div[class*="prism"],
+div[class*="prism"] > *,
+pre[class*="prism"],
+pre[class*="prism"] > * {
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+/* syntax-highlighter-pre用の特殊なスタイル */
+.syntax-highlighter-pre {
+  border: none !important;
+  background: transparent !important;
+}
+
+/* アクセシビリティ向上のためのスタイル */
+/* フォーカス表示の強化 */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid hsl(215, 100%, 50%) !important;
+  outline-offset: 2px !important;
+}
+
+/* ダークモードでのフォーカス表示 */
+.dark button:focus-visible,
+.dark [role="button"]:focus-visible,
+.dark a:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible,
+.dark [tabindex]:focus-visible {
+  outline-color: hsl(215, 100%, 60%) !important;
+}
+
+/* タブトリガーのアクティブ状態を明確に */
+.TabsTrigger[data-state="active"] {
+  font-weight: bold;
+  position: relative;
+}
+
+.TabsTrigger[data-state="active"]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background-color: currentColor;
+}
+
+/* ボタンのホバー状態を強調 */
+.Button:hover {
+  opacity: 0.8;
+}
+
+/* ツールチップのコントラスト改善 */
+.TooltipContent {
+  color: white;
+  background-color: rgba(0, 0, 0, 0.9);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.dark .TooltipContent {
+  color: #f1f1f1;
+  background-color: rgba(50, 50, 50, 0.9);
+}
+
+/* スクリーンリーダー向けのテキスト */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

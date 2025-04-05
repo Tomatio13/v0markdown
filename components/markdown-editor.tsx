@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,28 +28,30 @@ import {
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import CodeMirror from '@uiw/react-codemirror'
+import { vscodeDark } from '@uiw/codemirror-theme-vscode'
+import { xcodeLight } from '@uiw/codemirror-theme-xcode'
+import { javascript } from '@codemirror/lang-javascript'
+import { EditorView } from '@codemirror/view'
 
 export default function MarkdownEditor() {
-  const [markdown, setMarkdown] = useState("# Hello, World!\n\nStart typing your markdown here...")
+  const [markdown, setMarkdown] = useState(
+    "# Hello, World!\n\nStart typing your markdown here...\n\n```javascript\nconsole.log(\"Hello, highlighter!\");\n```"
+  )
   const previewRef = useRef<HTMLDivElement>(null)
   const { theme, setTheme } = useTheme()
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const insertText = (before: string, after = "") => {
-    const textarea = document.querySelector("textarea")
-    if (!textarea) return
-
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selectedText = markdown.substring(start, end)
-
-    const newText = markdown.substring(0, start) + before + selectedText + after + markdown.substring(end)
-    setMarkdown(newText)
-
-    // Set cursor position after the operation
-    setTimeout(() => {
-      textarea.focus()
-      textarea.setSelectionRange(start + before.length, end + before.length)
-    }, 0)
+    setMarkdown((prev) => {
+      return prev + before + after;
+    });
   }
 
   const handleSave = () => {
@@ -178,156 +180,218 @@ export default function MarkdownEditor() {
     printWindow.document.close()
   }
 
+  // CodeMirrorの拡張機能
+  const extensions = [
+    EditorView.lineWrapping,
+    javascript()
+  ]
+
   return (
     <div className="flex flex-col gap-4">
+      <style jsx global>{`
+        /* コードブロックの枠を強制的に削除するスタイル */
+        .prose {
+          overflow: visible;
+        }
+        .prose pre {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border-radius: 0 !important;
+          overflow: visible !important;
+        }
+        .prose pre > div {
+          border: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+          border-radius: 0 !important;
+        }
+        .prose pre > div > pre {
+          border: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+          border-radius: 0 !important;
+        }
+        .prose div[class*="language-"] {
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          background: transparent !important;
+        }
+        .prose pre.prism-code {
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          background: transparent !important;
+        }
+        /* コード自体の背景色だけを設定 */
+        .prose .syntax-highlighter-pre {
+          background: ${theme === 'dark' ? '#1E1E1E' : '#FFFFFF'} !important;
+          border-radius: 4px !important;
+          margin: 0 !important;
+          padding: 16px !important;
+        }
+      `}</style>
+      
       <div className="flex flex-wrap gap-2">
         <TooltipProvider>
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="見出しツール">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("# ", "\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("# ", "\n")} aria-label="見出し1">
                   <Heading1 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Heading 1</TooltipContent>
+              <TooltipContent>見出し1</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("## ", "\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("## ", "\n")} aria-label="見出し2">
                   <Heading2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Heading 2</TooltipContent>
+              <TooltipContent>見出し2</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("### ", "\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("### ", "\n")} aria-label="見出し3">
                   <Heading3 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Heading 3</TooltipContent>
+              <TooltipContent>見出し3</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="テキスト書式ツール">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("**", "**")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("**", "**")} aria-label="太字">
                   <Bold className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Bold</TooltipContent>
+              <TooltipContent>太字</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("*", "*")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("*", "*")} aria-label="斜体">
                   <Italic className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Italic</TooltipContent>
+              <TooltipContent>斜体</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="リストツール">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("- ", "\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("- ", "\n")} aria-label="箇条書きリスト">
                   <List className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Bullet List</TooltipContent>
+              <TooltipContent>箇条書きリスト</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("1. ", "\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("1. ", "\n")} aria-label="番号付きリスト">
                   <ListOrdered className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Numbered List</TooltipContent>
+              <TooltipContent>番号付きリスト</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("- [ ] ", "\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("- [ ] ", "\n")} aria-label="タスクリスト">
                   <CheckSquare className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Task List</TooltipContent>
+              <TooltipContent>タスクリスト</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="特殊要素ツール">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("> ", "\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("> ", "\n")} aria-label="引用">
                   <Quote className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Quote</TooltipContent>
+              <TooltipContent>引用</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("```\n", "\n```")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("```javascript\n", "\n```")} aria-label="コードブロック">
                   <Code className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Code Block</TooltipContent>
+              <TooltipContent>コードブロック</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")} aria-label="表">
                   <Table className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Table</TooltipContent>
+              <TooltipContent>表</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md" role="toolbar" aria-label="リンクツール">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("[", "](url)")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("[", "](url)")} aria-label="リンク">
                   <Link className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Link</TooltipContent>
+              <TooltipContent>リンク</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => insertText("![", "](url)")}>
+                <Button variant="ghost" size="icon" onClick={() => insertText("![", "](url)")} aria-label="画像">
                   <Image className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Image</TooltipContent>
+              <TooltipContent>画像</TooltipContent>
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex items-center gap-1 ml-auto" role="toolbar" aria-label="ドキュメント操作">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleSave} className="gap-1">
+                <Button variant="outline" size="sm" onClick={handleSave} className="gap-1" aria-label="保存">
                   <Save className="h-4 w-4" />
                   <span className="hidden sm:inline">Save</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Save Markdown</TooltipContent>
+              <TooltipContent>マークダウンを保存</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1">
+                <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1" aria-label="印刷">
                   <Printer className="h-4 w-4" />
                   <span className="hidden sm:inline">Print</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Print Preview</TooltipContent>
+              <TooltipContent>プレビュー印刷</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                  <span className="sr-only">Toggle theme</span>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  aria-label={theme === 'dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+                >
+                  {isMounted ? (
+                    theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
+                  ) : (
+                    <span className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">テーマ切り替え</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Toggle Theme</TooltipContent>
+              <TooltipContent>テーマ切り替え</TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>
@@ -335,27 +399,84 @@ export default function MarkdownEditor() {
 
       <Tabs defaultValue="split" className="w-full">
         <TabsList className="grid grid-cols-3 w-full">
-          <TabsTrigger value="split">Split</TabsTrigger>
-          <TabsTrigger value="edit">Edit</TabsTrigger>
-          <TabsTrigger value="preview">Preview</TabsTrigger>
+          <TabsTrigger value="split" aria-label="分割表示">Split</TabsTrigger>
+          <TabsTrigger value="edit" aria-label="編集のみ表示">Edit</TabsTrigger>
+          <TabsTrigger value="preview" aria-label="プレビューのみ表示">Preview</TabsTrigger>
         </TabsList>
 
         <TabsContent value="split" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardContent className="p-4">
-                <Textarea
+                <CodeMirror
                   value={markdown}
-                  onChange={(e) => setMarkdown(e.target.value)}
-                  className="min-h-[calc(100vh-250px)] font-mono resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                  placeholder="Type your markdown here..."
+                  onChange={(value) => setMarkdown(value)}
+                  height="calc(100vh - 250px)"
+                  className="min-h-[calc(100vh-250px)]"
+                  theme={theme === 'dark' ? vscodeDark : xcodeLight}
+                  extensions={extensions}
+                  aria-label="マークダウンエディタ"
                 />
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4 h-full">
                 <div ref={previewRef} className="prose prose-gray max-w-none min-h-[calc(100vh-250px)] overflow-auto h-full">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code({ className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || '')
+                        const style = theme === 'dark' ? vscDarkPlus : vs
+                        
+                        if (!match) {
+                          return <code className={className} {...props}>{children}</code>
+                        }
+                        
+                        // ReactMarkdownから渡されるpropsからrefを除外
+                        const { ref, ...syntaxProps } = props
+                        
+                        return (
+                          <div style={{ 
+                            border: 'none', 
+                            background: 'none', 
+                            padding: 0, 
+                            margin: 0, 
+                            boxShadow: 'none',
+                            borderRadius: 0
+                          }}>
+                            <SyntaxHighlighter
+                              language={match[1]}
+                              style={theme === 'dark' ? vscDarkPlus : vs}
+                              PreTag="div"
+                              wrapLines={false}
+                              showLineNumbers={false}
+                              customStyle={{
+                                border: 'none',
+                                borderRadius: 0,
+                                padding: '16px',
+                                margin: '0',
+                                background: theme === 'dark' ? '#1E1E1E' : '#FFFFFF',
+                                boxShadow: 'none'
+                              }}
+                              codeTagProps={{
+                                style: {
+                                  border: 'none',
+                                  background: 'transparent',
+                                  boxShadow: 'none'
+                                }
+                              }}
+                              {...syntaxProps}
+                            >
+                              {children ? children.toString() : ''}
+                            </SyntaxHighlighter>
+                          </div>
+                        )
+                      }
+                    }}
+                  >
+                    {markdown}
+                  </ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
@@ -365,11 +486,14 @@ export default function MarkdownEditor() {
         <TabsContent value="edit" className="mt-4">
           <Card>
             <CardContent className="p-4">
-              <Textarea
+              <CodeMirror
                 value={markdown}
-                onChange={(e) => setMarkdown(e.target.value)}
-                className="min-h-[calc(100vh-250px)] font-mono resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                placeholder="Type your markdown here..."
+                onChange={(value) => setMarkdown(value)}
+                height="calc(100vh - 250px)"
+                className="min-h-[calc(100vh-250px)]"
+                theme={theme === 'dark' ? vscodeDark : xcodeLight}
+                extensions={extensions}
+                aria-label="マークダウンエディタ"
               />
             </CardContent>
           </Card>
@@ -379,7 +503,61 @@ export default function MarkdownEditor() {
           <Card>
             <CardContent className="p-4 h-full">
               <div ref={previewRef} className="prose prose-gray max-w-none min-h-[calc(100vh-250px)] overflow-auto h-full">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    code({ className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || '')
+                      const style = theme === 'dark' ? vscDarkPlus : vs
+                      
+                      if (!match) {
+                        return <code className={className} {...props}>{children}</code>
+                      }
+                      
+                      // ReactMarkdownから渡されるpropsからrefを除外
+                      const { ref, ...syntaxProps } = props
+                      
+                      return (
+                        <div style={{ 
+                          border: 'none', 
+                          background: 'none', 
+                          padding: 0, 
+                          margin: 0, 
+                          boxShadow: 'none',
+                          borderRadius: 0
+                        }}>
+                          <SyntaxHighlighter
+                            language={match[1]}
+                            style={theme === 'dark' ? vscDarkPlus : vs}
+                            PreTag="div"
+                            wrapLines={false}
+                            showLineNumbers={false}
+                            customStyle={{
+                              border: 'none',
+                              borderRadius: 0,
+                              padding: '16px',
+                              margin: '0',
+                              background: theme === 'dark' ? '#1E1E1E' : '#FFFFFF',
+                              boxShadow: 'none'
+                            }}
+                            codeTagProps={{
+                              style: {
+                                border: 'none',
+                                background: 'transparent',
+                                boxShadow: 'none'
+                              }
+                            }}
+                            {...syntaxProps}
+                          >
+                            {children ? children.toString() : ''}
+                          </SyntaxHighlighter>
+                        </div>
+                      )
+                    }
+                  }}
+                >
+                  {markdown}
+                </ReactMarkdown>
               </div>
             </CardContent>
           </Card>
