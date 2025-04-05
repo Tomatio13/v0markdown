@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,6 +23,7 @@ import {
   CheckSquare,
   Moon,
   Sun,
+  Smile,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -35,6 +36,8 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode"
 import { xcodeLight } from "@uiw/codemirror-theme-xcode"
 import { EditorView } from "@codemirror/view"
 import { markdown } from "@codemirror/lang-markdown"
+import { EmojiPicker } from "./emoji-picker"
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
 
 export default function MarkdownEditor() {
   const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\nStart typing your markdown here...")
@@ -42,16 +45,19 @@ export default function MarkdownEditor() {
   const splitPreviewRef = useRef<HTMLDivElement>(null)
   const tabPreviewRef = useRef<HTMLDivElement>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const editorRef = useRef<any>(null)
+  const viewRef = useRef<EditorView | null>(null)
+  const cursorPosRef = useRef<number>(0)
 
   const insertText = (before: string, after = "") => {
     // For CodeMirror, we'll need to use the editor's API
     // This is a simplified approach - in a real app, you might want to use a ref
-    const selection = window.getSelection()?.toString() || ""
+    const selection = window.getSelection?.()?.toString() || ""
     const newText = before + selection + after
 
     // Insert at cursor position or replace selection
     setMarkdownContent((prev) => {
-      if (selection && window.getSelection) {
+      if (selection) {
         const selectionStart = prev.indexOf(selection)
         if (selectionStart !== -1) {
           return prev.substring(0, selectionStart) + newText + prev.substring(selectionStart + selection.length)
@@ -61,6 +67,99 @@ export default function MarkdownEditor() {
       return prev + newText
     })
   }
+
+  // マウントされた際にエディタにフォーカスを当てる
+  useEffect(() => {
+    // 初期カーソル位置を設定
+    cursorPosRef.current = markdownContent.length;
+    
+    // フォーカスを当てる（オプション）
+    const timeoutId = setTimeout(() => {
+      if (viewRef.current) {
+        viewRef.current.focus();
+      }
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  // カーソル位置の更新を処理する関数
+  const handleCursorUpdate = useCallback((view: EditorView | null) => {
+    if (view) {
+      const pos = view.state.selection.main.head;
+      cursorPosRef.current = pos;
+      console.log("カーソル位置を更新:", pos);
+    }
+  }, []);
+
+  const insertEmoji = useCallback((emoji: string) => {
+    console.log("絵文字を挿入:", emoji);
+    
+    try {
+      // 1. viewRefを経由した挿入を試みる
+      if (viewRef.current) {
+        // @ts-ignore - TypeScriptエラーを無視
+        viewRef.current.dispatch({
+          changes: {
+            from: cursorPosRef.current,
+            to: cursorPosRef.current,
+            insert: emoji
+          }
+        });
+        return;
+      }
+      
+      // 2. エディタのコンテンツエリアを探して挿入を試みる
+      const contentArea = document.querySelector('.cm-content');
+      if (contentArea && contentArea.isContentEditable) {
+        // contentEditableな要素に絵文字を挿入
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(emoji));
+          selection.collapseToEnd();
+          
+          // エディタの内容を取得して状態を更新
+          if (contentArea.textContent !== null) {
+            setMarkdownContent(contentArea.textContent);
+          }
+          return;
+        }
+      }
+      
+      // 3. DOMからエディタビューを取得する方法
+      const editorElement = document.querySelector('.cm-editor');
+      if (editorElement) {
+        // @ts-ignore - CodeMirror内部実装にアクセス
+        if (editorElement['__view']) {
+          // @ts-ignore
+          const view = editorElement['__view'];
+          // @ts-ignore
+          const pos = view.state.selection.main.head || cursorPosRef.current;
+          // @ts-ignore
+          view.dispatch({
+            changes: { from: pos, to: pos, insert: emoji }
+          });
+          return;
+        }
+      }
+      
+      // 4. 最終手段: カーソル位置をトラッキングして直接テキストを更新
+      setMarkdownContent(prev => {
+        const pos = cursorPosRef.current;
+        if (pos >= 0 && pos <= prev.length) {
+          return prev.substring(0, pos) + emoji + prev.substring(pos);
+        }
+        return prev + emoji; // どうしてもダメな場合は最後に追加
+      });
+      
+    } catch (error) {
+      console.error("絵文字挿入エラー:", error);
+      // フォールバック: テキストの最後に追加
+      setMarkdownContent(prev => prev + emoji);
+    }
+  }, [cursorPosRef.current]);
 
   const handleSave = () => {
     const blob = new Blob([markdownContent], { type: "text/markdown" })
@@ -258,6 +357,23 @@ export default function MarkdownEditor() {
                 </TooltipTrigger>
                 <TooltipContent>Italic</TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                    // スマイルボタンをクリックしたときの挙動（オプション）
+                    const dummyEvent = new MouseEvent('contextmenu', {
+                      bubbles: true,
+                      cancelable: true,
+                      clientX: 100,
+                      clientY: 100,
+                    });
+                    document.querySelector('.cm-content')?.dispatchEvent(dummyEvent);
+                  }}>
+                    <Smile className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>絵文字を挿入</TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Lists */}
@@ -384,14 +500,78 @@ export default function MarkdownEditor() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="h-full">
             <CardContent className="p-4 h-full">
-              <CodeMirror
-                value={markdownContent}
-                onChange={(value) => setMarkdownContent(value)}
-                height="calc(100vh - 230px)"
-                extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
-                theme={isDarkMode ? vscodeDark : xcodeLight}
-                className="border-none"
-              />
+              <ContextMenu>
+                <ContextMenuTrigger 
+                  onContextMenu={() => {
+                    // 右クリック時にカーソル位置を保存
+                    if (viewRef.current) {
+                      handleCursorUpdate(viewRef.current);
+                    }
+                  }}
+                >
+                  <CodeMirror
+                    value={markdownContent}
+                    onChange={(value) => {
+                      setMarkdownContent(value);
+                      // テキストが変更された場合にカーソル位置を確認（オプション）
+                      if (viewRef.current) {
+                        handleCursorUpdate(viewRef.current);
+                      }
+                    }}
+                    height="calc(100vh - 230px)"
+                    extensions={[
+                      markdown({ base: markdownLanguage, codeLanguages: languages }), 
+                      EditorView.lineWrapping,
+                      EditorView.updateListener.of(update => {
+                        // カーソル位置やセレクションが変更されたとき
+                        if (update.selectionSet) {
+                          handleCursorUpdate(update.view);
+                        }
+                      })
+                    ]}
+                    theme={isDarkMode ? vscodeDark : xcodeLight}
+                    className="border-none"
+                    onCreateEditor={(editor) => {
+                      console.log("エディタが作成されました");
+                      editorRef.current = editor;
+                      
+                      // エディタビューを取得して保存
+                      if (editor && editor.view) {
+                        console.log("エディタビューを取得しました");
+                        viewRef.current = editor.view;
+                        
+                        // 初期カーソル位置をテキスト末尾に設定
+                        cursorPosRef.current = markdownContent.length;
+                      } else {
+                        console.warn("エディタビューを取得できませんでした");
+                        
+                        // DOMを介してビューを探す（フォールバック）
+                        setTimeout(() => {
+                          const editorElement = document.querySelector('.cm-editor');
+                          if (editorElement) {
+                            try {
+                              // @ts-ignore - CodeMirror内部実装
+                              const view = editorElement['__view'];
+                              if (view) {
+                                console.log("DOMからエディタビューを取得しました");
+                                viewRef.current = view;
+                                
+                                // 初期カーソル位置を更新
+                                handleCursorUpdate(view);
+                              }
+                            } catch (error) {
+                              console.error("DOMからのビュー取得エラー:", error);
+                            }
+                          }
+                        }, 200);
+                      }
+                    }}
+                  />
+                </ContextMenuTrigger>
+                <ContextMenuContent className="min-w-[300px]">
+                  <EmojiPicker onEmojiSelect={insertEmoji} />
+                </ContextMenuContent>
+              </ContextMenu>
             </CardContent>
           </Card>
           <Card className="h-full">
@@ -400,10 +580,18 @@ export default function MarkdownEditor() {
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
+                    // @ts-ignore - ライブラリの型定義の問題を無視
                     code({ node, inline, className, children, ...props }) {
                       const match = /language-(\w+)/.exec(className || "")
                       return !inline && match ? (
-                        <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                        // @ts-ignore - ライブラリの型定義の問題を無視
+                        <SyntaxHighlighter
+                          // @ts-ignore - ライブラリの型定義の問題を無視
+                          style={vscDarkPlus}
+                          language={match[1]}
+                          PreTag="div"
+                          {...props}
+                        >
                           {String(children).replace(/\n$/, "")}
                         </SyntaxHighlighter>
                       ) : (
@@ -425,14 +613,75 @@ export default function MarkdownEditor() {
       <TabsContent value="edit" className="mt-0">
         <Card className="h-full">
           <CardContent className="p-4 h-full">
-            <CodeMirror
-              value={markdownContent}
-              onChange={(value) => setMarkdownContent(value)}
-              height="calc(100vh - 230px)"
-              extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
-              theme={isDarkMode ? vscodeDark : xcodeLight}
-              className="border-none"
-            />
+            <ContextMenu>
+              <ContextMenuTrigger 
+                onContextMenu={() => {
+                  // 右クリック時にカーソル位置を保存
+                  handleCursorUpdate(viewRef.current)
+                }}
+              >
+                <CodeMirror
+                  value={markdownContent}
+                  onChange={(value) => {
+                    setMarkdownContent(value);
+                    // テキストが変更された場合にカーソル位置を確認（オプション）
+                    if (viewRef.current) {
+                      handleCursorUpdate(viewRef.current);
+                    }
+                  }}
+                  height="calc(100vh - 230px)"
+                  extensions={[
+                    markdown({ base: markdownLanguage, codeLanguages: languages }), 
+                    EditorView.lineWrapping,
+                    EditorView.updateListener.of(update => {
+                      // カーソル位置やセレクションが変更されたとき
+                      if (update.selectionSet) {
+                        handleCursorUpdate(update.view);
+                      }
+                    })
+                  ]}
+                  theme={isDarkMode ? vscodeDark : xcodeLight}
+                  className="border-none"
+                  onCreateEditor={(editor) => {
+                    editorRef.current = editor;
+                    
+                    // エディタビューを取得して保存
+                    if (editor && editor.view) {
+                      console.log("エディタビューを取得しました");
+                      viewRef.current = editor.view;
+                      
+                      // 初期カーソル位置をテキスト末尾に設定
+                      cursorPosRef.current = markdownContent.length;
+                    } else {
+                      console.warn("エディタビューを取得できませんでした");
+                      
+                      // DOMを介してビューを探す（フォールバック）
+                      setTimeout(() => {
+                        const editorElement = document.querySelector('.cm-editor');
+                        if (editorElement) {
+                          try {
+                            // @ts-ignore - CodeMirror内部実装
+                            const view = editorElement['__view'];
+                            if (view) {
+                              console.log("DOMからエディタビューを取得しました");
+                              viewRef.current = view;
+                              
+                              // 初期カーソル位置を更新
+                              handleCursorUpdate(view);
+                            }
+                          } catch (error) {
+                            console.error("DOMからのビュー取得エラー:", error);
+                          }
+                        }
+                      }, 200);
+                    }
+                  }}
+                />
+              </ContextMenuTrigger>
+              <ContextMenuContent className="min-w-[300px]">
+                <EmojiPicker onEmojiSelect={insertEmoji} />
+              </ContextMenuContent>
+            </ContextMenu>
           </CardContent>
         </Card>
       </TabsContent>
@@ -444,10 +693,18 @@ export default function MarkdownEditor() {
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
+                  // @ts-ignore - ライブラリの型定義の問題を無視
                   code({ node, inline, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || "")
                     return !inline && match ? (
-                      <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                      // @ts-ignore - ライブラリの型定義の問題を無視
+                      <SyntaxHighlighter
+                        // @ts-ignore - ライブラリの型定義の問題を無視
+                        style={vscDarkPlus}
+                        language={match[1]}
+                        PreTag="div"
+                        {...props}
+                      >
                         {String(children).replace(/\n$/, "")}
                       </SyntaxHighlighter>
                     ) : (
