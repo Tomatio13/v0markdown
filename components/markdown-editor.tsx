@@ -21,6 +21,8 @@ import {
   Heading3,
   Table,
   CheckSquare,
+  Moon,
+  Sun,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -38,6 +40,7 @@ export default function MarkdownEditor() {
   const previewRef = useRef<HTMLDivElement>(null)
   const splitPreviewRef = useRef<HTMLDivElement>(null)
   const tabPreviewRef = useRef<HTMLDivElement>(null)
+  const [isDarkMode, setIsDarkMode] = useState(false)
 
   const insertText = (before: string, after = "") => {
     // For CodeMirror, we'll need to use the editor's API
@@ -198,6 +201,11 @@ export default function MarkdownEditor() {
     printWindow.document.close()
   }
 
+  const toggleDarkMode = () => {
+    setIsDarkMode(!isDarkMode)
+    document.documentElement.classList.toggle('dark')
+  }
+
   return (
     <div className="flex flex-col gap-2 sm:gap-4">
       <div className="flex flex-wrap items-center justify-between">
@@ -347,6 +355,15 @@ export default function MarkdownEditor() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Print Preview</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={toggleDarkMode} className="h-8 gap-1">
+                  {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isDarkMode ? "ライトモードに切り替え" : "ダークモードに切り替え"}</TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>
