@@ -24,6 +24,7 @@ import {
   Moon,
   Sun,
   Smile,
+  Box,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -38,6 +39,7 @@ import { EditorView } from "@codemirror/view"
 import { markdown } from "@codemirror/lang-markdown"
 import { EmojiPicker } from "./emoji-picker"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
+import MermaidDiagram from "./mermaid-diagram"
 
 // File System Access API の型定義
 declare global {
@@ -347,7 +349,45 @@ export default function MarkdownEditor() {
             margin: 0 0.2em 0.25em -1.6em;
             vertical-align: middle;
           }
+          /* Mermaid図表のスタイル */
+          .mermaid {
+            text-align: center;
+          }
+          .mermaid svg {
+            max-width: 100%;
+            height: auto !important;
+          }
         </style>
+        <!-- Mermaid スクリプトの追加 -->
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>
+          // Mermaidの初期化を遅延させる
+          document.addEventListener('DOMContentLoaded', function() {
+            mermaid.initialize({
+              startOnLoad: true,
+              theme: 'default',
+              fontFamily: '"Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", Meiryo, メイリオ, sans-serif',
+              securityLevel: 'loose'
+            });
+            
+            // すべてのmermaidブロックを手動で処理
+            setTimeout(function() {
+              const mermaidBlocks = document.querySelectorAll('.mermaid');
+              console.log('Found ' + mermaidBlocks.length + ' mermaid blocks');
+              
+              if (mermaidBlocks.length > 0) {
+                // mermaid.initがない場合（古いバージョン）はinitialize後に自動実行されるはず
+                if (typeof mermaid.init === 'function') {
+                  try {
+                    mermaid.init(undefined, mermaidBlocks);
+                  } catch (e) {
+                    console.error('Mermaid initialization error:', e);
+                  }
+                }
+              }
+            }, 500);
+          });
+        </script>
       </head>
       <body>
         <div id="content">
@@ -355,7 +395,11 @@ export default function MarkdownEditor() {
         </div>
         <script>
           window.onload = function() {
-            window.print();
+            // Mermaid図表を初期化
+            setTimeout(function() {
+              // 印刷を実行
+              window.print();
+            }, 1500); // Mermaidの初期化を待つために少し遅延させる
           }
         </script>
       </body>
@@ -495,6 +539,14 @@ export default function MarkdownEditor() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Table</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}>
+                    <Box className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Mermaidダイアグラム</TooltipContent>
               </Tooltip>
             </div>
 
@@ -649,6 +701,23 @@ export default function MarkdownEditor() {
                     // @ts-ignore - ライブラリの型定義の問題を無視
                     code({ node, inline, className, children, ...props }) {
                       const match = /language-(\w+)/.exec(className || "")
+                      
+                      // Mermaidダイアグラムの処理
+                      if (!inline && match && match[1] === 'mermaid') {
+                        // 空のチャートを避ける
+                        const chartContent = String(children).replace(/\n$/, "").trim();
+                        if (!chartContent) {
+                          return (
+                            <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
+                              図のコードが空です
+                            </div>
+                          );
+                        }
+                        return (
+                          <MermaidDiagram chart={chartContent} />
+                        )
+                      }
+                      
                       return !inline && match ? (
                         // @ts-ignore - ライブラリの型定義の問題を無視
                         <SyntaxHighlighter
@@ -762,6 +831,23 @@ export default function MarkdownEditor() {
                   // @ts-ignore - ライブラリの型定義の問題を無視
                   code({ node, inline, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || "")
+                    
+                    // Mermaidダイアグラムの処理
+                    if (!inline && match && match[1] === 'mermaid') {
+                      // 空のチャートを避ける
+                      const chartContent = String(children).replace(/\n$/, "").trim();
+                      if (!chartContent) {
+                        return (
+                          <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
+                            図のコードが空です
+                          </div>
+                        );
+                      }
+                      return (
+                        <MermaidDiagram chart={chartContent} />
+                      )
+                    }
+                    
                     return !inline && match ? (
                       // @ts-ignore - ライブラリの型定義の問題を無視
                       <SyntaxHighlighter
