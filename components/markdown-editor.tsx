@@ -39,6 +39,24 @@ import { markdown } from "@codemirror/lang-markdown"
 import { EmojiPicker } from "./emoji-picker"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
 
+// File System Access API の型定義
+declare global {
+  interface Window {
+    showSaveFilePicker?: (options?: {
+      suggestedName?: string;
+      types?: Array<{
+        description: string;
+        accept: Record<string, string[]>;
+      }>;
+    }) => Promise<{
+      createWritable: () => Promise<{
+        write: (content: string) => Promise<void>;
+        close: () => Promise<void>;
+      }>
+    }>;
+  }
+}
+
 export default function MarkdownEditor() {
   const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\nStart typing your markdown here...")
   const previewRef = useRef<HTMLDivElement>(null)
@@ -48,6 +66,7 @@ export default function MarkdownEditor() {
   const editorRef = useRef<any>(null)
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
+  const [isSaving, setIsSaving] = useState(false)
 
   const insertText = (before: string, after = "") => {
     // For CodeMirror, we'll need to use the editor's API
@@ -161,16 +180,63 @@ export default function MarkdownEditor() {
     }
   }, [cursorPosRef.current]);
 
-  const handleSave = () => {
-    const blob = new Blob([markdownContent], { type: "text/markdown" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "document.md"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      // window.showDirectoryPickerがサポートされている場合のみ実行
+      if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
+        // ファイル保存ダイアログを表示
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: 'document.md',
+          types: [{
+            description: 'Markdown',
+            accept: {
+              'text/markdown': ['.md'],
+            },
+          }],
+        });
+        
+        // ファイルに書き込むためのWritableStreamを取得
+        const writable = await fileHandle.createWritable();
+        
+        // ファイルにマークダウンコンテンツを書き込み
+        await writable.write(markdownContent);
+        
+        // ストリームを閉じて保存を完了
+        await writable.close();
+        
+        console.log("ファイルが保存されました");
+      } else {
+        // 従来の方法にフォールバック
+        const blob = new Blob([markdownContent], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "document.md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log("従来の方法でファイルがダウンロードされました");
+      }
+    } catch (error) {
+      console.error("ファイル保存エラー:", error);
+      
+      // エラーの場合は従来の方法にフォールバック
+      const blob = new Blob([markdownContent], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "document.md";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const handlePrint = () => {
@@ -466,9 +532,9 @@ export default function MarkdownEditor() {
             <div className="flex items-center space-x-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1">
+                  <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving}>
                     <Save className="h-4 w-4" />
-                    <span className="hidden sm:inline">Save</span>
+                    <span className="hidden sm:inline">{isSaving ? "保存中..." : "Save"}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Save Markdown</TooltipContent>
