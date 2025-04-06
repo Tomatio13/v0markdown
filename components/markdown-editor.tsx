@@ -44,6 +44,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/component
 import MermaidDiagram from "./mermaid-diagram"
 import { AIChat } from "./ai-chat"
 import { TripleLayout } from "./triple-layout"
+import { useChat } from 'ai/react'
 
 // File System Access API の型定義
 declare global {
@@ -74,6 +75,14 @@ export default function MarkdownEditor() {
   const cursorPosRef = useRef<number>(0)
   const [isSaving, setIsSaving] = useState(false)
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple'>('split')
+
+  // useChatフックをMarkdownEditorに移動
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat();
+
+  // チャットクリア関数
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, [setMessages]);
 
   const insertText = (before: string, after = "") => {
     // For CodeMirror, we'll need to use the editor's API
@@ -878,11 +887,17 @@ export default function MarkdownEditor() {
         )}
         
         {viewMode === 'triple' && (
-          <TripleLayout 
+          <TripleLayout
             editorComponent={EditorComponent}
             previewComponent={PreviewComponent}
             onAIContentInsert={handleAIContentInsert}
             isDarkMode={isDarkMode}
+            messages={messages}
+            input={input}
+            handleInputChange={handleInputChange}
+            handleSubmit={handleSubmit}
+            isLoading={isLoading}
+            clearMessages={clearMessages}
           />
         )}
       </div>

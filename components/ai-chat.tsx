@@ -1,27 +1,29 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
-import { Send } from 'lucide-react'
+import { useEffect, useCallback } from 'react'
+import { Send, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent } from '@/components/ui/card'
-import { useChat } from 'ai/react'
+import type { Message, UseChatHelpers } from 'ai/react'
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface AIChatProps {
+interface AIChatProps extends Pick<UseChatHelpers, 'messages' | 'input' | 'handleInputChange' | 'handleSubmit' | 'isLoading'> {
   onInsertToEditor?: (text: string) => void
   isDarkMode?: boolean
+  clearMessages: () => void
 }
 
-export const AIChat = ({ onInsertToEditor, isDarkMode = false }: AIChatProps) => {
-  // Vercel AI SDKのuseChatフックを使用
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat();
+export const AIChat = ({
+  messages,
+  input,
+  handleInputChange,
+  handleSubmit,
+  isLoading,
+  onInsertToEditor,
+  isDarkMode = false,
+  clearMessages,
+}: AIChatProps) => {
 
   const handleInsertToEditor = (text: string) => {
     if (onInsertToEditor) {
@@ -31,6 +33,19 @@ export const AIChat = ({ onInsertToEditor, isDarkMode = false }: AIChatProps) =>
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'}`}>
+      <div className={`flex justify-between items-center px-4 py-2 ${isDarkMode ? 'border-b border-gray-700' : 'border-b border-gray-200'}`}>
+        <h3 className="text-lg font-medium">AIチャット</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={clearMessages}
+          disabled={isLoading || messages.length === 0}
+          className={`${isDarkMode ? 'border-gray-600 hover:bg-gray-700' : ''}`}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          クリア
+        </Button>
+      </div>
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map((message) => (
