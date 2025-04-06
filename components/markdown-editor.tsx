@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
@@ -26,7 +26,8 @@ import {
   Smile,
   Box,
   MessageSquare,
-  SplitSquareVertical
+  SplitSquareVertical,
+  Trash2
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -122,10 +123,14 @@ export default function MarkdownEditor() {
   const handleCursorUpdate = useCallback((view: EditorView | null) => {
     if (view) {
       const pos = view.state.selection.main.head;
-      cursorPosRef.current = pos;
-      console.log("カーソル位置を更新:", pos);
+      // viewRefがnullの場合や、posが以前と同じ場合は更新しない
+      // (不要な再レンダリングや無限ループを防ぐため)
+      if (cursorPosRef.current !== pos) {
+          cursorPosRef.current = pos;
+          console.log("カーソル位置を更新:", pos);
+      }
     }
-  }, []);
+  }, []); // 依存配列は空のままで良い
 
   const insertEmoji = useCallback((emoji: string) => {
     console.log("絵文字を挿入:", emoji);
@@ -133,71 +138,45 @@ export default function MarkdownEditor() {
     try {
       // 1. viewRefを経由した挿入を試みる
       if (viewRef.current) {
+        const currentPos = viewRef.current.state.selection.main.head; // 現在のカーソル位置
         // @ts-ignore - TypeScriptエラーを無視 (必要であれば型アサーションを検討)
         viewRef.current.dispatch({
           changes: {
-            from: cursorPosRef.current,
-            to: cursorPosRef.current,
+            from: currentPos,
+            to: currentPos,
             insert: emoji
-          }
+          },
+          selection: { anchor: currentPos + emoji.length } // 挿入後にカーソル移動
         });
-        // カーソル位置を更新
-        cursorPosRef.current += emoji.length;
+        viewRef.current.focus(); // エディタにフォーカスを戻す
+        // cursorPosRefはupdateListenerで更新されるはずだが、念のため
+        cursorPosRef.current = currentPos + emoji.length;
+        console.log("絵文字挿入 (CodeMirror):", emoji, " 新カーソル位置:", cursorPosRef.current);
         return;
       }
 
-      // 2. エディタのコンテンツエリアを探して挿入を試みる (型ガードを追加)
+      // 2. エディタのコンテンツエリアを探して挿入を試みる (削除)
+      /*
       const contentArea = document.querySelector('.cm-content');
-      if (contentArea instanceof HTMLElement && contentArea.isContentEditable) {
-        // contentEditableな要素に絵文字を挿入
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          range.deleteContents();
-          range.insertNode(document.createTextNode(emoji));
-          selection.collapseToEnd();
+      ...
+      */
 
-          // エディタの内容を取得して状態を更新
-          if (contentArea.textContent !== null) {
-            setMarkdownContent(contentArea.textContent);
-            // カーソル位置の更新は難しいが、試みる
-            // cursorPosRef.current = ???
-          }
-          return;
-        }
-      }
-
-      // 3. DOMからエディタビューを取得する方法 (現状維持)
+      // 3. DOMからエディタビューを取得する方法 (削除)
+      /*
       const editorElement = document.querySelector('.cm-editor');
-      if (editorElement) {
-        // @ts-ignore - CodeMirror内部実装にアクセス
-        if (editorElement['__view']) {
-          // @ts-ignore
-          const view = editorElement['__view'];
-          // @ts-ignore
-          const pos = view.state.selection.main.head || cursorPosRef.current;
-          // @ts-ignore
-          view.dispatch({
-            changes: { from: pos, to: pos, insert: emoji }
-          });
-          // カーソル位置を更新
-          cursorPosRef.current = pos + emoji.length;
-          return;
-        }
-      }
+      ...
+      */
 
-      // 4. 最終手段: カーソル位置をトラッキングして直接テキストを更新
+      // 4. フォールバック: カーソル位置をトラッキングして直接テキストを更新
+      console.warn("viewRef.current is not available for emoji insertion. Falling back.");
       setMarkdownContent(prev => {
         const pos = cursorPosRef.current;
-        if (pos >= 0 && pos <= prev.length) {
-          const newContent = prev.substring(0, pos) + emoji + prev.substring(pos);
-          // カーソル位置を更新
-          cursorPosRef.current = pos + emoji.length;
-          return newContent;
-        }
-        // どうしてもダメな場合は最後に追加
-        const newContent = prev + emoji;
-        cursorPosRef.current = newContent.length;
+        // カーソル位置が有効範囲内か確認
+        const safePos = Math.max(0, Math.min(pos, prev.length));
+        const newContent = prev.substring(0, safePos) + emoji + prev.substring(safePos);
+        // カーソル位置を更新
+        cursorPosRef.current = safePos + emoji.length;
+        console.log("絵文字挿入 (Fallback):", emoji, " 新カーソル位置:", cursorPosRef.current);
         return newContent;
       });
 
@@ -210,7 +189,8 @@ export default function MarkdownEditor() {
          return newContent;
       });
     }
-  }, [cursorPosRef.current]); // 依存配列に cursorPosRef.current を含めるか検討
+  // 依存配列に cursorPosRef.current を含めない
+  }, [setMarkdownContent]);
 
   const handleSave = async () => {
     try {
@@ -452,6 +432,12 @@ export default function MarkdownEditor() {
     document.documentElement.classList.toggle('dark')
   }
 
+  // エディタの内容をクリアする関数
+  const handleClearContent = useCallback(() => {
+    setMarkdownContent("");
+    cursorPosRef.current = 0; // カーソル位置もリセット
+  }, []);
+
   // マークダウンコンテンツが変更されたときの処理
   const handleContentChange = useCallback((value: string) => {
     setMarkdownContent(value)
@@ -462,69 +448,87 @@ export default function MarkdownEditor() {
     try {
       // 1. viewRefを経由した挿入を試みる
       if (viewRef.current) {
+        const currentPos = viewRef.current.state.selection.main.head; // 現在のカーソル位置
         // @ts-ignore - TypeScriptエラーを無視 (必要であれば型アサーションを検討)
         viewRef.current.dispatch({
           changes: {
-            from: cursorPosRef.current,
-            to: cursorPosRef.current,
+            from: currentPos,
+            to: currentPos,
             insert: text
-          }
+          },
+          selection: { anchor: currentPos + text.length } // 挿入後にカーソル移動
         });
-        // カーソル位置を更新
-        cursorPosRef.current += text.length;
+        viewRef.current.focus(); // エディタにフォーカスを戻す
+        // cursorPosRefはupdateListenerで更新されるはずだが、念のため
+        cursorPosRef.current = currentPos + text.length;
+        console.log("AIコンテンツ挿入 (CodeMirror):", text, " 新カーソル位置:", cursorPosRef.current);
         return;
       }
 
-      // 2. エディタのコンテンツエリアを探して挿入を試みる (型ガードを追加)
+      // 2. エディタのコンテンツエリアを探して挿入を試みる (削除)
+      /*
       const contentArea = document.querySelector('.cm-content');
-      if (contentArea instanceof HTMLElement && contentArea.isContentEditable) {
-        // contentEditableな要素に挿入
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          range.deleteContents();
-          range.insertNode(document.createTextNode(text));
-          selection.collapseToEnd();
+      ...
+      */
 
-          // エディタの内容を取得して状態を更新
-          if (contentArea.textContent !== null) {
-            setMarkdownContent(contentArea.textContent);
-          }
-          return;
-        }
-      }
-
-      // 3. 最終手段: カーソル位置をトラッキングして直接テキストを更新
+      // 3. 最終手段: カーソル位置をトラッキングして直接テキストを更新 (フォールバック)
+      console.warn("viewRef.current is not available. Falling back to direct state update.");
       setMarkdownContent(prev => {
-        const pos = cursorPosRef.current;
-        if (pos >= 0 && pos <= prev.length) {
-          const newContent = prev.substring(0, pos) + text + prev.substring(pos);
-          // カーソル位置を更新
-          cursorPosRef.current = pos + text.length;
-          return newContent;
-        }
-        // どうしてもダメな場合は最後に追加
-        const newContent = prev + text;
-        cursorPosRef.current = newContent.length;
+        const pos = cursorPosRef.current; // 保存されているカーソル位置を使用
+        // カーソル位置が有効範囲内か確認
+        const safePos = Math.max(0, Math.min(pos, prev.length));
+        const newContent = prev.substring(0, safePos) + text + prev.substring(safePos);
+        // カーソル位置を更新
+        cursorPosRef.current = safePos + text.length;
+        console.log("AIコンテンツ挿入 (Fallback):", text, " 新カーソル位置:", cursorPosRef.current);
         return newContent;
       });
 
     } catch (error) {
       console.error("AIコンテンツ挿入エラー:", error);
       // フォールバック: テキストの最後に追加
-      setMarkdownContent(prev => prev + text);
+      setMarkdownContent(prev => {
+         const newContent = prev + text;
+         cursorPosRef.current = newContent.length; // カーソル位置を最後に設定
+         return newContent;
+      });
     }
-  }, [cursorPosRef.current]);
+  // 依存配列に cursorPosRef.current を含めない
+  }, [setMarkdownContent]);
+
+  // EditorView.updateListenerを含む拡張機能
+  const editorExtensions = useMemo(() => [
+    markdown({ base: markdownLanguage, codeLanguages: languages }),
+    EditorView.lineWrapping,
+    EditorView.updateListener.of((update) => {
+      if (update.selectionSet || update.docChanged) { // selectionSet または docChanged で発火
+        // viewRef.currentがnullの場合や、ビューがフォーカスされていない場合は処理しない
+        if (update.view.hasFocus) {
+           handleCursorUpdate(update.view);
+        } else {
+           // フォーカスがない場合でも、外部からの変更などでカーソル位置が変わる可能性がある
+           // 必要に応じて handleCursorUpdate を呼ぶか、Refを直接更新する
+           // cursorPosRef.current = update.state.selection.main.head;
+        }
+      }
+    })
+  ], [handleCursorUpdate]); // handleCursorUpdate を依存配列に追加
 
   // エディタコンポーネント
   const EditorComponent = (
     <CodeMirror
       value={markdownContent}
       height="100%"
-      extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
+      extensions={editorExtensions} // 更新された拡張機能を使用
       onChange={handleContentChange}
       theme={isDarkMode ? vscodeDark : xcodeLight}
       className={`text-md ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}
+      onCreateEditor={(view, state) => { // onCreateEditorを追加
+        viewRef.current = view; // viewRefを設定
+        console.log("CodeMirror editor instance created and viewRef set.");
+        // 初期カーソル位置を設定・更新
+        handleCursorUpdate(view);
+      }}
       basicSetup={{
         lineNumbers: true,
         highlightActiveLine: true,
@@ -760,6 +764,14 @@ export default function MarkdownEditor() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Image</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClearContent}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>エディタの内容をクリア</TooltipContent>
               </Tooltip>
             </div>
           </div>
