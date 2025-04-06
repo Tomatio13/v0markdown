@@ -92,3 +92,121 @@
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
+/* CodeMirrorスタイルのダークモード対応 */
+.dark .cm-editor, 
+.dark .cm-scroller,
+.dark .cm-content,
+.dark .cm-line {
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+}
+
+/* CodeMirrorのエディタコンテンツ領域のスタイル */
+.cm-editor .cm-scroller,
+.cm-editor .cm-content {
+  background-color: inherit !important;
+}
+
+/* CodeMirrorの行のスタイル */
+.cm-editor .cm-line {
+  background-color: inherit !important;
+  padding: 0 4px 0 8px;
+}
+
+/* VSCodeダークテーマのカーソルスタイル */
+.dark .cm-cursor {
+  border-left-color: #f8f8f0 !important;
+}
+
+/* 選択範囲のハイライト */
+.dark .cm-selectionBackground, 
+.dark .cm-content ::selection {
+  background-color: rgba(55, 55, 55, 0.5) !important;
+}
+
+/* ライトモード時の背景色設定 */
+.cm-editor, 
+.cm-scroller,
+.cm-content,
+.cm-line {
+  background-color: white !important;
+}
+
+/* コンテナスタイルの明示的な設定 */
+.h-\[calc\(100vh-8rem\)\] {
+  background-color: inherit;
+}
+
+/* プレビューエリアのダークモード対応 */
+.dark .prose {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+}
+
+/* コードブロックのダークモード対応 */
+.dark .prose pre {
+  background-color: #000000 !important; /* 黒背景 */
+  border: none; /* 境界線を削除 */
+  border-radius: 6px;
+  margin: 1em 0;
+}
+
+.dark .prose code {
+  color: #d4d4d4;
+}
+
+/* シンタックスハイライターのダークモード対応 */
+.dark pre[class*="language-"] {
+  background-color: #000000 !important; /* 黒背景 */
+  border: none; /* 境界線を削除 */
+}
+
+/* インラインコードのダークモード対応 */
+.dark .prose :not(pre) > code {
+  background-color: #000000;
+  color: #d4d4d4;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  border: none; /* 境界線を削除 */
+  font-size: 0.875em;
+}
+
+/* シンタックスハイライトの色調整 */
+.dark .token.keyword { color: #569CD6 !important; } /* キーワード（import, as など） */
+.dark .token.string { color: #CE9178 !important; } /* 文字列 */
+.dark .token.function { color: #DCDCAA !important; } /* 関数名 */
+.dark .token.comment { color: #6A9955 !important; } /* コメント */
+.dark .token.class-name { color: #4EC9B0 !important; } /* クラス名 */
+.dark .token.operator { color: #D4D4D4 !important; } /* 演算子 */
+.dark .token.number { color: #B5CEA8 !important; } /* 数値 */
+.dark .token.builtin { color: #4EC9B0 !important; } /* 組み込み関数/オブジェクト */
+.dark .token.punctuation { color: #D4D4D4 !important; } /* 句読点 */
+.dark .token.property { color: #9CDCFE !important; } /* プロパティ */
+
+/* コードブロックの言語表示 */
+.code-language {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  display: inline-block;
+  margin-bottom: -5px;
+  position: relative;
+  top: 1px;
+}
+
+.dark-language {
+  background-color: #333333;
+  color: #d4d4d4;
+  border: 1px solid #444444;
+  border-bottom: none;
+}
+
+.light-language {
+  background-color: #f5f5f5;
+  color: #333333;
+  border: 1px solid #e0e0e0;
+  border-bottom: none;
+}
+

@@ -25,6 +25,8 @@ import {
   Sun,
   Smile,
   Box,
+  MessageSquare,
+  SplitSquareVertical
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -40,6 +42,8 @@ import { markdown } from "@codemirror/lang-markdown"
 import { EmojiPicker } from "./emoji-picker"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
 import MermaidDiagram from "./mermaid-diagram"
+import { AIChat } from "./ai-chat"
+import { TripleLayout } from "./triple-layout"
 
 // File System Access API の型定義
 declare global {
@@ -69,6 +73,7 @@ export default function MarkdownEditor() {
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
   const [isSaving, setIsSaving] = useState(false)
+  const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple'>('split')
 
   const insertText = (before: string, after = "") => {
     // For CodeMirror, we'll need to use the editor's API
@@ -438,11 +443,168 @@ export default function MarkdownEditor() {
     document.documentElement.classList.toggle('dark')
   }
 
+  // マークダウンコンテンツが変更されたときの処理
+  const handleContentChange = useCallback((value: string) => {
+    setMarkdownContent(value)
+  }, [])
+
+  // AIからのコンテンツをエディタに挿入
+  const handleAIContentInsert = useCallback((text: string) => {
+    try {
+      // 1. viewRefを経由した挿入を試みる
+      if (viewRef.current) {
+        // @ts-ignore - TypeScriptエラーを無視 (必要であれば型アサーションを検討)
+        viewRef.current.dispatch({
+          changes: {
+            from: cursorPosRef.current,
+            to: cursorPosRef.current,
+            insert: text
+          }
+        });
+        // カーソル位置を更新
+        cursorPosRef.current += text.length;
+        return;
+      }
+
+      // 2. エディタのコンテンツエリアを探して挿入を試みる (型ガードを追加)
+      const contentArea = document.querySelector('.cm-content');
+      if (contentArea instanceof HTMLElement && contentArea.isContentEditable) {
+        // contentEditableな要素に挿入
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(text));
+          selection.collapseToEnd();
+
+          // エディタの内容を取得して状態を更新
+          if (contentArea.textContent !== null) {
+            setMarkdownContent(contentArea.textContent);
+          }
+          return;
+        }
+      }
+
+      // 3. 最終手段: カーソル位置をトラッキングして直接テキストを更新
+      setMarkdownContent(prev => {
+        const pos = cursorPosRef.current;
+        if (pos >= 0 && pos <= prev.length) {
+          const newContent = prev.substring(0, pos) + text + prev.substring(pos);
+          // カーソル位置を更新
+          cursorPosRef.current = pos + text.length;
+          return newContent;
+        }
+        // どうしてもダメな場合は最後に追加
+        const newContent = prev + text;
+        cursorPosRef.current = newContent.length;
+        return newContent;
+      });
+
+    } catch (error) {
+      console.error("AIコンテンツ挿入エラー:", error);
+      // フォールバック: テキストの最後に追加
+      setMarkdownContent(prev => prev + text);
+    }
+  }, [cursorPosRef.current]);
+
+  // エディタコンポーネント
+  const EditorComponent = (
+    <CodeMirror
+      value={markdownContent}
+      height="100%"
+      extensions={[markdown({ base: markdownLanguage, codeLanguages: languages }), EditorView.lineWrapping]}
+      onChange={handleContentChange}
+      theme={isDarkMode ? vscodeDark : xcodeLight}
+      className={`text-md ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}
+      basicSetup={{
+        lineNumbers: true,
+        highlightActiveLine: true,
+        highlightSpecialChars: true,
+        foldGutter: true,
+        drawSelection: true,
+        dropCursor: true,
+        allowMultipleSelections: true,
+        indentOnInput: true,
+        syntaxHighlighting: true,
+      }}
+    />
+  )
+
+  // プレビューコンポーネント
+  const PreviewComponent = (
+    <div
+      ref={splitPreviewRef}
+      className={`prose prose-sm max-w-none h-full overflow-auto p-4 ${
+        isDarkMode ? 'prose-invert bg-gray-900' : 'bg-white'
+      }`}
+    >
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // @ts-ignore - ライブラリの型定義の問題を無視
+          code({ node, inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || "")
+
+            // Mermaidダイアグラムの処理
+            if (!inline && match && match[1] === 'mermaid') {
+              const chartContent = String(children).replace(/\n$/, "").trim();
+              if (!chartContent) {
+                return (
+                  <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
+                    図のコードが空です
+                  </div>
+                );
+              }
+              // ここで MermaidDiagram コンポーネントを使う
+              return (
+                 <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
+                    <MermaidDiagram chart={chartContent} />
+                 </div>
+              )
+            }
+
+            return !inline && match ? (
+              <div>
+                {match[1] !== 'mermaid' && (
+                  <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
+                    {match[1]}
+                  </div>
+                )}
+                <SyntaxHighlighter
+                  // @ts-ignore - ライブラリの型定義の問題を無視
+                  style={vscDarkPlus} // Use dark mode theme directly for now
+                  language={match[1]}
+                  PreTag="div"
+                  customStyle={isDarkMode ? { 
+                    backgroundColor: '#000000', 
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '1em',
+                    margin: '1em 0'
+                  } : {}}
+                  {...props}
+                >
+                  {String(children).replace(/\n$/, "")}
+                </SyntaxHighlighter>
+              </div>
+            ) : (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            )
+          },
+        }}
+      >
+        {markdownContent}
+      </ReactMarkdown>
+    </div>
+  )
+
   return (
-    <Tabs defaultValue="split" className="w-full flex flex-col gap-2 sm:gap-4">
-      <div className="flex flex-wrap items-center justify-between">
+    <div className={`h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+      <div className="bg-muted p-2 flex justify-between items-center mb-2 rounded-md">
         <TooltipProvider>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex space-x-1">
             {/* Headings */}
             <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
               <Tooltip>
@@ -592,15 +754,70 @@ export default function MarkdownEditor() {
               </Tooltip>
             </div>
           </div>
+        </TooltipProvider>
 
-          {/* Tabs and Actions */}
-          <div className="flex items-center space-x-3">
-            {/* Tab controls */}
-            <TabsList className="bg-gray-50 dark:bg-gray-800 h-8">
-              <TabsTrigger value="split" className="px-2 text-xs">Split</TabsTrigger>
-              <TabsTrigger value="edit" className="px-2 text-xs">Edit</TabsTrigger>
-              <TabsTrigger value="preview" className="px-2 text-xs">Preview</TabsTrigger>
-            </TabsList>
+        <TooltipProvider>
+          <div className="flex space-x-2">
+            {/* ビューモード切り替えボタン */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'editor' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('editor')}
+                  >
+                    <Code size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>エディタのみ表示</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'preview' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('preview')}
+                  >
+                    <Box size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>プレビューのみ表示</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'split' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('split')}
+                  >
+                    <SplitSquareVertical size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>エディタとプレビューを分割表示</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'triple' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('triple')}
+                  >
+                    <MessageSquare size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>AIチャット表示</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Actions */}
             <div className="flex items-center space-x-2">
@@ -636,268 +853,40 @@ export default function MarkdownEditor() {
         </TooltipProvider>
       </div>
 
-      <TabsContent value="split" className="mt-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="h-full">
-            <CardContent className="p-4 h-full">
-              <ContextMenu>
-                <ContextMenuTrigger
-                  onContextMenu={() => {
-                    // 右クリック時にカーソル位置を保存
-                    if (viewRef.current) {
-                      handleCursorUpdate(viewRef.current);
-                    }
-                  }}
-                >
-                  <CodeMirror
-                    value={markdownContent}
-                    onChange={(value) => {
-                      setMarkdownContent(value);
-                      // テキストが変更された場合にカーソル位置を確認（オプション）
-                      if (viewRef.current) {
-                        handleCursorUpdate(viewRef.current);
-                      }
-                    }}
-                    height="calc(100vh - 230px)"
-                    extensions={[
-                      markdown({ base: markdownLanguage, codeLanguages: languages }),
-                      EditorView.lineWrapping,
-                      EditorView.updateListener.of(update => {
-                        // カーソル位置やセレクションが変更されたとき
-                        if (update.selectionSet || update.docChanged) { // ドキュメント変更時も更新
-                          handleCursorUpdate(update.view);
-                        }
-                      })
-                    ]}
-                    theme={isDarkMode ? vscodeDark : xcodeLight}
-                    className="border-none"
-                    // onCreateEditor の引数を修正
-                    onCreateEditor={(view, state) => {
-                      console.log("エディタが作成されました");
-                      editorRef.current = view; // editorRef に view を設定 (用途に応じて)
-
-                      // エディタビューを取得して保存
-                      if (view) {
-                        console.log("エディタビューを取得しました");
-                        viewRef.current = view;
-
-                        // 初期カーソル位置をテキスト末尾に設定
-                        cursorPosRef.current = state.doc.length; // state からドキュメント長を取得
-                        // 必要であれば初期フォーカスを設定
-                        // view.focus();
-                      } else {
-                        console.warn("エディタビューを取得できませんでした");
-                        // フォールバック処理 (現状維持または改善)
-                        setTimeout(() => {
-                           const editorElement = document.querySelector('.cm-editor');
-                           if (editorElement) {
-                             try {
-                               // @ts-ignore - CodeMirror内部実装
-                               const fallbackView = editorElement['__view'];
-                               if (fallbackView) {
-                                 console.log("DOMからエディタビューを取得しました");
-                                 viewRef.current = fallbackView;
-                                 handleCursorUpdate(fallbackView);
-                               }
-                             } catch (error) {
-                               console.error("DOMからのビュー取得エラー:", error);
-                             }
-                           }
-                         }, 200);
-                      }
-                    }}
-                  />
-                </ContextMenuTrigger>
-                <ContextMenuContent className="min-w-[300px]">
-                  <EmojiPicker onEmojiSelect={insertEmoji} />
-                </ContextMenuContent>
-              </ContextMenu>
-            </CardContent>
-          </Card>
-          <Card className="h-full">
-            <CardContent className="p-4 h-full">
-              <div ref={splitPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    // @ts-ignore - ライブラリの型定義の問題を無視
-                    code({ node, inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || "")
-
-                      // Mermaidダイアグラムの処理
-                      if (!inline && match && match[1] === 'mermaid') {
-                        const chartContent = String(children).replace(/\n$/, "").trim();
-                        if (!chartContent) {
-                          return (
-                            <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
-                              図のコードが空です
-                            </div>
-                          );
-                        }
-                        // ここで MermaidDiagram コンポーネントを使う
-                        return (
-                           <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
-                            <MermaidDiagram chart={chartContent} />
-                           </div>
-                        )
-                      }
-
-                      return !inline && match ? (
-                        // @ts-ignore - ライブラリの型定義の問題を無視
-                        <SyntaxHighlighter
-                          // @ts-ignore - ライブラリの型定義の問題を無視
-                          style={vscDarkPlus} // Use dark mode theme directly for now
-                          language={match[1]}
-                          PreTag="div"
-                          {...props}
-                        >
-                          {String(children).replace(/\n$/, "")}
-                        </SyntaxHighlighter>
-                      ) : (
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      )
-                    },
-                  }}
-                >
-                  {markdownContent}
-                </ReactMarkdown>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="edit" className="mt-0">
-        <Card className="h-full">
-          <CardContent className="p-4 h-full">
-            <ContextMenu>
-              <ContextMenuTrigger
-                onContextMenu={() => {
-                  // 右クリック時にカーソル位置を保存
-                  handleCursorUpdate(viewRef.current)
-                }}
-              >
-                <CodeMirror
-                  value={markdownContent}
-                  onChange={(value) => {
-                    setMarkdownContent(value);
-                    // テキストが変更された場合にカーソル位置を確認（オプション）
-                    if (viewRef.current) {
-                      handleCursorUpdate(viewRef.current);
-                    }
-                  }}
-                  height="calc(100vh - 230px)"
-                  extensions={[
-                    markdown({ base: markdownLanguage, codeLanguages: languages }),
-                    EditorView.lineWrapping,
-                    EditorView.updateListener.of(update => {
-                      // カーソル位置やセレクションが変更されたとき
-                      if (update.selectionSet || update.docChanged) { // ドキュメント変更時も更新
-                        handleCursorUpdate(update.view);
-                      }
-                    })
-                  ]}
-                  theme={isDarkMode ? vscodeDark : xcodeLight}
-                  className="border-none"
-                  // onCreateEditor の引数を修正
-                  onCreateEditor={(view, state) => {
-                    editorRef.current = view; // editorRef に view を設定 (用途に応じて)
-
-                    // エディタビューを取得して保存
-                    if (view) {
-                      console.log("エディタビューを取得しました");
-                      viewRef.current = view;
-
-                      // 初期カーソル位置をテキスト末尾に設定
-                      cursorPosRef.current = state.doc.length; // state からドキュメント長を取得
-                    } else {
-                      console.warn("エディタビューを取得できませんでした");
-                      // フォールバック処理 (現状維持または改善)
-                      setTimeout(() => {
-                         const editorElement = document.querySelector('.cm-editor');
-                         if (editorElement) {
-                           try {
-                             // @ts-ignore - CodeMirror内部実装
-                             const fallbackView = editorElement['__view'];
-                             if (fallbackView) {
-                               console.log("DOMからエディタビューを取得しました");
-                               viewRef.current = fallbackView;
-                               handleCursorUpdate(fallbackView);
-                             }
-                           } catch (error) {
-                             console.error("DOMからのビュー取得エラー:", error);
-                           }
-                         }
-                       }, 200);
-                    }
-                  }}
-                />
-              </ContextMenuTrigger>
-              <ContextMenuContent className="min-w-[300px]">
-                <EmojiPicker onEmojiSelect={insertEmoji} />
-              </ContextMenuContent>
-            </ContextMenu>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="preview" className="mt-0">
-        <Card className="h-full">
-          <CardContent className="p-4 h-full">
-            <div ref={tabPreviewRef} className="prose prose-gray dark:prose-invert max-w-none h-[calc(100vh-230px)] overflow-auto">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  // @ts-ignore - ライブラリの型定義の問題を無視
-                  code({ node, inline, className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || "")
-
-                    // Mermaidダイアグラムの処理
-                    if (!inline && match && match[1] === 'mermaid') {
-                      const chartContent = String(children).replace(/\n$/, "").trim();
-                      if (!chartContent) {
-                        return (
-                          <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
-                            図のコードが空です
-                          </div>
-                        );
-                      }
-                      // ここで MermaidDiagram コンポーネントを使う
-                      return (
-                         <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
-                           <MermaidDiagram chart={chartContent} />
-                         </div>
-                      )
-                    }
-
-                    return !inline && match ? (
-                      // @ts-ignore - ライブラリの型定義の問題を無視
-                      <SyntaxHighlighter
-                        // @ts-ignore - ライブラリの型定義の問題を無視
-                        style={vscDarkPlus} // Use dark mode theme directly for now
-                        language={match[1]}
-                        PreTag="div"
-                        {...props}
-                      >
-                        {String(children).replace(/\n$/, "")}
-                      </SyntaxHighlighter>
-                    ) : (
-                      <code className={className} {...props}>
-                        {children}
-                      </code>
-                    )
-                  },
-                }}
-              >
-                {markdownContent}
-              </ReactMarkdown>
+      <div className="h-[calc(100%-3rem)]">
+        {viewMode === 'editor' && (
+          <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full`}>
+            {EditorComponent}
+          </div>
+        )}
+        
+        {viewMode === 'preview' && (
+          <div className={isDarkMode ? 'bg-gray-900 h-full' : 'bg-white h-full'}>
+            {PreviewComponent}
+          </div>
+        )}
+        
+        {viewMode === 'split' && (
+          <div className={`grid grid-cols-2 h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+            <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+              {EditorComponent}
             </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+            <div className={isDarkMode ? 'bg-gray-900' : 'bg-white'}>
+              {PreviewComponent}
+            </div>
+          </div>
+        )}
+        
+        {viewMode === 'triple' && (
+          <TripleLayout 
+            editorComponent={EditorComponent}
+            previewComponent={PreviewComponent}
+            onAIContentInsert={handleAIContentInsert}
+            isDarkMode={isDarkMode}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
