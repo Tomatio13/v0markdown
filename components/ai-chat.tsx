@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent } from '@/components/ui/card'
+import { useChat } from 'ai/react'
 
 interface Message {
   id: string;
@@ -19,72 +20,8 @@ interface AIChatProps {
 }
 
 export const AIChat = ({ onInsertToEditor, isDarkMode = false }: AIChatProps) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!input.trim() || isLoading) return;
-    
-    // ユーザーメッセージを追加
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-    
-    try {
-      // AIの応答を取得
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage].map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('AIからの応答でエラーが発生しました');
-      }
-      
-      const data = await response.json();
-      
-      // AIの応答を追加
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.content || '応答を生成できませんでした'
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('AIチャットエラー:', error);
-      // エラーメッセージを表示
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'エラーが発生しました。もう一度お試しください。'
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Vercel AI SDKのuseChatフックを使用
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat();
 
   const handleInsertToEditor = (text: string) => {
     if (onInsertToEditor) {
