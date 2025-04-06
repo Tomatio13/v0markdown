@@ -42,6 +42,7 @@ import { xcodeLight } from "@uiw/codemirror-theme-xcode"
 import { EditorView } from "@codemirror/view"
 import { markdown } from "@codemirror/lang-markdown"
 import { vim } from "@replit/codemirror-vim"
+import { keymap } from "@codemirror/view"
 import { EmojiPicker, EmojiContextMenu } from "./emoji-picker"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
 import MermaidDiagram from "./mermaid-diagram"
@@ -438,7 +439,32 @@ export default function MarkdownEditor() {
 
   // Vimモードの切り替え関数
   const toggleVimMode = () => {
-    setIsVimMode(!isVimMode)
+    const currentCursorPos = cursorPosRef.current;
+    setIsVimMode(!isVimMode);
+    setTimeout(() => {
+      if (viewRef.current) {
+        // viewRef.current.contentDOM.focus(); // デバッグ中はフォーカス移動を一旦コメントアウト
+        try {
+          const state = viewRef.current.state;
+          const transaction = state.update({
+            selection: {anchor: currentCursorPos, head: currentCursorPos}
+          });
+          viewRef.current.dispatch(transaction);
+          // モード切替後もデバッグ用枠線適用
+          console.log("Toggling Vim mode, applying debug borders.");
+          document.querySelectorAll('.cm-tooltip, .cm-panel, .cm-dialog, .cm-vimMode-command-dialog, .cm-search-panel')
+            .forEach(el => {
+               if (el instanceof HTMLElement) {
+                  el.style.setProperty('border', '2px solid orange', 'important'); // Vim切替時はオレンジ枠
+                  el.style.setProperty('visibility', 'visible', 'important');
+                  el.style.setProperty('opacity', '0.7', 'important');
+               }
+            });
+        } catch (error) {
+          console.error("カーソル位置の復元に失敗:", error);
+        }
+      }
+    }, 100);
   }
 
   // エディタの内容をクリアする関数
@@ -506,23 +532,114 @@ export default function MarkdownEditor() {
   }, [setMarkdownContent]);
 
   // EditorView.updateListenerを含む拡張機能
-  const editorExtensions = useMemo(() => [
-    markdown({ base: markdownLanguage, codeLanguages: languages }),
-    EditorView.lineWrapping,
-    ...(isVimMode ? [vim()] : []), // 条件付きでvim()を追加する方法を変更
-    EditorView.updateListener.of((update) => {
-      if (update.selectionSet || update.docChanged) { // selectionSet または docChanged で発火
-        // viewRef.currentがnullの場合や、ビューがフォーカスされていない場合は処理しない
-        if (update.view.hasFocus) {
-           handleCursorUpdate(update.view);
-        } else {
-           // フォーカスがない場合でも、外部からの変更などでカーソル位置が変わる可能性がある
-           // 必要に応じて handleCursorUpdate を呼ぶか、Refを直接更新する
-           // cursorPosRef.current = update.state.selection.main.head;
+  const editorExtensions = useMemo(() => {
+    const extensions = [
+      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      EditorView.lineWrapping,
+      EditorView.updateListener.of((update) => {
+        // エディタの更新時やフォーカス変更時にポップアップ/パネルに枠線をつける
+        if (update.docChanged || update.selectionSet || update.focusChanged || update.viewportChanged) {
+          setTimeout(() => {
+            // CodeMirrorが生成する可能性のある要素を広範囲に選択
+            document.querySelectorAll(
+              '.cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, .cm-vimMode-command-dialog, .cm-search-panel' // より広範なセレクタ
+            )
+            .forEach(el => {
+              if (el instanceof HTMLElement) {
+                 // デバッグ用に非表示ではなく、赤い枠線をつける
+                 el.style.setProperty('border', '1px solid red', 'important');
+                 // 一時的に表示を維持（ただし操作はできないように）
+                 el.style.setProperty('visibility', 'visible', 'important');
+                 el.style.setProperty('opacity', '0.5', 'important'); // 半透明にする
+                 el.style.setProperty('pointer-events', 'none', 'important');
+                 // 表示位置に関するスタイルは削除（本来の位置で見えるように）
+                 // el.style.removeProperty('position');
+                 // el.style.removeProperty('top');
+                 // el.style.removeProperty('left');
+                 // el.style.removeProperty('display');
+              }
+            });
+            // エディタにフォーカスを戻す
+            // viewRef.current?.contentDOM?.focus(); // デバッグ中はフォーカス移動を一旦コメントアウト
+          }, 50); // 遅延
         }
-      }
-    })
-  ], [handleCursorUpdate, isVimMode]); // isVimModeを依存配列に追加
+
+        // カーソル位置更新の処理
+        if (update.selectionSet || update.docChanged) {
+          if (update.view.hasFocus) {
+            handleCursorUpdate(update.view);
+          }
+        }
+      }),
+      // EditorView.theme でデバッグ用の枠線を追加
+      EditorView.theme({
+        ".cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, .cm-vimMode-command-dialog, .cm-search-panel, .cm-completion*, .cm-vim*, .cm-search*, .cm-popup": {
+           /* 非表示スタイルはコメントアウト */
+           /* display: "none !important", */
+           /* visibility: "hidden !important", */
+           /* opacity: "0 !important", */
+           /* pointerEvents: "none !important", */
+           /* position: "absolute !important", */
+           /* top: "-9999px !important", */
+           /* left: "-9999px !important", */
+           border: "1px dashed blue !important" // テーマによる枠線は青い破線
+         },
+      }),
+      // キー入力ハンドラ
+      EditorView.domEventHandlers({
+        keydown: (event, view) => {
+          // デバッグログ：押されたキーを出力
+          console.log(`Keydown: key=${event.key}, code=${event.code}, ctrl=${event.ctrlKey}, shift=${event.shiftKey}, alt=${event.altKey}, meta=${event.metaKey}`);
+
+          // Ctrl+Space は無効化
+          if (event.ctrlKey && (event.code === "Space" || event.key === " ")) {
+            console.log("Ctrl+Space intercepted.");
+            event.preventDefault();
+            return true;
+          }
+          
+          // Tabキーはスペースを挿入
+          if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            console.log("Tab key intercepted for indent.");
+            const pos = view.state.selection.main.head;
+            const spaces = "  ";
+            view.dispatch({
+              changes: { from: pos, to: pos, insert: spaces }
+            });
+            event.preventDefault();
+            return true;
+          }
+
+          // エスケープキーでポップアップ要素に赤い枠線をつける
+          if (event.key === "Escape") {
+            console.log("Escape key pressed, applying debug borders.");
+            setTimeout(() => {
+              document.querySelectorAll('.cm-tooltip, .cm-panel, .cm-dialog, .cm-vimMode-command-dialog, .cm-search-panel')
+                .forEach(el => {
+                  if (el instanceof HTMLElement) {
+                     el.style.setProperty('border', '2px solid red', 'important');
+                     el.style.setProperty('visibility', 'visible', 'important');
+                     el.style.setProperty('opacity', '0.7', 'important');
+                  }
+                });
+              // view.contentDOM.focus(); // デバッグ中はフォーカス移動を一旦コメントアウト
+            }, 10);
+            return false; // Vimの標準エスケープ処理を許可
+          }
+          
+          return false;
+        }
+      })
+    ];
+    
+    // Vimモードが有効な場合
+    if (isVimMode) {
+      // Vim拡張を追加 (status表示は無効)
+      extensions.push(vim({ status: false }));
+    }
+    
+    return extensions;
+  }, [handleCursorUpdate, isVimMode]);
 
   // エディタコンポーネント
   const EditorComponent = (
@@ -530,26 +647,73 @@ export default function MarkdownEditor() {
       <CodeMirror
         value={markdownContent}
         height="100%"
-        extensions={editorExtensions} // 更新された拡張機能を使用
+        extensions={editorExtensions}
         onChange={handleContentChange}
         theme={isDarkMode ? vscodeDark : xcodeLight}
         className={`text-md ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}
-        onCreateEditor={(view, state) => { // onCreateEditorを追加
-          viewRef.current = view; // viewRefを設定
+        onCreateEditor={(view, state) => {
+          viewRef.current = view;
           console.log("CodeMirror editor instance created and viewRef set.");
-          // 初期カーソル位置を設定・更新
           handleCursorUpdate(view);
+          
+          // CSSによるポップアップ非表示スタイルを削除またはコメントアウト
+          const styleId = 'codemirror-popup-hider';
+          let styleElement = document.getElementById(styleId);
+          if (styleElement) {
+             // 既存の非表示スタイルを削除
+             // styleElement.remove(); 
+             // またはデバッグ用に内容を書き換え
+             styleElement.textContent = `
+               /* Debug Styles - Apply borders to potential popups */
+               .cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, 
+               .cm-vimMode-command-dialog, .cm-search-panel, 
+               .cm-completion*, .cm-vim*, .cm-search*, .cm-popup {
+                 border: 1px solid lime !important; /* 初期状態は緑の枠線 */
+                 opacity: 0.8 !important; 
+                 pointer-events: auto !important; /* イベントを一時的に許可してデバッグしやすくする */
+                 /* visibility: visible !important; */ /* 必要ならコメント解除 */
+               }
+             `;
+          } else {
+             // 新しくデバッグ用スタイルを作成
+             styleElement = document.createElement('style');
+             styleElement.id = styleId;
+             styleElement.textContent = `
+               /* Debug Styles - Apply borders to potential popups */
+               .cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, 
+               .cm-vimMode-command-dialog, .cm-search-panel, 
+               .cm-completion*, .cm-vim*, .cm-search*, .cm-popup {
+                 border: 1px solid lime !important; /* 初期状態は緑の枠線 */
+                 opacity: 0.8 !important; 
+                 pointer-events: auto !important; /* イベントを一時的に許可してデバッグしやすくする */
+                 /* visibility: visible !important; */ /* 必要ならコメント解除 */
+               }
+             `;
+             document.head.appendChild(styleElement);
+          }
+          // 初期フォーカス設定
+          // view.contentDOM.focus(); // デバッグ中は一旦コメントアウト
         }}
+        // basicSetup は前回修正した最小限の状態を維持
         basicSetup={{
           lineNumbers: true,
-          highlightActiveLine: true,
-          highlightSpecialChars: true,
-          foldGutter: true,
-          drawSelection: true,
-          dropCursor: true,
-          allowMultipleSelections: true,
-          indentOnInput: true,
-          syntaxHighlighting: true,
+          /* highlightActiveLine: false, */
+          /* highlightSpecialChars: false, */
+          /* foldGutter: false, */
+          /* drawSelection: false, */
+          /* dropCursor: false, */
+          allowMultipleSelections: true, 
+          /* indentOnInput: false, */
+          syntaxHighlighting: true, 
+          autocompletion: false, 
+          tabSize: 2,
+          /* highlightSelectionMatches: false, */
+          /* closeBrackets: false, */
+          /* searchKeymap: false, */
+          /* completionKeymap: false, */
+          /* historyKeymap: false, */
+          /* foldKeymap: false, */
+          /* lintKeymap: false, */
         }}
       />
     </EmojiContextMenu>
