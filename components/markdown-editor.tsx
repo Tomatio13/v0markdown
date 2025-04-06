@@ -42,12 +42,13 @@ import { xcodeLight } from "@uiw/codemirror-theme-xcode"
 import { EditorView } from "@codemirror/view"
 import { markdown } from "@codemirror/lang-markdown"
 import { vim } from "@replit/codemirror-vim"
-import { EmojiPicker } from "./emoji-picker"
+import { EmojiPicker, EmojiContextMenu } from "./emoji-picker"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
 import MermaidDiagram from "./mermaid-diagram"
 import { AIChat } from "./ai-chat"
 import { TripleLayout } from "./triple-layout"
 import { useChat } from 'ai/react'
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // File System Access API の型定義
 declare global {
@@ -525,31 +526,33 @@ export default function MarkdownEditor() {
 
   // エディタコンポーネント
   const EditorComponent = (
-    <CodeMirror
-      value={markdownContent}
-      height="100%"
-      extensions={editorExtensions} // 更新された拡張機能を使用
-      onChange={handleContentChange}
-      theme={isDarkMode ? vscodeDark : xcodeLight}
-      className={`text-md ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}
-      onCreateEditor={(view, state) => { // onCreateEditorを追加
-        viewRef.current = view; // viewRefを設定
-        console.log("CodeMirror editor instance created and viewRef set.");
-        // 初期カーソル位置を設定・更新
-        handleCursorUpdate(view);
-      }}
-      basicSetup={{
-        lineNumbers: true,
-        highlightActiveLine: true,
-        highlightSpecialChars: true,
-        foldGutter: true,
-        drawSelection: true,
-        dropCursor: true,
-        allowMultipleSelections: true,
-        indentOnInput: true,
-        syntaxHighlighting: true,
-      }}
-    />
+    <EmojiContextMenu onEmojiSelect={insertEmoji}>
+      <CodeMirror
+        value={markdownContent}
+        height="100%"
+        extensions={editorExtensions} // 更新された拡張機能を使用
+        onChange={handleContentChange}
+        theme={isDarkMode ? vscodeDark : xcodeLight}
+        className={`text-md ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}
+        onCreateEditor={(view, state) => { // onCreateEditorを追加
+          viewRef.current = view; // viewRefを設定
+          console.log("CodeMirror editor instance created and viewRef set.");
+          // 初期カーソル位置を設定・更新
+          handleCursorUpdate(view);
+        }}
+        basicSetup={{
+          lineNumbers: true,
+          highlightActiveLine: true,
+          highlightSpecialChars: true,
+          foldGutter: true,
+          drawSelection: true,
+          dropCursor: true,
+          allowMultipleSelections: true,
+          indentOnInput: true,
+          syntaxHighlighting: true,
+        }}
+      />
+    </EmojiContextMenu>
   )
 
   // プレビューコンポーネント
@@ -673,23 +676,16 @@ export default function MarkdownEditor() {
                 </TooltipTrigger>
                 <TooltipContent>Italic</TooltipContent>
               </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                    // スマイルボタンをクリックしたときの挙動（オプション）
-                    const dummyEvent = new MouseEvent('contextmenu', {
-                      bubbles: true,
-                      cancelable: true,
-                      clientX: 100,
-                      clientY: 100,
-                    });
-                    document.querySelector('.cm-content')?.dispatchEvent(dummyEvent);
-                  }}>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Smile className="h-4 w-4" />
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>絵文字を挿入</TooltipContent>
-              </Tooltip>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0">
+                  <EmojiPicker onEmojiSelect={insertEmoji} />
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Lists */}
