@@ -27,7 +27,8 @@ import {
   Box,
   MessageSquare,
   SplitSquareVertical,
-  Trash2
+  Trash2,
+  Terminal
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -40,6 +41,7 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode"
 import { xcodeLight } from "@uiw/codemirror-theme-xcode"
 import { EditorView } from "@codemirror/view"
 import { markdown } from "@codemirror/lang-markdown"
+import { vim } from "@replit/codemirror-vim"
 import { EmojiPicker } from "./emoji-picker"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
 import MermaidDiagram from "./mermaid-diagram"
@@ -71,6 +73,7 @@ export default function MarkdownEditor() {
   const splitPreviewRef = useRef<HTMLDivElement>(null)
   const tabPreviewRef = useRef<HTMLDivElement>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isVimMode, setIsVimMode] = useState(false)
   const editorRef = useRef<EditorView | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
@@ -432,6 +435,11 @@ export default function MarkdownEditor() {
     document.documentElement.classList.toggle('dark')
   }
 
+  // Vimモードの切り替え関数
+  const toggleVimMode = () => {
+    setIsVimMode(!isVimMode)
+  }
+
   // エディタの内容をクリアする関数
   const handleClearContent = useCallback(() => {
     setMarkdownContent("");
@@ -500,6 +508,7 @@ export default function MarkdownEditor() {
   const editorExtensions = useMemo(() => [
     markdown({ base: markdownLanguage, codeLanguages: languages }),
     EditorView.lineWrapping,
+    ...(isVimMode ? [vim()] : []), // 条件付きでvim()を追加する方法を変更
     EditorView.updateListener.of((update) => {
       if (update.selectionSet || update.docChanged) { // selectionSet または docChanged で発火
         // viewRef.currentがnullの場合や、ビューがフォーカスされていない場合は処理しない
@@ -512,7 +521,7 @@ export default function MarkdownEditor() {
         }
       }
     })
-  ], [handleCursorUpdate]); // handleCursorUpdate を依存配列に追加
+  ], [handleCursorUpdate, isVimMode]); // isVimModeを依存配列に追加
 
   // エディタコンポーネント
   const EditorComponent = (
@@ -868,6 +877,15 @@ export default function MarkdownEditor() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{isDarkMode ? "ライトモードに切り替え" : "ダークモードに切り替え"}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={toggleVimMode} className="h-8 gap-1">
+                    <Terminal className="h-4 w-4" />
+                    <span className="hidden sm:inline">{isVimMode ? "Vim:ON" : "Vim:OFF"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isVimMode ? "Vimモードをオフにする" : "Vimモードをオンにする"}</TooltipContent>
               </Tooltip>
             </div>
           </div>
