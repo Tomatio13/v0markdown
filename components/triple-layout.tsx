@@ -37,23 +37,17 @@ export const TripleLayout = ({
       />
       
       {/* AIチャットパネル */}
-      <ResizablePanel defaultSize={50} minSize={30} className={isDarkMode ? 'bg-gray-900' : 'bg-white'}>
-        <div className={`h-full flex flex-col ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'}`}>
-          {/* タイトル表示を削除 */}
-          
-          <div className="flex-1 overflow-hidden">
-            <AIChat 
-              onInsertToEditor={onAIContentInsert}
-              isDarkMode={isDarkMode}
-              messages={messages}
-              input={input}
-              handleInputChange={handleInputChange}
-              handleSubmit={handleSubmit}
-              isLoading={isLoading}
-              clearMessages={clearMessages}
-            />
-          </div>
-        </div>
+      <ResizablePanel defaultSize={50} minSize={30} className={isDarkMode ? 'bg-[#2c2c2c]' : 'bg-gray-100'}>
+        <AIChat 
+          onInsertToEditor={onAIContentInsert}
+          isDarkMode={isDarkMode}
+          messages={messages}
+          input={input}
+          handleInputChange={handleInputChange}
+          handleSubmit={handleSubmit}
+          isLoading={isLoading}
+          clearMessages={clearMessages}
+        />
       </ResizablePanel>
     </ResizablePanelGroup>
   )

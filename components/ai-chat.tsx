@@ -32,46 +32,48 @@ export const AIChat = ({
   };
 
   return (
-    <div className={`flex flex-col h-full ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'}`}>
+    <div className={`flex flex-col h-full ${isDarkMode ? 'bg-[#2c2c2c] text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
       <div className={`flex justify-between items-center px-4 py-2 ${isDarkMode ? 'border-b border-gray-700' : 'border-b border-gray-200'}`}>
-        <h3 className="text-lg font-medium">AIチャット</h3>
+        <h3 className="text-base font-semibold">AIチャット</h3>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={clearMessages}
           disabled={isLoading || messages.length === 0}
-          className={`${isDarkMode ? 'border-gray-600 hover:bg-gray-700' : ''}`}
+          className={`text-xs px-2 py-1 ${isDarkMode ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-200'}`}
         >
-          <Trash2 className="mr-2 h-4 w-4" />
+          <Trash2 className="mr-1 h-3.5 w-3.5" />
           クリア
         </Button>
       </div>
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+        <div className="space-y-3">
           {messages.map((message) => (
-            <Card 
-              key={message.id} 
+            <Card
+              key={message.id}
               className={`
-                ${message.role === 'user' 
-                  ? isDarkMode 
-                    ? 'bg-blue-900/30 ml-8 border-blue-800' 
-                    : 'bg-primary/10 ml-8' 
-                  : isDarkMode 
-                    ? 'bg-gray-800 mr-8 border-gray-700' 
-                    : 'bg-muted mr-8'
+                max-w-[90%] rounded-lg shadow-sm
+                ${message.role === 'user'
+                  ? isDarkMode
+                    ? 'bg-[#3a3d41] ml-auto'
+                    : 'bg-blue-50 ml-auto'
+                  : isDarkMode
+                    ? 'bg-[#3a3d41] mr-auto'
+                    : 'bg-white mr-auto'
                 }
+                ${isDarkMode ? 'border-none' : 'border border-gray-200'}
               `}
             >
               <CardContent className="p-3">
                 <div>
-                  <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
                 </div>
-                {message.role === 'assistant' && (
+                {message.role === 'assistant' && !isLoading && (
                   <Button
                     size="sm"
-                    variant={isDarkMode ? "secondary" : "ghost"}
+                    variant="ghost"
                     onClick={() => handleInsertToEditor(message.content)}
-                    className="mt-2 text-xs"
+                    className={`mt-2 text-xs px-2 py-1 ${isDarkMode ? 'text-blue-400 hover:bg-gray-600' : 'text-blue-600 hover:bg-gray-100'}`}
                   >
                     エディタに挿入
                   </Button>
@@ -80,29 +82,33 @@ export const AIChat = ({
             </Card>
           ))}
           {isLoading && (
-            <Card className={isDarkMode ? "bg-gray-800 mr-8 border-gray-700" : "bg-muted mr-8"}>
+            <Card className={`max-w-[90%] mr-auto rounded-lg shadow-sm ${isDarkMode ? 'bg-[#3a3d41] border-none' : 'bg-white border border-gray-200'}`}>
               <CardContent className="p-3">
-                <p className="text-sm">回答を生成中...</p>
+                <p className="text-sm animate-pulse">回答を生成中...</p>
               </CardContent>
             </Card>
           )}
         </div>
       </ScrollArea>
       
-      <form onSubmit={handleSubmit} className={`p-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-        <div className="flex gap-2">
+      <form onSubmit={handleSubmit} className={`p-4 border-t ${isDarkMode ? 'border-gray-700 bg-[#2c2c2c]' : 'border-gray-200 bg-gray-100'}`}>
+        <div className="flex items-center gap-2">
           <Input
             value={input}
             onChange={handleInputChange}
             placeholder="AIに質問する..."
-            className={`flex-1 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : ''}`}
+            className={`flex-1 rounded-md text-sm ${isDarkMode ? 'bg-[#3a3d41] border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
             disabled={isLoading}
           />
-          <Button 
-            type="submit" 
-            size="icon" 
+          <Button
+            type="submit"
+            size="icon"
             disabled={isLoading || !input.trim()}
-            variant={isDarkMode ? "secondary" : "default"}
+            className={`rounded-md ${
+              isDarkMode
+                ? 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-500'
+                : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400'
+            }`}
           >
             <Send size={18} />
           </Button>
