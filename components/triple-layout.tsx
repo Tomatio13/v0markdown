@@ -10,6 +10,8 @@ interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 
   onAIContentInsert: (text: string) => void
   isDarkMode?: boolean
   clearMessages: () => void
+  driveEnabled?: boolean
+  driveFileListComponent?: React.ReactNode
 }
 
 export const TripleLayout = ({ 
@@ -23,11 +25,30 @@ export const TripleLayout = ({
   handleSubmit,
   isLoading,
   clearMessages,
+  driveEnabled = false,
+  driveFileListComponent
 }: TripleLayoutProps) => {
   return (
     <ResizablePanelGroup direction="horizontal" className={`h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+      {/* Google Driveパネル（有効時のみ表示） */}
+      {driveEnabled && driveFileListComponent && (
+        <>
+          <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+            {driveFileListComponent}
+          </ResizablePanel>
+          <ResizableHandle 
+            withHandle 
+            className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+          />
+        </>
+      )}
+      
       {/* エディタパネル */}
-      <ResizablePanel defaultSize={50} minSize={30} className={isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}>
+      <ResizablePanel 
+        defaultSize={driveEnabled ? 50 : 50} 
+        minSize={30} 
+        className={isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}
+      >
         {editorComponent}
       </ResizablePanel>
       
@@ -37,7 +58,11 @@ export const TripleLayout = ({
       />
       
       {/* AIチャットパネル */}
-      <ResizablePanel defaultSize={50} minSize={30} className={isDarkMode ? 'bg-[#2c2c2c]' : 'bg-gray-100'}>
+      <ResizablePanel 
+        defaultSize={driveEnabled ? 35 : 50} 
+        minSize={30} 
+        className={isDarkMode ? 'bg-[#2c2c2c]' : 'bg-gray-100'}
+      >
         <AIChat 
           onInsertToEditor={onAIContentInsert}
           isDarkMode={isDarkMode}

@@ -28,7 +28,8 @@ import {
   MessageSquare,
   SplitSquareVertical,
   Trash2,
-  Terminal
+  Terminal,
+  Upload
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -50,6 +51,12 @@ import { AIChat } from "./ai-chat"
 import { TripleLayout } from "./triple-layout"
 import { useChat } from 'ai/react'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import type { GoogleFile } from '@/lib/types'
+import { v4 as uuidv4 } from 'uuid'
+import { Switch } from "@/components/ui/switch"
+import GoogleAuth from "./google-auth"
+import GoogleDriveFileList from "./google-drive-file-list"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
 // File System Access API の型定義
 declare global {
@@ -82,13 +89,127 @@ export default function MarkdownEditor() {
   const [isSaving, setIsSaving] = useState(false)
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple'>('split')
 
-  // useChatフックをMarkdownEditorに移動
+  // Google Drive連携関連の状態 (accessToken のみ保持)
+  const [driveEnabled, setDriveEnabled] = useState(false)
+  const [accessToken, setAccessToken] = useState<string | null>(null) // driveService の代わりに accessToken
+  const [selectedFile, setSelectedFile] = useState<GoogleFile | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false) // 認証状態は引き続き管理
+
+  // useChatフック
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat();
 
   // チャットクリア関数
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, [setMessages]);
+
+  // Google認証状態が変更されたときのハンドラ (accessToken をセット)
+  const handleAuthChange = useCallback((authenticated: boolean, token?: string) => {
+    setIsAuthenticated(authenticated)
+    setAccessToken(token || null) // トークンを状態に保存
+    if (!authenticated) {
+      setSelectedFile(null) // ログアウト時に選択ファイルをクリア
+    }
+  }, [])
+
+  // Google Drive連携の有効/無効を切り替えるハンドラ
+  const handleDriveToggle = useCallback((enabled: boolean) => {
+    setDriveEnabled(enabled)
+    if (!enabled) {
+      setSelectedFile(null)
+    }
+  }, [])
+
+  // Google Driveからファイルを選択したときのハンドラ (API Route を fetch)
+  const handleFileSelect = useCallback(async (file: GoogleFile) => {
+    if (!accessToken) return
+
+    try {
+      const response = await fetch(`/api/drive/read?fileId=${file.id}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      // テキストコンテンツを取得
+      const content = await response.text()
+
+      setMarkdownContent(content)
+      setSelectedFile(file)
+    } catch (error: any) {
+      console.error('ファイル読み込みエラー:', error)
+      alert(error.message || 'ファイルを読み込めませんでした')
+    } finally {
+      // 必要であればローディング状態を解除
+    }
+  }, [accessToken])
+
+  // Google Driveにファイルを保存するハンドラ (API Route を fetch)
+  const handleDriveSave = useCallback(async () => {
+    if (!accessToken) return
+
+    setIsSaving(true)
+
+    try {
+      // 1. Markdownの最初の行を取得
+      const firstLine = markdownContent.split('\n')[0] || '';
+      // 2. 見出し記号を除去し、トリム
+      let baseName = firstLine.replace(/^#+\s*/, '').trim();
+      // 3. スペースを除去
+      baseName = baseName.replace(/\s+/g, '');
+      // 4. ファイル名に使えない文字を置換
+      baseName = baseName.replace(/[\/]/g, '_'); 
+
+      // 5. ファイル名が空でないか確認、空ならデフォルト名
+      const potentialFileName = baseName ? `${baseName}.md` : '';
+
+      // 選択中のファイル名、または生成したファイル名、またはデフォルト名を使用
+      const fileName = selectedFile?.name || potentialFileName || `untitled-${uuidv4().substring(0, 8)}.md`;
+      
+      const method = selectedFile ? 'PUT' : 'POST' // 既存ファイルはPUT、新規はPOST
+
+      const response = await fetch('/api/drive/save', {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          name: fileName, // 生成したファイル名を使用
+          content: markdownContent,
+          fileId: selectedFile?.id // 更新時のみ fileId を送信
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const savedFileData = await response.json()
+      console.log('Google Driveに保存しました:', savedFileData)
+
+      // 選択ファイル情報を更新 (IDと更新日時を含む)
+      setSelectedFile({
+        id: savedFileData.id,
+        name: savedFileData.name, // 保存された実際のファイル名で更新
+        mimeType: 'text/markdown', // mimeType は固定
+        modifiedTime: savedFileData.modifiedTime
+        // createdTime は保存APIレスポンスに含まれていないため更新しない
+      })
+
+    } catch (error: any) {
+      console.error('Google Drive保存エラー:', error)
+      alert(error.message || 'Google Driveへの保存に失敗しました')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [accessToken, markdownContent, selectedFile])
 
   const insertText = (before: string, after = "") => {
     // For CodeMirror, we'll need to use the editor's API
@@ -200,6 +321,12 @@ export default function MarkdownEditor() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
+      
+      // Google Driveが有効で認証済みの場合はGoogle Driveに保存
+      if (driveEnabled && isAuthenticated && accessToken) {
+        await handleDriveSave();
+        return;
+      }
       
       // window.showDirectoryPickerがサポートされている場合のみ実行
       if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
@@ -947,7 +1074,18 @@ export default function MarkdownEditor() {
         </TooltipProvider>
 
         <TooltipProvider>
-          <div className="flex space-x-2">
+          <div className="flex items-center space-x-2">
+            {/* Google Drive連携部分 */}
+            <div className="flex items-center mr-4 space-x-2">
+              <Switch 
+                checked={driveEnabled} 
+                onCheckedChange={handleDriveToggle}
+                disabled={!isAuthenticated}
+                label="Google Drive連携"
+              />
+              <GoogleAuth onAuthChange={handleAuthChange} />
+            </div>
+
             {/* ビューモード切り替えボタン */}
             <TooltipProvider>
               <Tooltip>
@@ -1014,11 +1152,27 @@ export default function MarkdownEditor() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving}>
-                    <Save className="h-4 w-4" />
-                    <span className="hidden sm:inline">{isSaving ? "保存中..." : "Save"}</span>
+                    {isSaving ? (
+                      <>
+                        <span className="animate-spin mr-1">⌛</span>
+                        <span className="hidden sm:inline">保存中...</span>
+                      </>
+                    ) : (
+                      <>
+                        {driveEnabled && isAuthenticated ? <Upload className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                        <span className="hidden sm:inline">Save</span>
+                        {driveEnabled && isAuthenticated && (
+                          <span className="text-xs ml-1">(Drive)</span>
+                        )}
+                      </>
+                    )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Save Markdown</TooltipContent>
+                <TooltipContent>
+                  {driveEnabled && isAuthenticated 
+                    ? "Google Driveに保存" 
+                    : "ローカルに保存"}
+                </TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1054,26 +1208,73 @@ export default function MarkdownEditor() {
 
       <div className="h-[calc(100%-3rem)]">
         {viewMode === 'editor' && (
-          <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full`}>
-            {EditorComponent}
-          </div>
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full`}>
+            {driveEnabled && isAuthenticated && accessToken && (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+                  <GoogleDriveFileList 
+                    accessToken={accessToken} 
+                    onFileSelect={handleFileSelect}
+                    selectedFileId={selectedFile?.id}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+              </>
+            )}
+            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
+              <div className="h-full overflow-auto">
+                {EditorComponent}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
         
         {viewMode === 'preview' && (
-          <div className={isDarkMode ? 'bg-gray-900 h-full' : 'bg-white h-full'}>
-            {PreviewComponent}
-          </div>
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+            {driveEnabled && isAuthenticated && accessToken && (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+                  <GoogleDriveFileList 
+                    accessToken={accessToken} 
+                    onFileSelect={handleFileSelect}
+                    selectedFileId={selectedFile?.id}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+              </>
+            )}
+            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
+              {PreviewComponent}
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
         
         {viewMode === 'split' && (
-          <div className={`grid grid-cols-2 h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
-            <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
-              {EditorComponent}
-            </div>
-            <div className={isDarkMode ? 'bg-gray-900' : 'bg-white'}>
-              {PreviewComponent}
-            </div>
-          </div>
+          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+            {driveEnabled && isAuthenticated && accessToken && (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+                  <GoogleDriveFileList 
+                    accessToken={accessToken} 
+                    onFileSelect={handleFileSelect}
+                    selectedFileId={selectedFile?.id}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+              </>
+            )}
+            <ResizablePanel defaultSize={driveEnabled ? 42 : 50}>
+              <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full overflow-auto`}>
+                {EditorComponent}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+            <ResizablePanel defaultSize={driveEnabled ? 43 : 50}>
+              <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+                {PreviewComponent}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
         
         {viewMode === 'triple' && (
@@ -1088,6 +1289,16 @@ export default function MarkdownEditor() {
             handleSubmit={handleSubmit}
             isLoading={isLoading}
             clearMessages={clearMessages}
+            driveEnabled={driveEnabled && isAuthenticated}
+            driveFileListComponent={
+              driveEnabled && isAuthenticated && accessToken ? (
+                <GoogleDriveFileList 
+                  accessToken={accessToken} 
+                  onFileSelect={handleFileSelect}
+                  selectedFileId={selectedFile?.id}
+                />
+              ) : null
+            }
           />
         )}
       </div>
