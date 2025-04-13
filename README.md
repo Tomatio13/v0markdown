@@ -10,7 +10,7 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-06B6D4?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Google Drive](https://img.shields.io/badge/Google_Drive-4285F4?style=for-the-badge&logo=google-drive&logoColor=white)](https://www.google.com/drive/)
 [![Marp](https://img.shields.io/badge/Marp-9cf?style=for-the-badge&logo=markdown&logoColor=black)](https://marp.app/)
-
+[![Quatro](https://img.shields.io/badge/quatro-quatro-blue)](https://quarto.org/)
 </div>
 
 ## 📋 目次
