@@ -25,6 +25,8 @@
   - [🚀 インストール](#-インストール)
   - [📖 使い方](#-使い方)
   - [👨‍💻 開発](#-開発)
+  - [Jupyterのインストール方法](#jupyterのインストール方法)
+  - [Quatroのインストール方法](#quatroのインストール方法)
   - [📄 ライセンス](#-ライセンス)
 
 
@@ -43,18 +45,23 @@
 - **絵文字ピッカー:** 絵文字を簡単に検索・挿入できます。
 - **Mermaid ダイアグラムサポート:** ` ```mermaid ` でMermaid記法による図表を作成・表示できます。
 
-- **Marpプレゼンテーションサポート:** 
+- **Marpプレゼンテーションサポート:**
     - [Marp](https://marp.app/)（Markdown Presentation Ecosystem）完全対応。
+    - **Marpプレビュー機能:** エディタ内でプレゼンテーションのリアルタイムプレビューが可能です。
     - Marpディレクティブを使用したスライド設定（テーマ、ページ番号、背景色など）。
     - 画像サイズの調整や配置のカスタマイズ（`width`、`height`、`position`など）。
     - グローバルディレクティブとローカルディレクティブの両方をサポート。
     - カスタムCSSによるスライドデザインのオーバーライド。
-    - プレビューでスライド表示を確認しながら編集可能。
-  - **PowerPoint(PPTX)変換機能:** 
+    - ヘッダ挿入ボタンで簡単にMarpディレクティブを挿入できます。
+- **PowerPoint(PPTX)変換機能:**
     - マークダウンをプレゼンテーション用のPPTXファイルに変換できます。
     - Marpの記法を使用してスライドを作成できます（`---`でスライド区切り）。
-    - 編集可能なPPTX出力オプションも利用可能です。
+    - 変換プロセスの進行状況が表示されます。
     - オフライン環境でも利用できる堅牢な変換機能です。
+- **Quarto変換機能:**
+    - [Quarto](https://quarto.org/)形式のマークダウンをPPTXファイルに変換できます。
+    - 変換プロセスの進行状況が表示されます。
+    - Quartoプレビューコンポーネントにより、エディタ内でプレビュー可能です。
 - **Google Drive連携:**
     - Googleアカウントで認証します。
     - Google Drive内のMarkdownファイル（`.md`）を一覧表示・検索できます。
@@ -82,6 +89,9 @@
 - [googleapis](https://github.com/googleapis/google-api-nodejs-client) - Google APIクライアントライブラリ (サーバーサイドで使用)
 - [Mermaid](https://mermaid.js.org/) - ダイアグラム生成ライブラリ
 - [Marp CLI](https://github.com/marp-team/marp-cli) - マークダウンからPPTXを生成するツール
+- [@marp-team/marp-core](https://github.com/marp-team/marp-core) - Marpコアライブラリ
+- [@marp-team/marpit](https://github.com/marp-team/marpit) - Marpの基盤となるフレームワーク
+- [Quarto](https://quarto.org/) - 科学技術計算向けパブリッシングシステム (PPTX変換で使用)
 - [Vercel AI SDK](https://sdk.vercel.ai/) - AIチャット機能 (オプション)
 
 ## ⚙️ Google Drive連携のための設定
@@ -135,6 +145,9 @@ NEXT_PUBLIC_GOOGLE_API_KEY="your_google_api_key"
 NEXT_PUBLIC_REDIRECT_URI="http://localhost:3000"
 
 GROK_API_KEY="YOUR_GROK_API_KEY" 
+
+JUPYTER_PATH=/path/to/jupyter
+QUARTO_PATH=/path/to/quarto/bin
 ```
 
 **重要:** `.env.local` ファイルを変更した後は、Next.jsの開発サーバーを**再起動**する必要があります。
@@ -200,6 +213,7 @@ pnpm install
     *   Marpディレクティブ（`theme`、`paginate`など）を使用してスライドの見た目をカスタマイズできます。
     *   「Export to PPTX」ボタンをクリックすると、PowerPointファイルとして出力されます。
     *   出力されたPPTXファイルはMicrosoft PowerPointやLibreOfficeなどで編集可能です。
+    *   Quarto記法で記述されたマークダウンも同様に「Export Quarto to PPTX」ボタンで変換できます。
 
 ## 👨‍💻 開発
 
@@ -212,6 +226,35 @@ npm run build
 
 # 本番環境としてアプリを起動
 npm start
+```
+
+## Jupyterのインストール方法
+最低限以下のコマンドを実行してJupyter環境を構築してください。
+```bash
+mkdir jupytor
+# Python仮想化環境の作成
+python -m venv venv
+# Python仮想化環境の有効化
+source venv/bin/activate
+# 必要なパッケージのインストール
+pip install --upgrade pip
+pip install jupyter numpy plotly matplotlib
+# Python仮想化環境の無効化
+deactivate
+```
+
+## Quatroのインストール方法
+[Quatroのインストール](https://quarto.org/docs/get-started/)を参照してください。
+以下、Ubuntuの場合です。他のOSは試していません。
+```bash
+# debファイルの取得
+wget https://github.com/quarto-dev/quarto-cli/releases/download/v1.7.23/quarto-1.7.23-linux-amd64.deb 
+
+# rootユーザでインストール
+sudo apt install ./quarto-1.7.23-linux-amd64.deb
+# quatroのインストール先の確認
+$ ls -t /opt/quarto/bin   
+ tools   vendor   quarto   quarto.js
 ```
 
 ## 📄 ライセンス
