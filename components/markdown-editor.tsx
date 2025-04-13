@@ -32,7 +32,8 @@ import {
   Upload,
   Presentation,
   Columns,
-  FileDown
+  FileDown,
+  FileCode
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -61,6 +62,9 @@ import GoogleAuth from "./google-auth"
 import GoogleDriveFileList from "./google-drive-file-list"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import MarpPreview from "./marp-preview"
+import QuartoPreview from "./quarto-preview"
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism"
+import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 
 // File System Access API の型定義
 declare global {
@@ -91,7 +95,7 @@ export default function MarkdownEditor() {
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
   const [isSaving, setIsSaving] = useState(false)
-  const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split'>('split')
+  const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split'>('split')
 
   // Google Drive連携関連の状態 (accessToken のみ保持)
   const [driveEnabled, setDriveEnabled] = useState(false)
@@ -611,6 +615,7 @@ export default function MarkdownEditor() {
 
   // PowerPointへの変換処理
   const [isPptxGenerating, setIsPptxGenerating] = useState(false)
+  const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false)
   
   const handleExportToPptx = async () => {
     console.log('PowerPoint変換処理を開始します...');
@@ -714,6 +719,113 @@ export default function MarkdownEditor() {
       alert(error instanceof Error ? error.message : '変換中に不明なエラーが発生しました')
     } finally {
       setIsPptxGenerating(false)
+    }
+  }
+
+  // QuartoでのPPTX変換処理
+  const handleExportToQuartoPptx = async () => {
+    console.log('Quarto PowerPoint変換処理を開始します...');
+    try {
+      setIsQuartoPptxGenerating(true)
+      
+      // マークダウンコンテンツが空でないか確認
+      if (!markdownContent.trim()) {
+        console.error('マークダウンコンテンツが空です');
+        alert('マークダウンコンテンツが空です。変換するコンテンツを入力してください。');
+        return;
+      }
+      
+      console.log(`マークダウンコンテンツ (${markdownContent.length}文字) をフォームデータに変換します...`);
+      
+      // マークダウンコンテンツをエンコード
+      const formData = new FormData()
+      formData.append('markdown', markdownContent)
+      formData.append('format', 'pptx')
+      
+      // APIエンドポイントを呼び出し
+      console.log('APIエンドポイントを呼び出します...');
+      const response = await fetch('/api/export-to-quarto', {
+        method: 'POST',
+        body: formData
+      })
+      
+      console.log(`APIレスポンス: status=${response.status}, ok=${response.ok}`);
+      
+      // APIからのエラーレスポンスを処理
+      if (!response.ok) {
+        let errorMessage = 'Quarto PowerPoint変換エラー';
+        try {
+          // JSONエラーレスポンスを解析
+          const errorData = await response.json();
+          errorMessage = errorData.error || 'Quarto PowerPoint変換エラー';
+          console.error('APIエラーレスポンス:', errorData);
+        } catch (jsonError) {
+          // JSONでない場合はテキストを取得
+          const errorText = await response.text();
+          errorMessage = errorText || 'Quarto PowerPoint変換エラー';
+          console.error('APIエラーテキスト:', errorText);
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Content-Typeを確認
+      const contentType = response.headers.get('Content-Type');
+      console.log(`レスポンスのContent-Type: ${contentType}`);
+      
+      if (contentType && contentType.includes('application/json')) {
+        // JSONレスポンスの場合はエラーとして処理
+        const jsonData = await response.json();
+        console.error('JSONレスポンス (エラーの可能性):', jsonData);
+        throw new Error(jsonData.error || 'Quarto PowerPoint変換エラー');
+      }
+      
+      // 処理時間のデバッグ情報
+      const processingTime = response.headers.get('X-Processing-Time');
+      if (processingTime) {
+        console.log(`サーバー処理時間: ${processingTime}`);
+      }
+      
+      // BlobとしてPPTXファイルを取得
+      console.log('レスポンスデータをBlobとして取得します...');
+      const pptxBlob = await response.blob();
+      console.log(`Blobサイズ: ${pptxBlob.size} バイト, タイプ: ${pptxBlob.type}`);
+      
+      // ファイルサイズの確認
+      if (pptxBlob.size === 0) {
+        throw new Error('生成されたPPTXファイルが空です');
+      }
+      
+      // ファイル名を決定 - マークダウンの先頭行から決定
+      let fileName = 'presentation.pptx'
+      const firstLine = markdownContent.split('\n')[0] || ''
+      const title = firstLine.replace(/^#+\s*/, '').trim()
+      if (title) {
+        fileName = `${title.replace(/\s+/g, '_').replace(/[\/\\?%*:|"<>]/g, '_')}.pptx`
+      }
+      console.log(`ファイル名: ${fileName}`);
+      
+      // ダウンロード
+      console.log('ファイルをダウンロードします...');
+      const url = URL.createObjectURL(pptxBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      
+      // クリーンアップ
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        console.log('ダウンロードリンクのクリーンアップ完了');
+      }, 100)
+      
+      console.log('Quarto PowerPointファイルが正常に生成されました')
+    } catch (error) {
+      console.error('Quarto PowerPoint変換エラー詳細:', error)
+      alert(error instanceof Error ? error.message : '変換中に不明なエラーが発生しました')
+    } finally {
+      setIsQuartoPptxGenerating(false)
     }
   }
 
@@ -966,55 +1078,23 @@ export default function MarkdownEditor() {
           remarkPlugins={[remarkGfm]}
           className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
           components={{
-            code({ node, inline, className, children, ...props }) {
-              const match = /language-(\w+)/.exec(className || "")
-
-              // Mermaidダイアグラムの処理
-              if (!inline && match && match[1] === 'mermaid') {
-                const chartContent = String(children).replace(/\n$/, "").trim();
-                if (!chartContent) {
-                  return (
-                    <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
-                      図のコードが空です
-                    </div>
-                  );
-                }
-                // ここで MermaidDiagram コンポーネントを使う
-                return (
-                   <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
-                      <MermaidDiagram chart={chartContent} />
-                   </div>
-                )
-              }
-
-              return !inline && match ? (
-                <div>
-                  {match[1] !== 'mermaid' && (
-                    <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
-                      {match[1]}
-                    </div>
-                  )}
-                  <SyntaxHighlighter
-                    // @ts-ignore - ライブラリの型定義の問題を無視
-                    style={vscDarkPlus} // Use dark mode theme directly for now
-                    language={match[1]}
-                    PreTag="div"
-                    customStyle={isDarkMode ? { 
-                      backgroundColor: '#000000', 
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '1em',
-                      margin: '1em 0'
-                    } : {}}
-                    {...props}
-                  >
-                    {String(children).replace(/\n$/, "")}
-                  </SyntaxHighlighter>
-                </div>
-              ) : (
+            code({ node, className, children, ...props }) {
+              const match = /language-(\w+)/.exec(className || '')
+              
+              return !match ? (
                 <code className={className} {...props}>
                   {children}
                 </code>
+              ) : (
+                <SyntaxHighlighter
+                  // @ts-ignore - スタイルの型の問題を無視
+                  language={match[1]}
+                  PreTag="div"
+                  style={isDarkMode ? oneDark : oneLight}
+                  {...props}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
               )
             },
           }}
@@ -1036,6 +1116,56 @@ export default function MarkdownEditor() {
       </div>
     </div>
   )
+
+  // Quartoプレビューコンポーネント
+  const QuartoPreviewComponent = (
+    <div className="quarto-preview-wrapper h-full overflow-auto h-[calc(100vh-8rem)]">
+      <div ref={tabPreviewRef} className="markdown-preview h-full">
+        <QuartoPreview
+          markdown={markdownContent}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    </div>
+  );
+
+  // 選択範囲の色を設定するためのuseEffect
+  useEffect(() => {
+    // スタイルシートを動的に追加
+    const styleElement = document.createElement('style');
+    styleElement.id = 'codemirror-selection-styles';
+    
+    // Lightモード用の選択範囲スタイル (より鮮明な黄色系)
+    const lightModeStyles = `
+      .cm-editor:not(.cm-focused) .cm-selectionBackground {
+        background-color: rgba(255, 213, 0, 0.4) !important;
+      }
+      .cm-editor.cm-focused .cm-selectionBackground {
+        background-color: rgba(255, 213, 0, 0.7) !important;
+      }
+    `;
+    
+    // Darkモード用の選択範囲スタイル
+    const darkModeStyles = `
+      .dark .cm-editor .cm-selectionBackground {
+        background-color: rgba(100, 100, 150, 0.4) !important;
+      }
+      .dark .cm-editor.cm-focused .cm-selectionBackground {
+        background-color: rgba(100, 100, 170, 0.6) !important;
+      }
+    `;
+    
+    styleElement.textContent = lightModeStyles + darkModeStyles;
+    document.head.appendChild(styleElement);
+    
+    // クリーンアップ関数
+    return () => {
+      const existingStyle = document.getElementById('codemirror-selection-styles');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, []); // 空の依存配列でマウント時のみ実行
 
   return (
     <div className={`h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
@@ -1184,6 +1314,27 @@ footer: "フッタ"
                 </TooltipTrigger>
                 <TooltipContent>Marpヘッダ</TooltipContent>
               </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                    const quartoHeader = `---
+title: "Quarto Basics"
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+`;
+                    // エディタの先頭に挿入
+                    setMarkdownContent(quartoHeader + markdownContent);
+                  }}>
+                    <FileCode className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Quartoヘッダ</TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Links and images */}
@@ -1230,6 +1381,7 @@ footer: "フッタ"
             </div>
 
             {/* ビューモード切り替えボタン */}
+            
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1311,6 +1463,38 @@ footer: "フッタ"
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    variant={viewMode === 'quarto-preview' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('quarto-preview')}
+                  >
+                    <FileCode size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Quartoプレビュー</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'quarto-split' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('quarto-split')}
+                  >
+                    <SplitSquareVertical size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>エディタとQuartoプレビューを分割表示</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
                     variant={viewMode === 'triple' ? 'default' : 'outline'}
                     size="icon"
                     onClick={() => setViewMode('triple')}
@@ -1383,6 +1567,32 @@ footer: "フッタ"
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>PowerPointとして出力</TooltipContent>
+              </Tooltip>
+              
+              {/* Quarto PPTX変換ボタン */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleExportToQuartoPptx} 
+                    className="h-8 gap-1"
+                    disabled={isQuartoPptxGenerating}
+                  >
+                    {isQuartoPptxGenerating ? (
+                      <>
+                        <span className="animate-spin mr-1">⌛</span>
+                        <span className="hidden sm:inline">変換中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="h-4 w-4" />
+                        <span className="hidden sm:inline">Q-PPTX</span>
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>QuartoでPowerPointとして出力</TooltipContent>
               </Tooltip>
               
               <Tooltip>
@@ -1524,6 +1734,26 @@ footer: "フッタ"
           </ResizablePanelGroup>
         )}
 
+        {viewMode === 'quarto-preview' && (
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+            {driveEnabled && isAuthenticated && accessToken && (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+                  <GoogleDriveFileList 
+                    accessToken={accessToken} 
+                    onFileSelect={handleFileSelect}
+                    selectedFileId={selectedFile?.id}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+              </>
+            )}
+            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
+              {QuartoPreviewComponent}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
+
         {viewMode === 'marp-split' && (
           <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
             {driveEnabled && isAuthenticated && accessToken && (
@@ -1547,6 +1777,34 @@ footer: "フッタ"
             <ResizablePanel defaultSize={driveEnabled ? 43 : 50}>
               <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
                 {MarpPreviewComponent}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
+
+        {viewMode === 'quarto-split' && (
+          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+            {driveEnabled && isAuthenticated && accessToken && (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+                  <GoogleDriveFileList 
+                    accessToken={accessToken} 
+                    onFileSelect={handleFileSelect}
+                    selectedFileId={selectedFile?.id}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+              </>
+            )}
+            <ResizablePanel defaultSize={driveEnabled ? 42 : 50}>
+              <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full overflow-auto`}>
+                {EditorComponent}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+            <ResizablePanel defaultSize={driveEnabled ? 43 : 50}>
+              <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+                {QuartoPreviewComponent}
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
