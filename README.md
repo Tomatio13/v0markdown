@@ -9,6 +9,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-06B6D4?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Google Drive](https://img.shields.io/badge/Google_Drive-4285F4?style=for-the-badge&logo=google-drive&logoColor=white)](https://www.google.com/drive/)
+[![Marp](https://img.shields.io/badge/Marp-9cf?style=for-the-badge&logo=markdown&logoColor=black)](https://marp.app/)
 
 </div>
 
@@ -41,6 +42,19 @@
 - **マークダウン書式ツールバー:** 見出し、太字、リストなどをボタン一つで挿入できます。
 - **絵文字ピッカー:** 絵文字を簡単に検索・挿入できます。
 - **Mermaid ダイアグラムサポート:** ` ```mermaid ` でMermaid記法による図表を作成・表示できます。
+
+- **Marpプレゼンテーションサポート:** 
+    - [Marp](https://marp.app/)（Markdown Presentation Ecosystem）完全対応。
+    - Marpディレクティブを使用したスライド設定（テーマ、ページ番号、背景色など）。
+    - 画像サイズの調整や配置のカスタマイズ（`width`、`height`、`position`など）。
+    - グローバルディレクティブとローカルディレクティブの両方をサポート。
+    - カスタムCSSによるスライドデザインのオーバーライド。
+    - プレビューでスライド表示を確認しながら編集可能。
+  - **PowerPoint(PPTX)変換機能:** 
+    - マークダウンをプレゼンテーション用のPPTXファイルに変換できます。
+    - Marpの記法を使用してスライドを作成できます（`---`でスライド区切り）。
+    - 編集可能なPPTX出力オプションも利用可能です。
+    - オフライン環境でも利用できる堅牢な変換機能です。
 - **Google Drive連携:**
     - Googleアカウントで認証します。
     - Google Drive内のMarkdownファイル（`.md`）を一覧表示・検索できます。
@@ -67,6 +81,7 @@
 - [@react-oauth/google](https://github.com/MomenSherif/react-oauth) - Google OAuth認証ライブラリ
 - [googleapis](https://github.com/googleapis/google-api-nodejs-client) - Google APIクライアントライブラリ (サーバーサイドで使用)
 - [Mermaid](https://mermaid.js.org/) - ダイアグラム生成ライブラリ
+- [Marp CLI](https://github.com/marp-team/marp-cli) - マークダウンからPPTXを生成するツール
 - [Vercel AI SDK](https://sdk.vercel.ai/) - AIチャット機能 (オプション)
 
 ## ⚙️ Google Drive連携のための設定
@@ -156,6 +171,35 @@ pnpm install
 5.  **プレビュー:** 分割ビューまたはプレビュータブでレンダリング結果を確認します。
 6.  **ツールバー:** 書式設定やモード切り替えなどを行います。
 7.  **ローカル保存:** Google Drive連携をオフにすると、「Save」ボタンでファイルをローカルにダウンロードできます。
+8.  **Marpプレゼンテーション:**
+    *   マークダウンで簡単にプレゼンテーションスライドを作成できます。
+    *   スライドの区切りは `---` で行います。
+    *   Marp記法例:
+        ```markdown
+        ---
+        marp: true
+        theme: default
+        paginate: true
+        ---
+
+        # スライド1
+        これは最初のスライドです
+
+        ---
+
+        # スライド2
+        これは2枚目のスライドです
+        
+        ---
+
+        ## コード例
+        ```js
+        console.log('Hello World');
+        ```
+        ```
+    *   Marpディレクティブ（`theme`、`paginate`など）を使用してスライドの見た目をカスタマイズできます。
+    *   「Export to PPTX」ボタンをクリックすると、PowerPointファイルとして出力されます。
+    *   出力されたPPTXファイルはMicrosoft PowerPointやLibreOfficeなどで編集可能です。
 
 ## 👨‍💻 開発
 

@@ -31,7 +31,8 @@ import {
   Terminal,
   Upload,
   Presentation,
-  Columns
+  Columns,
+  FileDown
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -607,6 +608,114 @@ export default function MarkdownEditor() {
   const handleContentChange = useCallback((value: string) => {
     setMarkdownContent(value)
   }, [])
+
+  // PowerPointへの変換処理
+  const [isPptxGenerating, setIsPptxGenerating] = useState(false)
+  
+  const handleExportToPptx = async () => {
+    console.log('PowerPoint変換処理を開始します...');
+    try {
+      setIsPptxGenerating(true)
+      
+      // マークダウンコンテンツが空でないか確認
+      if (!markdownContent.trim()) {
+        console.error('マークダウンコンテンツが空です');
+        alert('マークダウンコンテンツが空です。変換するコンテンツを入力してください。');
+        return;
+      }
+      
+      console.log(`マークダウンコンテンツ (${markdownContent.length}文字) をフォームデータに変換します...`);
+      
+      // マークダウンコンテンツをエンコード
+      const formData = new FormData()
+      formData.append('markdown', markdownContent)
+      
+      // APIエンドポイントを呼び出し
+      console.log('APIエンドポイントを呼び出します...');
+      const response = await fetch('/api/export-to-pptx', {
+        method: 'POST',
+        body: formData
+      })
+      
+      console.log(`APIレスポンス: status=${response.status}, ok=${response.ok}`);
+      
+      // APIからのエラーレスポンスを処理
+      if (!response.ok) {
+        let errorMessage = 'PowerPoint変換エラー';
+        try {
+          // JSONエラーレスポンスを解析
+          const errorData = await response.json();
+          errorMessage = errorData.error || 'PowerPoint変換エラー';
+          console.error('APIエラーレスポンス:', errorData);
+        } catch (jsonError) {
+          // JSONでない場合はテキストを取得
+          const errorText = await response.text();
+          errorMessage = errorText || 'PowerPoint変換エラー';
+          console.error('APIエラーテキスト:', errorText);
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Content-Typeを確認
+      const contentType = response.headers.get('Content-Type');
+      console.log(`レスポンスのContent-Type: ${contentType}`);
+      
+      if (contentType && contentType.includes('application/json')) {
+        // JSONレスポンスの場合はエラーとして処理
+        const jsonData = await response.json();
+        console.error('JSONレスポンス (エラーの可能性):', jsonData);
+        throw new Error(jsonData.error || 'PowerPoint変換エラー');
+      }
+      
+      // 処理時間のデバッグ情報
+      const processingTime = response.headers.get('X-Processing-Time');
+      if (processingTime) {
+        console.log(`サーバー処理時間: ${processingTime}`);
+      }
+      
+      // BlobとしてPPTXファイルを取得
+      console.log('レスポンスデータをBlobとして取得します...');
+      const pptxBlob = await response.blob();
+      console.log(`Blobサイズ: ${pptxBlob.size} バイト, タイプ: ${pptxBlob.type}`);
+      
+      // ファイルサイズの確認
+      if (pptxBlob.size === 0) {
+        throw new Error('生成されたPPTXファイルが空です');
+      }
+      
+      // ファイル名を決定 - マークダウンの先頭行から決定
+      let fileName = 'presentation.pptx'
+      const firstLine = markdownContent.split('\n')[0] || ''
+      const title = firstLine.replace(/^#+\s*/, '').trim()
+      if (title) {
+        fileName = `${title.replace(/\s+/g, '_').replace(/[\/\\?%*:|"<>]/g, '_')}.pptx`
+      }
+      console.log(`ファイル名: ${fileName}`);
+      
+      // ダウンロード
+      console.log('ファイルをダウンロードします...');
+      const url = URL.createObjectURL(pptxBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      
+      // クリーンアップ
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        console.log('ダウンロードリンクのクリーンアップ完了');
+      }, 100)
+      
+      console.log('PowerPointファイルが正常に生成されました')
+    } catch (error) {
+      console.error('PowerPoint変換エラー詳細:', error)
+      alert(error instanceof Error ? error.message : '変換中に不明なエラーが発生しました')
+    } finally {
+      setIsPptxGenerating(false)
+    }
+  }
 
   // AIからのコンテンツをエディタに挿入
   const handleAIContentInsert = useCallback((text: string) => {
@@ -1249,6 +1358,33 @@ footer: "フッタ"
                 </TooltipTrigger>
                 <TooltipContent>Print Preview</TooltipContent>
               </Tooltip>
+              
+              {/* PowerPoint変換ボタン */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleExportToPptx} 
+                    className="h-8 gap-1"
+                    disabled={isPptxGenerating}
+                  >
+                    {isPptxGenerating ? (
+                      <>
+                        <span className="animate-spin mr-1">⌛</span>
+                        <span className="hidden sm:inline">変換中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="h-4 w-4" />
+                        <span className="hidden sm:inline">PPTX</span>
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>PowerPointとして出力</TooltipContent>
+              </Tooltip>
+              
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="outline" size="sm" onClick={toggleDarkMode} className="h-8 gap-1">
