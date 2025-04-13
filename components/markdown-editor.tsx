@@ -29,7 +29,9 @@ import {
   SplitSquareVertical,
   Trash2,
   Terminal,
-  Upload
+  Upload,
+  Presentation,
+  Columns
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -57,6 +59,7 @@ import { Switch } from "@/components/ui/switch"
 import GoogleAuth from "./google-auth"
 import GoogleDriveFileList from "./google-drive-file-list"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import MarpPreview from "./marp-preview"
 
 // File System Access API の型定義
 declare global {
@@ -87,7 +90,7 @@ export default function MarkdownEditor() {
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
   const [isSaving, setIsSaving] = useState(false)
-  const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple'>('split')
+  const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split'>('split')
 
   // Google Drive連携関連の状態 (accessToken のみ保持)
   const [driveEnabled, setDriveEnabled] = useState(false)
@@ -846,73 +849,82 @@ export default function MarkdownEditor() {
     </EmojiContextMenu>
   )
 
-  // プレビューコンポーネント
+  // 通常のMarkdownプレビューコンポーネント（ReactMarkdownを使用）
   const PreviewComponent = (
-    <div
-      ref={splitPreviewRef}
-      className={`prose prose-sm max-w-none h-full overflow-auto p-4 ${
-        isDarkMode ? 'prose-invert bg-gray-900' : 'bg-white'
-      }`}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          // @ts-ignore - ライブラリの型定義の問題を無視
-          code({ node, inline, className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || "")
+    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+      <div ref={tabPreviewRef} className="markdown-preview p-4">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
+          components={{
+            code({ node, inline, className, children, ...props }) {
+              const match = /language-(\w+)/.exec(className || "")
 
-            // Mermaidダイアグラムの処理
-            if (!inline && match && match[1] === 'mermaid') {
-              const chartContent = String(children).replace(/\n$/, "").trim();
-              if (!chartContent) {
+              // Mermaidダイアグラムの処理
+              if (!inline && match && match[1] === 'mermaid') {
+                const chartContent = String(children).replace(/\n$/, "").trim();
+                if (!chartContent) {
+                  return (
+                    <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
+                      図のコードが空です
+                    </div>
+                  );
+                }
+                // ここで MermaidDiagram コンポーネントを使う
                 return (
-                  <div className="p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded text-red-600 dark:text-red-400">
-                    図のコードが空です
-                  </div>
-                );
+                   <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
+                      <MermaidDiagram chart={chartContent} />
+                   </div>
+                )
               }
-              // ここで MermaidDiagram コンポーネントを使う
-              return (
-                 <div className="mermaid"> {/* Ensure .mermaid class is present for handlePrint */}
-                    <MermaidDiagram chart={chartContent} />
-                 </div>
-              )
-            }
 
-            return !inline && match ? (
-              <div>
-                {match[1] !== 'mermaid' && (
-                  <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
-                    {match[1]}
-                  </div>
-                )}
-                <SyntaxHighlighter
-                  // @ts-ignore - ライブラリの型定義の問題を無視
-                  style={vscDarkPlus} // Use dark mode theme directly for now
-                  language={match[1]}
-                  PreTag="div"
-                  customStyle={isDarkMode ? { 
-                    backgroundColor: '#000000', 
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '1em',
-                    margin: '1em 0'
-                  } : {}}
-                  {...props}
-                >
-                  {String(children).replace(/\n$/, "")}
-                </SyntaxHighlighter>
-              </div>
-            ) : (
-              <code className={className} {...props}>
-                {children}
-              </code>
-            )
-          },
-        }}
-      >
-        {markdownContent}
-      </ReactMarkdown>
+              return !inline && match ? (
+                <div>
+                  {match[1] !== 'mermaid' && (
+                    <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
+                      {match[1]}
+                    </div>
+                  )}
+                  <SyntaxHighlighter
+                    // @ts-ignore - ライブラリの型定義の問題を無視
+                    style={vscDarkPlus} // Use dark mode theme directly for now
+                    language={match[1]}
+                    PreTag="div"
+                    customStyle={isDarkMode ? { 
+                      backgroundColor: '#000000', 
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '1em',
+                      margin: '1em 0'
+                    } : {}}
+                    {...props}
+                  >
+                    {String(children).replace(/\n$/, "")}
+                  </SyntaxHighlighter>
+                </div>
+              ) : (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              )
+            },
+          }}
+        >
+          {markdownContent}
+        </ReactMarkdown>
+      </div>
+    </div>
+  )
+
+  // Marpプレビューコンポーネント（MarpPreviewを使用）
+  const MarpPreviewComponent = (
+    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+      <div ref={tabPreviewRef} className="markdown-preview p-4">
+        <MarpPreview 
+          markdown={markdownContent} 
+          isDarkMode={isDarkMode} 
+        />
+      </div>
     </div>
   )
 
@@ -1041,6 +1053,28 @@ export default function MarkdownEditor() {
                 </TooltipTrigger>
                 <TooltipContent>Mermaidダイアグラム</TooltipContent>
               </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                    const marpHeader = `---
+marp: true
+theme: default
+${isDarkMode ? 'class: invert' : '# class: invert'}
+paginate: true
+header: "ヘッダ"
+footer: "フッタ"
+---
+
+`;
+                    // エディタの先頭に挿入
+                    setMarkdownContent(marpHeader + markdownContent);
+                  }}>
+                    <Presentation className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Marpヘッダ</TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Links and images */}
@@ -1132,6 +1166,38 @@ export default function MarkdownEditor() {
               </Tooltip>
             </TooltipProvider>
 
+
+            {/* Marpボタン */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'marp-preview' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('marp-preview')}
+                  >
+                    <Presentation size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Marpプレゼンテーションプレビュー</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'marp-split' ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setViewMode('marp-split')}
+                  >
+                    <Columns size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>エディタとMarpプレビューを分割表示</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1300,6 +1366,54 @@ export default function MarkdownEditor() {
               ) : null
             }
           />
+        )}
+
+        {viewMode === 'marp-preview' && (
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+            {driveEnabled && isAuthenticated && accessToken && (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+                  <GoogleDriveFileList 
+                    accessToken={accessToken} 
+                    onFileSelect={handleFileSelect}
+                    selectedFileId={selectedFile?.id}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+              </>
+            )}
+            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
+              {MarpPreviewComponent}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
+
+        {viewMode === 'marp-split' && (
+          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+            {driveEnabled && isAuthenticated && accessToken && (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+                  <GoogleDriveFileList 
+                    accessToken={accessToken} 
+                    onFileSelect={handleFileSelect}
+                    selectedFileId={selectedFile?.id}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+              </>
+            )}
+            <ResizablePanel defaultSize={driveEnabled ? 42 : 50}>
+              <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full overflow-auto`}>
+                {EditorComponent}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+            <ResizablePanel defaultSize={driveEnabled ? 43 : 50}>
+              <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+                {MarpPreviewComponent}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
       </div>
     </div>
