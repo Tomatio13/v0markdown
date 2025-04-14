@@ -33,7 +33,10 @@ import {
   Presentation,
   Columns,
   FileDown,
-  FileCode
+  FileCode,
+  BotMessageSquare,
+  FileChartColumn,
+  ChartColumn
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -1496,7 +1499,7 @@ jupyter: python3
                     size="icon"
                     onClick={() => setViewMode('quarto-preview')}
                   >
-                    <FileCode size={18} />
+                    <FileChartColumn size={18} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Quartoプレビュー</TooltipContent>
@@ -1511,7 +1514,7 @@ jupyter: python3
                     size="icon"
                     onClick={() => setViewMode('quarto-split')}
                   >
-                    <SplitSquareVertical size={18} />
+                    <ChartColumn size={18} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>エディタとQuartoプレビューを分割表示</TooltipContent>
@@ -1528,7 +1531,7 @@ jupyter: python3
                     size="icon"
                     onClick={() => setViewMode('triple')}
                   >
-                    <MessageSquare size={18} />
+                    <BotMessageSquare size={20} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>AIチャット表示</TooltipContent>
