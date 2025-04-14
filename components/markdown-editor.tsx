@@ -96,6 +96,7 @@ export default function MarkdownEditor() {
   const cursorPosRef = useRef<number>(0)
   const [isSaving, setIsSaving] = useState(false)
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split'>('split')
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 }); // ステータスバー用のカーソル位置状態
 
   // Google Drive連携関連の状態 (accessToken のみ保持)
   const [driveEnabled, setDriveEnabled] = useState(false)
@@ -253,18 +254,23 @@ export default function MarkdownEditor() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // カーソル位置の更新を処理する関数
+  // カーソル位置の更新を処理する関数 (行・列を取得)
   const handleCursorUpdate = useCallback((view: EditorView | null) => {
     if (view) {
       const pos = view.state.selection.main.head;
-      // viewRefがnullの場合や、posが以前と同じ場合は更新しない
-      // (不要な再レンダリングや無限ループを防ぐため)
-      if (cursorPosRef.current !== pos) {
-          cursorPosRef.current = pos;
-          console.log("カーソル位置を更新:", pos);
-      }
+      const line = view.state.doc.lineAt(pos);
+      const lineNum = line.number;
+      const colNum = pos - line.from + 1; // 1-based column
+      // 状態が実際に変化した場合のみ更新
+      setCursorPosition(prevPos => {
+        if (prevPos.line !== lineNum || prevPos.col !== colNum) {
+          console.log("カーソル位置を更新:", lineNum, colNum);
+          return { line: lineNum, col: colNum };
+        }
+        return prevPos; // 変化がなければ現在の状態を維持
+      });
     }
-  }, []); // 依存配列は空のままで良い
+  }, [setCursorPosition]); // 依存配列を修正
 
   const insertEmoji = useCallback((emoji: string) => {
     console.log("絵文字を挿入:", emoji);
@@ -918,7 +924,7 @@ export default function MarkdownEditor() {
         // カーソル位置更新の処理
         if (update.selectionSet || update.docChanged) {
           if (update.view.hasFocus) {
-            handleCursorUpdate(update.view);
+            handleCursorUpdate(update.view); // 修正された関数を呼び出す
           }
         }
       }),
@@ -1175,8 +1181,23 @@ export default function MarkdownEditor() {
     };
   }, []); // 空の依存配列でマウント時のみ実行
 
+  // プレビューモードの表示名を取得するヘルパー関数
+  const getPreviewModeName = () => {
+    if (viewMode.includes('marp')) {
+      return 'Marp';
+    }
+    if (viewMode.includes('quarto')) {
+      return 'Quarto';
+    }
+    if (viewMode.includes('preview') || viewMode.includes('split')) {
+      return 'Markdown';
+    }
+    return null; // プレビューが表示されていない場合
+  };
+
   return (
-    <div className={`h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+    // ルート要素を Flexbox コンテナに変更してステータスバーを配置
+    <div className={`flex flex-col h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
       <div className="bg-muted p-2 flex justify-between items-center mb-2 rounded-md">
         <TooltipProvider>
           <div className="flex space-x-1">
@@ -1626,7 +1647,8 @@ jupyter: python3
         </TooltipProvider>
       </div>
 
-      <div className="h-[calc(100%-3rem)]">
+      {/* メインコンテンツエリア (エディタ/プレビュー) を flex-grow で囲む */}
+      <div className="flex-grow h-[calc(100%-3rem-4px)]"> {/* ツールバーとステータスバーの高さを引く */}
         {viewMode === 'editor' && (
           <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full`}>
             {driveEnabled && isAuthenticated && accessToken && (
@@ -1824,6 +1846,21 @@ jupyter: python3
             </ResizablePanel>
           </ResizablePanelGroup>
         )}
+      </div>
+
+      {/* Status Bar */}
+      <div className={`p-1 border-t text-xs flex justify-between items-center ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
+        {/* Left side: Cursor position */}
+        <div>
+          <span>Ln {cursorPosition.line}, Col {cursorPosition.col}</span>
+        </div>
+        {/* Right side: Preview mode */}
+        <div>
+          {getPreviewModeName() && (
+            <span>Preview: {getPreviewModeName()}</span>
+          )}
+        </div>
+        {/* Add other status info if needed */}
       </div>
     </div>
   )
