@@ -1079,19 +1079,27 @@ export default function MarkdownEditor() {
           className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
           components={{
             code({ node, className, children, ...props }) {
-              const match = /language-(\w+)/.exec(className || '')
-              
+              // props から ref のみを除外
+              const { ref, ...restProps } = props;
+              const match = /language-(\w+)/.exec(className || '');
+
+              if (match && match[1] === 'mermaid') {
+                // MermaidDiagram には計算された chart のみ渡す
+                return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
+              }
+
               return !match ? (
-                <code className={className} {...props}>
+                // 通常の code タグには className と children のみを渡す
+                <code className={className}>
                   {children}
                 </code>
               ) : (
                 <SyntaxHighlighter
-                  // @ts-ignore - スタイルの型の問題を無視
+                  // @ts-ignore を一旦コメントアウトして型エラーを確認
                   language={match[1]}
                   PreTag="div"
-                  style={isDarkMode ? oneDark : oneLight}
-                  {...props}
+                  style={isDarkMode ? oneDark as any : oneLight as any}
+                  // children を SyntaxHighlighter に渡す
                 >
                   {String(children).replace(/\n$/, '')}
                 </SyntaxHighlighter>
@@ -1717,7 +1725,7 @@ jupyter: python3
             }
             getEditorContent={() => markdownContent}
             setInput={setInput}
-            append={append}
+            append={append as any}
           />
         )}
 
