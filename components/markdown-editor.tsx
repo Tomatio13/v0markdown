@@ -1087,11 +1087,11 @@ export default function MarkdownEditor() {
           remarkPlugins={[remarkGfm]}
           className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
           components={{
-            code({ node, className, children, ...props }) {
+            code({ node,className, children, ...props }) {
               // props から ref のみを除外
               const { ref, ...restProps } = props;
               const match = /language-(\w+)/.exec(className || '');
-
+             
               if (match && match[1] === 'mermaid') {
                 // MermaidDiagram には計算された chart のみ渡す
                 return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
@@ -1103,15 +1103,31 @@ export default function MarkdownEditor() {
                   {children}
                 </code>
               ) : (
+              <div>
+                <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
+                  {match[1]}
+                </div>
+                
                 <SyntaxHighlighter
                   // @ts-ignore を一旦コメントアウトして型エラーを確認
                   language={match[1]}
                   PreTag="div"
-                  style={isDarkMode ? oneDark as any : oneLight as any}
+                  style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
+                  // style={vscDarkPlus}
+                  customStyle={isDarkMode ? { 
+                    backgroundColor: '#000000', 
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '1em',
+                    margin: '1em 0'
+                  } : {}}
+                  {...props}
                   // children を SyntaxHighlighter に渡す
                 >
                   {String(children).replace(/\n$/, '')}
                 </SyntaxHighlighter>
+
+                </div>
               )
             },
           }}
