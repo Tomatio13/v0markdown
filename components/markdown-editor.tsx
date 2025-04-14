@@ -104,7 +104,7 @@ export default function MarkdownEditor() {
   const [isAuthenticated, setIsAuthenticated] = useState(false) // 認証状態は引き続き管理
 
   // useChatフック
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat();
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append, reload, stop } = useChat();
 
   // チャットクリア関数
   const clearMessages = useCallback(() => {
@@ -1691,7 +1691,11 @@ jupyter: python3
         
         {viewMode === 'triple' && (
           <TripleLayout
-            editorComponent={EditorComponent}
+            editorComponent={
+              <div className="h-full overflow-auto">
+                {EditorComponent}
+              </div>
+            }
             previewComponent={PreviewComponent}
             onAIContentInsert={handleAIContentInsert}
             isDarkMode={isDarkMode}
@@ -1711,6 +1715,9 @@ jupyter: python3
                 />
               ) : null
             }
+            getEditorContent={() => markdownContent}
+            setInput={setInput}
+            append={append}
           />
         )}
 

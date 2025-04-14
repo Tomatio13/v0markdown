@@ -12,6 +12,9 @@ interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 
   clearMessages: () => void
   driveEnabled?: boolean
   driveFileListComponent?: React.ReactNode
+  getEditorContent?: () => string
+  setInput?: (value: string) => void
+  append?: (message: { content: string, role: 'user' | 'assistant' | 'system' | 'function' }) => Promise<void>
 }
 
 export const TripleLayout = ({ 
@@ -26,7 +29,10 @@ export const TripleLayout = ({
   isLoading,
   clearMessages,
   driveEnabled = false,
-  driveFileListComponent
+  driveFileListComponent,
+  getEditorContent,
+  setInput,
+  append
 }: TripleLayoutProps) => {
   return (
     <ResizablePanelGroup direction="horizontal" className={`h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
@@ -72,6 +78,9 @@ export const TripleLayout = ({
           handleSubmit={handleSubmit}
           isLoading={isLoading}
           clearMessages={clearMessages}
+          getEditorContent={getEditorContent}
+          setInput={setInput}
+          append={append}
         />
       </ResizablePanel>
     </ResizablePanelGroup>

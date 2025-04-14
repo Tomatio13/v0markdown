@@ -10,8 +10,11 @@ import type { Message, UseChatHelpers } from 'ai/react'
 
 interface AIChatProps extends Pick<UseChatHelpers, 'messages' | 'input' | 'handleInputChange' | 'handleSubmit' | 'isLoading'> {
   onInsertToEditor?: (text: string) => void
+  getEditorContent?: () => string
   isDarkMode?: boolean
   clearMessages: () => void
+  setInput?: (value: string) => void
+  append?: (message: { content: string, role: 'user' | 'assistant' | 'system' | 'function' }) => Promise<void>
 }
 
 export const AIChat = ({
@@ -21,8 +24,11 @@ export const AIChat = ({
   handleSubmit,
   isLoading,
   onInsertToEditor,
+  getEditorContent,
   isDarkMode = false,
   clearMessages,
+  setInput,
+  append,
 }: AIChatProps) => {
 
   const handleInsertToEditor = (text: string) => {
@@ -30,6 +36,92 @@ export const AIChat = ({
       onInsertToEditor(text);
     }
   };
+
+  // コンポーネントマウント時にgetEditorContent関数をチェック
+  useEffect(() => {
+    if (getEditorContent) {
+      try {
+        const content = getEditorContent();
+        console.log('エディタ内容のチェック (マウント時):', content ? content.substring(0, 50) + '...' : 'エディタ内容が空です');
+      } catch (err) {
+        console.error('getEditorContent関数エラー:', err);
+      }
+    } else {
+      console.warn('getEditorContent関数が提供されていません');
+    }
+  }, [getEditorContent]);
+
+  // 直接APIを呼び出す方法を追加
+  const submitWithEditorContent = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    // デバッグ: 入力内容を確認
+    console.log('元の入力内容:', input);
+    console.log('@editorキーワードの有無:', input.includes('@editor'));
+    console.log('getEditorContent関数の有無:', !!getEditorContent);
+    
+    try {
+      if (input.includes('@editor') && getEditorContent) {
+        // エディタ内容を取得
+        const editorContent = getEditorContent();
+        console.log('取得したエディタ内容:', editorContent.substring(0, 100) + '...');
+        
+        // 入力を置換
+        const processedInput = input.replace('@editor', `\n\n### エディタ内容:\n\`\`\`\n${editorContent}\n\`\`\`\n`);
+        
+        console.log('AIに送信する内容:', processedInput.substring(0, 100) + '...');
+        
+        // append APIを使用して直接メッセージを送信（もし利用可能なら）
+        if (append) {
+          console.log('append APIを使用してメッセージを送信します');
+          // 入力フィールドをクリア
+          if (setInput) {
+            setInput('');
+          }
+          
+          // ユーザーメッセージを追加
+          await append({ 
+            content: processedInput,
+            role: 'user'
+          });
+          
+          return;
+        }
+        
+        // appendがない場合はフォールバック方法を使用
+        console.log('フォールバック送信方法を使用します');
+        
+        // 通常の方法でフォームを送信
+        // 入力フィールドを一時的に処理済みテキストに変更
+        handleInputChange({ target: { value: processedInput } } as React.ChangeEvent<HTMLInputElement>);
+        
+        // 少し遅延してから送信
+        setTimeout(() => {
+          const fakeEvent = {
+            preventDefault: () => {}
+          } as React.FormEvent<HTMLFormElement>;
+          
+          handleSubmit(fakeEvent);
+          
+          // 送信後に入力フィールドを元の値に戻す（ただし入力は空にする）
+          setTimeout(() => {
+            if (setInput) {
+              setInput('');
+            } else {
+              handleInputChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>);
+            }
+          }, 100);
+        }, 50);
+      } else {
+        // 通常の送信処理
+        handleSubmit(e);
+      }
+    } catch (err) {
+      console.error('送信処理エラー:', err);
+      // エラー時は通常送信
+      handleSubmit(e);
+    }
+  }, [input, handleSubmit, handleInputChange, getEditorContent, setInput, append]);
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? 'bg-[#2c2c2c] text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
@@ -91,12 +183,12 @@ export const AIChat = ({
         </div>
       </ScrollArea>
       
-      <form onSubmit={handleSubmit} className={`p-4 border-t ${isDarkMode ? 'border-gray-700 bg-[#2c2c2c]' : 'border-gray-200 bg-gray-100'}`}>
+      <form onSubmit={submitWithEditorContent} className={`p-4 border-t ${isDarkMode ? 'border-gray-700 bg-[#2c2c2c]' : 'border-gray-200 bg-gray-100'}`}>
         <div className="flex items-center gap-2">
           <Input
             value={input}
             onChange={handleInputChange}
-            placeholder="AIに質問する..."
+            placeholder="AIに質問する... (@editorでエディタ内容を取得)"
             className={`flex-1 rounded-md text-sm ${isDarkMode ? 'bg-[#3a3d41] border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
             disabled={isLoading}
           />
