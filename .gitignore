@@ -27,4 +27,4 @@ yarn-error.log*
 next-env.d.ts
 tmp/
 
-public/images/
+/public/images/
