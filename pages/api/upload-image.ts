@@ -49,12 +49,15 @@ export default async function handler(
 
     // 保存されたファイル名を取得
     const fileName = uploadedFile.newFilename;
-    const relativeUrl = `/images/${fileName}`;
+    
+    // 変更点: 新しいAPIエンドポイントを使用するようにURL形式を変更
+    const apiUrl = `/api/images/${fileName}`;
 
     console.log(`File uploaded successfully: ${fileName}`);
-    console.log(`Relative URL: ${relativeUrl}`);
+    console.log(`API URL: ${apiUrl}`);
 
-    return res.status(200).json({ url: relativeUrl });
+    // 変更点: レスポンスのURLを新しいAPIルートに変更
+    return res.status(200).json({ url: apiUrl });
 
   } catch (error: any) {
     console.error('ファイルアップロードエラー:', error);
