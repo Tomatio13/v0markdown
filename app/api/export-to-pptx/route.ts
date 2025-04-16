@@ -69,8 +69,8 @@ export PUPPETEER_DOWNLOAD_PATH="${projectRoot}/node_modules/.cache/puppeteer"
 mkdir -p "$PUPPETEER_CACHE_DIR"
 
 # 編集可能なPPTXを生成
-#npx @marp-team/marp-cli "${mdFilePath}" --pptx-editable -o "${pptxFilePath}" --no-stdin --allow-local-files
-"${projectRoot}/node_modules/.bin/marp" "${mdFilePath}" --pptx-editable -o "${pptxFilePath}" --no-stdin --allow-local-files
+npx @marp-team/marp-cli "${mdFilePath}" --pptx-editable -o "${pptxFilePath}" --no-stdin --allow-local-files
+#"${projectRoot}/node_modules/.bin/marp" "${mdFilePath}" --pptx-editable -o "${pptxFilePath}" --no-stdin --allow-local-files
 
 EXIT_CODE=$?
 echo "変換終了: $(date), 終了コード: $EXIT_CODE"
@@ -140,7 +140,7 @@ fi
             resolve();
           } else {
             log(`スクリプトエラー - 出力: ${stdoutData}\nエラー: ${stderrData}`);
-            reject(new Error(`変換スクリプト失敗 (コード: ${code})`));
+            reject(new Error(`変換スクリプト失敗 (コード: ${code}). Marp stderr: ${stderrData || 'No stderr output'}`));
           }
         });
         

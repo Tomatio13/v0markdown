@@ -68,6 +68,7 @@ import MarpPreview from "./marp-preview"
 import QuartoPreview from "./quarto-preview"
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
+import { lineNumbers } from '@codemirror/view'; // 行番号表示のためにインポート
 
 // File System Access API の型定義
 declare global {
@@ -98,6 +99,8 @@ export default function MarkdownEditor() {
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false) // 画像アップロード中フラグを追加
+  const imageInputRef = useRef<HTMLInputElement>(null); // 画像ファイル選択用refを追加
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split'>('split')
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 }); // ステータスバー用のカーソル位置状態
 
@@ -891,9 +894,77 @@ export default function MarkdownEditor() {
   // 依存配列に cursorPosRef.current を含めない
   }, [setMarkdownContent]);
 
+  // 画像アップロード処理
+  const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // 同じファイルを連続で選択できるように値をクリア
+
+    if (!file) {
+      return;
+    }
+
+    // 画像ファイル以外は処理しない
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルを選択してください。');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    const formData = new FormData();
+    formData.append('file', file); // API側のキー名と一致させる
+
+    try {
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `画像アップロードエラー: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const imageUrl = `![](${window.location.origin}${data.url})`; // ポート番号を動的に設定
+
+      // CodeMirrorに挿入
+      if (viewRef.current) {
+        const currentPos = viewRef.current.state.selection.main.head;
+        viewRef.current.dispatch({
+          changes: {
+            from: currentPos,
+            to: currentPos,
+            insert: imageUrl,
+          },
+          selection: { anchor: currentPos + imageUrl.length },
+        });
+        viewRef.current.focus();
+        cursorPosRef.current = currentPos + imageUrl.length;
+        console.log("画像挿入 (CodeMirror):", imageUrl, " 新カーソル位置:", cursorPosRef.current);
+      } else {
+        // フォールバック (既存のロジックに合わせる)
+        console.warn("viewRef.current is not available for image insertion. Falling back.");
+        setMarkdownContent(prev => {
+          const pos = cursorPosRef.current;
+          const safePos = Math.max(0, Math.min(pos, prev.length));
+          const newContent = prev.substring(0, safePos) + imageUrl + prev.substring(safePos);
+          cursorPosRef.current = safePos + imageUrl.length;
+          console.log("画像挿入 (Fallback):", imageUrl, " 新カーソル位置:", cursorPosRef.current);
+          return newContent;
+        });
+      }
+    } catch (error: any) {
+      console.error('画像アップロード処理エラー:', error);
+      alert(error.message || '画像のアップロードに失敗しました。');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }, [setMarkdownContent]); // cursorPosRef.current を依存配列から削除
+
   // EditorView.updateListenerを含む拡張機能
   const editorExtensions = useMemo(() => {
     const extensions = [
+      lineNumbers(), // 行番号表示を追加
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
@@ -1054,27 +1125,14 @@ export default function MarkdownEditor() {
           // 初期フォーカス設定
           // view.contentDOM.focus(); // デバッグ中は一旦コメントアウト
         }}
-        // basicSetup は前回修正した最小限の状態を維持
-        basicSetup={{
+        // basicSetup を削除
+        /* basicSetup={{
           lineNumbers: true,
-          /* highlightActiveLine: false, */
-          /* highlightSpecialChars: false, */
-          /* foldGutter: false, */
-          /* drawSelection: false, */
-          /* dropCursor: false, */
           allowMultipleSelections: true, 
-          /* indentOnInput: false, */
           syntaxHighlighting: true, 
           autocompletion: false, 
           tabSize: 2,
-          /* highlightSelectionMatches: false, */
-          /* closeBrackets: false, */
-          /* searchKeymap: false, */
-          /* completionKeymap: false, */
-          /* historyKeymap: false, */
-          /* foldKeymap: false, */
-          /* lintKeymap: false, */
-        }}
+        }} */
       />
     </EmojiContextMenu>
   )
@@ -1087,48 +1145,53 @@ export default function MarkdownEditor() {
           remarkPlugins={[remarkGfm]}
           className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
           components={{
-            code({ node,className, children, ...props }) {
-              // props から ref のみを除外
-              const { ref, ...restProps } = props;
+            // node.position を使ってインライン判定を行う
+            code({ node, className, children, ...props }) {
+              const { ref, ...restProps } = props; // propsからはrefのみ除外
               const match = /language-(\w+)/.exec(className || '');
-             
+              
+              // nodeオブジェクトとpositionプロパティの存在を確認
+              const isInline = node && node.position 
+                                ? node.position.start.line === node.position.end.line 
+                                : false; // nodeやpositionがない場合はブロックとして扱う（フォールバック）
+
+              // Mermaid の処理 (変更なし)
               if (match && match[1] === 'mermaid') {
-                // MermaidDiagram には計算された chart のみ渡す
                 return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
               }
 
-              return !match ? (
-                // 通常の code タグには className と children のみを渡す
-                <code className={className}>
-                  {children}
-                </code>
-              ) : (
-              <div>
-                <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
-                  {match[1]}
-                </div>
-                
-                <SyntaxHighlighter
-                  // @ts-ignore を一旦コメントアウトして型エラーを確認
-                  language={match[1]}
-                  PreTag="div"
-                  style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
-                  // style={vscDarkPlus}
-                  customStyle={isDarkMode ? { 
-                    backgroundColor: '#000000', 
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '1em',
-                    margin: '1em 0'
-                  } : {}}
-                  {...props}
-                  // children を SyntaxHighlighter に渡す
-                >
-                  {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
+              // インラインコードの場合 (isInlineで判定)
+              if (isInline) {
+                return (
+                  <code className={className} {...restProps}>
+                    {children}
+                  </code>
+                );
+              }
 
+              // ブロックコードの場合 (SyntaxHighlighterを使用)
+              return (
+                <div>
+                  <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
+                    {match ? match[1] : 'code'} {/* matchがない場合は 'code' とする */}
+                  </div>
+                  <SyntaxHighlighter
+                    language={match ? match[1] : undefined} // matchがない場合はundefined
+                    PreTag="div"
+                    style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
+                    customStyle={isDarkMode ? { 
+                      backgroundColor: '#000000', 
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '1em',
+                      margin: '1em 0'
+                    } : {}}
+                    // {...restProps} // <-- 不要なpropsは渡さない
+                  >
+                    {String(children).replace(/\n$/, '')}
+                  </SyntaxHighlighter>
                 </div>
-              )
+              );
             },
           }}
         >
@@ -1397,8 +1460,13 @@ jupyter: python3
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("![", "](url)")}>
-                    <Image className="h-4 w-4" />
+                  {/* 画像ボタンのonClickを修正 */}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>
+                    {isUploadingImage ? (
+                      <span className="animate-spin h-4 w-4">⌛</span> // アップロード中インジケータ
+                    ) : (
+                      <Image className="h-4 w-4" />
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Image</TooltipContent>
@@ -1881,6 +1949,15 @@ jupyter: python3
         </div>
         {/* Add other status info if needed */}
       </div>
+
+      {/* ファイル選択用の非表示input要素を追加 */}
+      <input
+        type="file"
+        ref={imageInputRef}
+        accept="image/*" // 画像ファイルのみ受け入れる
+        style={{ display: 'none' }} // 常に非表示
+        onChange={handleImageUpload}
+      />
     </div>
   )
 }

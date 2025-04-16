@@ -52,6 +52,7 @@
     "@react-oauth/google": "^0.12.1",
     "@replit/codemirror-vim": "^6.3.0",
     "@tailwindcss/typography": "^0.5.15",
+    "@types/formidable": "^3.4.5",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@types/uuid": "^10.0.0",
     "@uiw/codemirror-theme-vscode": "^4.23.10",
@@ -68,6 +69,7 @@
     "crypto-browserify": "^3.12.1",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "8.5.1",
+    "formidable": "^3.5.2",
     "googleapis": "^148.0.0",
     "input-otp": "1.4.1",
     "jwt-decode": "^4.0.0",
@@ -100,6 +102,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@marp-team/marp-cli": "^4.1.2",
     "@types/node": "^22",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
