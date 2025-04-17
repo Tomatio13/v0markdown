@@ -33,7 +33,11 @@ export default async function handler(
     filename: (name, ext, part, form) => {
       // ファイル名をサニタイズし、一意なIDを付与
       const originalFilename = part.originalFilename || 'unknown';
-      const sanitizedFilename = originalFilename.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      // 日本語（ひらがな、カタカナ、漢字など）を許可し、それ以外の非英数字記号などを'_'に置換
+      const sanitizedFilename = originalFilename.replace(
+        /[^a-zA-Z0-9_.\-\u3040-\u309f\u30a0-\u30ff\uff00-\uffef\u4e00-\u9fff]/g, 
+        '_'
+      );
       return `${uuidv4()}-${sanitizedFilename}`;
     },
   });
