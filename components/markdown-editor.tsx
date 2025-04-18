@@ -1280,11 +1280,110 @@ export default function MarkdownEditor() {
   return (
     // ルート要素を Flexbox コンテナに変更してステータスバーを配置
     <div className={`flex flex-col h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
-      <div className="bg-muted p-2 flex justify-between items-center mb-2 rounded-md">
+      {/* 上部セクション: タイトルと保存ボタン等 */}
+      <div className="flex justify-between items-center mb-2 pl-0 pr-2 py-2">
+        <h1 className="text-xl font-bold pl-1">Markdown Editor</h1>
+        
+        <div className="flex items-center space-x-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <span className="animate-spin mr-1">⌛</span>
+                      <span className="hidden sm:inline">保存中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span className="hidden sm:inline">Save</span>
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {driveEnabled && isAuthenticated 
+                  ? "Google Driveに保存" 
+                  : "ローカルに保存"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1">
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">Print</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Print Preview</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleExportToPptx} 
+                  className="h-8 gap-1"
+                  disabled={isPptxGenerating}
+                >
+                  {isPptxGenerating ? (
+                    <>
+                      <span className="animate-spin mr-1">⌛</span>
+                      <span className="hidden sm:inline">変換中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="h-4 w-4" />
+                      <span className="hidden sm:inline">PPTX</span>
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>PowerPointとして出力</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleExportToQuartoPptx} 
+                  className="h-8 gap-1"
+                  disabled={isQuartoPptxGenerating}
+                >
+                  {isQuartoPptxGenerating ? (
+                    <>
+                      <span className="animate-spin mr-1">⌛</span>
+                      <span className="hidden sm:inline">変換中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="h-4 w-4" />
+                      <span className="hidden sm:inline">Q-PPTX</span>
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>QuartoでPowerPointとして出力</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+      
+      {/* 下部セクション: メインツールバー */}
+      <div className="bg-muted pl-1 pr-2 py-2 flex justify-start items-center mb-2 rounded-md">
         <TooltipProvider>
-          <div className="flex space-x-1">
+          <div className="flex space-x-0 items-center"> {/* space-x-1から space-x-0 に変更 */}
             {/* Headings */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("# ", "\n")}>
@@ -1312,7 +1411,7 @@ export default function MarkdownEditor() {
             </div>
 
             {/* Text formatting */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("**", "**")}>
@@ -1342,7 +1441,7 @@ export default function MarkdownEditor() {
             </div>
 
             {/* Lists */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- ", "\n")}>
@@ -1370,7 +1469,7 @@ export default function MarkdownEditor() {
             </div>
 
             {/* Block elements */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("> ", "\n")}>
@@ -1449,7 +1548,7 @@ jupyter: python3
             </div>
 
             {/* Links and images */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("[", "](url)")}>
@@ -1480,246 +1579,137 @@ jupyter: python3
                 <TooltipContent>エディタの内容をクリア</TooltipContent>
               </Tooltip>
             </div>
-          </div>
-        </TooltipProvider>
 
-        <TooltipProvider>
-          <div className="flex items-center space-x-2">
-            {/* Google Drive連携部分 */}
-            <div className="flex items-center mr-4 space-x-2">
-              <Switch 
-                checked={driveEnabled} 
-                onCheckedChange={handleDriveToggle}
-                disabled={!isAuthenticated}
-                label="Google Drive連携"
-              />
-              <GoogleAuth onAuthChange={handleAuthChange} />
+            {/* ビューモード切り替えボタン - ここに移動 */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'editor' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('editor')}
+                      className="h-8 w-8"
+                    >
+                      <Code size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>エディタのみ表示</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'preview' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('preview')}
+                      className="h-8 w-8"
+                    >
+                      <Box size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>プレビューのみ表示</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'split' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('split')}
+                      className="h-8 w-8"
+                    >
+                      <SplitSquareVertical size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>エディタとプレビューを分割表示</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'marp-preview' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('marp-preview')}
+                      className="h-8 w-8"
+                    >
+                      <Presentation size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Marpプレゼンテーションプレビュー</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'marp-split' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('marp-split')}
+                      className="h-8 w-8"
+                    >
+                      <Columns size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>エディタとMarpプレビューを分割表示</TooltipContent>
+                </Tooltip>
+                 
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'quarto-preview' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('quarto-preview')}
+                      className="h-8 w-8"
+                    >
+                      <FileChartColumn size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Quartoプレビュー</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'quarto-split' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('quarto-split')}
+                      className="h-8 w-8"
+                    >
+                      <ChartColumn size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>エディタとQuartoプレビューを分割表示</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={viewMode === 'triple' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => setViewMode('triple')}
+                      className="h-8 w-8"
+                    >
+                      <BotMessageSquare size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>AIチャット表示</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
-            {/* ビューモード切り替えボタン */}
-            
-            <TooltipProvider>
+            {/* ダークモード・Vimモード・Google Drive連携 - 左側に移動 */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'editor' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('editor')}
-                  >
-                    <Code size={18} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>エディタのみ表示</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'preview' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('preview')}
-                  >
-                    <Box size={18} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>プレビューのみ表示</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'split' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('split')}
-                  >
-                    <SplitSquareVertical size={18} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>エディタとプレビューを分割表示</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-
-            {/* Marpボタン */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'marp-preview' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('marp-preview')}
-                  >
-                    <Presentation size={18} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Marpプレゼンテーションプレビュー</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'marp-split' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('marp-split')}
-                  >
-                    <Columns size={18} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>エディタとMarpプレビューを分割表示</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'quarto-preview' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('quarto-preview')}
-                  >
-                    <FileChartColumn size={18} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Quartoプレビュー</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'quarto-split' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('quarto-split')}
-                  >
-                    <ChartColumn size={18} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>エディタとQuartoプレビューを分割表示</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={viewMode === 'triple' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('triple')}
-                  >
-                    <BotMessageSquare size={20} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>AIチャット表示</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Actions */}
-            <div className="flex items-center space-x-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving}>
-                    {isSaving ? (
-                      <>
-                        <span className="animate-spin mr-1">⌛</span>
-                        <span className="hidden sm:inline">保存中...</span>
-                      </>
-                    ) : (
-                      <>
-                        {driveEnabled && isAuthenticated ? <Upload className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-                        <span className="hidden sm:inline">Save</span>
-                        {driveEnabled && isAuthenticated && (
-                          <span className="text-xs ml-1">(Drive)</span>
-                        )}
-                      </>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {driveEnabled && isAuthenticated 
-                    ? "Google Driveに保存" 
-                    : "ローカルに保存"}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1">
-                    <Printer className="h-4 w-4" />
-                    <span className="hidden sm:inline">Print</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Print Preview</TooltipContent>
-              </Tooltip>
-              
-              {/* PowerPoint変換ボタン */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleExportToPptx} 
-                    className="h-8 gap-1"
-                    disabled={isPptxGenerating}
-                  >
-                    {isPptxGenerating ? (
-                      <>
-                        <span className="animate-spin mr-1">⌛</span>
-                        <span className="hidden sm:inline">変換中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileDown className="h-4 w-4" />
-                        <span className="hidden sm:inline">PPTX</span>
-                      </>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>PowerPointとして出力</TooltipContent>
-              </Tooltip>
-              
-              {/* Quarto PPTX変換ボタン */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleExportToQuartoPptx} 
-                    className="h-8 gap-1"
-                    disabled={isQuartoPptxGenerating}
-                  >
-                    {isQuartoPptxGenerating ? (
-                      <>
-                        <span className="animate-spin mr-1">⌛</span>
-                        <span className="hidden sm:inline">変換中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileDown className="h-4 w-4" />
-                        <span className="hidden sm:inline">Q-PPTX</span>
-                      </>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>QuartoでPowerPointとして出力</TooltipContent>
-              </Tooltip>
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={toggleDarkMode} className="h-8 gap-1">
+                  <Button variant="outline" size="sm" onClick={toggleDarkMode} className="h-8 w-8 p-0">
                     {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{isDarkMode ? "ライトモードに切り替え" : "ダークモードに切り替え"}</TooltipContent>
+                <TooltipContent>{isDarkMode ? "ライトモード" : "ダークモード"}</TooltipContent>
               </Tooltip>
+            </div>
+
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="outline" size="sm" onClick={toggleVimMode} className="h-8 gap-1">
@@ -1730,14 +1720,24 @@ jupyter: python3
                 <TooltipContent>{isVimMode ? "Vimモードをオフにする" : "Vimモードをオンにする"}</TooltipContent>
               </Tooltip>
             </div>
+            
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
+              <div className="text-sm mr-1">Google Drive連携</div>
+              <Switch 
+                checked={driveEnabled} 
+                onCheckedChange={handleDriveToggle}
+                disabled={!isAuthenticated}
+              />
+              <GoogleAuth onAuthChange={handleAuthChange} />
+            </div>
           </div>
         </TooltipProvider>
       </div>
 
-      {/* メインコンテンツエリア (エディタ/プレビュー) を flex-grow で囲む */}
+      {/* メインコンテンツエリア (エディタ/プレビュー) */}
       <div className="flex-grow h-[calc(100%-3rem-4px)]"> {/* ツールバーとステータスバーの高さを引く */}
         {viewMode === 'editor' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full`}>
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full pl-0`}>
             {driveEnabled && isAuthenticated && accessToken && (
               <>
                 <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
@@ -1751,7 +1751,7 @@ jupyter: python3
               </>
             )}
             <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
-              <div className="h-full overflow-auto">
+              <div className="h-full overflow-auto pl-0">
                 {EditorComponent}
               </div>
             </ResizablePanel>
@@ -1759,7 +1759,7 @@ jupyter: python3
         )}
         
         {viewMode === 'preview' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full pl-0`}>
             {driveEnabled && isAuthenticated && accessToken && (
               <>
                 <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
@@ -1779,7 +1779,7 @@ jupyter: python3
         )}
         
         {viewMode === 'split' && (
-          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} pl-0`}>
             {driveEnabled && isAuthenticated && accessToken && (
               <>
                 <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
@@ -1809,7 +1809,7 @@ jupyter: python3
         {viewMode === 'triple' && (
           <TripleLayout
             editorComponent={
-              <div className="h-full overflow-auto">
+              <div className="h-full overflow-auto pl-0">
                 {EditorComponent}
               </div>
             }
@@ -1839,7 +1839,7 @@ jupyter: python3
         )}
 
         {viewMode === 'marp-preview' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full pl-0`}>
             {driveEnabled && isAuthenticated && accessToken && (
               <>
                 <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
@@ -1859,7 +1859,7 @@ jupyter: python3
         )}
 
         {viewMode === 'quarto-preview' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
+          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full pl-0`}>
             {driveEnabled && isAuthenticated && accessToken && (
               <>
                 <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
@@ -1879,7 +1879,7 @@ jupyter: python3
         )}
 
         {viewMode === 'marp-split' && (
-          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} pl-0`}>
             {driveEnabled && isAuthenticated && accessToken && (
               <>
                 <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
@@ -1907,7 +1907,7 @@ jupyter: python3
         )}
 
         {viewMode === 'quarto-split' && (
-          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
+          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} pl-0`}>
             {driveEnabled && isAuthenticated && accessToken && (
               <>
                 <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
