@@ -105,9 +105,23 @@ export default function MarkdownEditor() {
     const headings: Heading[] = []; // 型を Heading[] に指定
     let currentH1: Heading | null = null;
     const lines = markdownContent.split('\n');
+    let inCodeBlock = false; // コードブロック内かどうかのフラグ
 
     lines.forEach((line, index) => {
       const lineNumber = index + 1;
+
+      // コードブロックの開始/終了を検出
+      if (line.trim().startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        return; // ``` の行自体は見出しではないので処理をスキップ
+      }
+
+      // コードブロック内は無視
+      if (inCodeBlock) {
+        return;
+      }
+
+      // 見出しの抽出 (コードブロック外のみ)
       if (line.startsWith('# ')) {
         const text = line.substring(2).trim();
         // level を 1 として明示的に指定
@@ -123,11 +137,10 @@ export default function MarkdownEditor() {
             currentH1.children = [];
           }
           currentH1.children.push(h2);
-        } else {
-          // H1なしでH2が出現した場合の処理は不要 (型チェックでエラーになるため)
-          // もし許容する場合は、TableOfContents側の型定義も修正が必要
-          // 今回は H1 の下に H2 がある構造のみを抽出する
         }
+        // H1なしでH2が出現した場合の処理は不要 (型チェックでエラーになるため)
+        // もし許容する場合は、TableOfContents側の型定義も修正が必要
+        // 今回は H1 の下に H2 がある構造のみを抽出する -> 既存ロジック踏襲
       }
     });
 
