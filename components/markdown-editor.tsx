@@ -24,9 +24,9 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/component
 import MermaidDiagram from "./mermaid-diagram"
 import { AIChat } from "./ai-chat"
 import { TripleLayout } from "./triple-layout"
-import { useChat } from 'ai/react'
+import { useChat, Message, CreateMessage } from "ai/react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import type { GoogleFile } from '@/lib/types'
+import type { GoogleFile } from "@/lib/types"
 import { v4 as uuidv4 } from 'uuid'
 import { Switch } from "@/components/ui/switch"
 import GoogleAuth from "./google-auth"
@@ -34,7 +34,10 @@ import GoogleDriveFileList from "./google-drive-file-list"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import MarpPreview from "./marp-preview"
 import QuartoPreview from "./quarto-preview"
-import TableOfContents from "./table-of-contents"
+import TableOfContents from "./table-of-contents" // Heading をここからインポート
+import { ScrollArea } from "@/components/ui/scroll-area"
+// Heading 型を TableOfContents からインポート
+import { type Heading } from "./table-of-contents"; // 'type' を使ったインポートに修正
 
 // --- グローバル型定義 ---
 declare global {
@@ -99,26 +102,31 @@ export default function MarkdownEditor() {
   // --- Derived State ---
   // H1/H2見出し抽出 (ネスト構造、行番号は1-based)
   const extractedHeadings = useMemo(() => {
-    const headings: { level: number; text: string; line: number; children: { level: number; text: string; line: number }[] }[] = [];
-    let currentH1: { level: number; text: string; line: number; children: { level: number; text: string; line: number }[] } | null = null;
+    const headings: Heading[] = []; // 型を Heading[] に指定
+    let currentH1: Heading | null = null;
     const lines = markdownContent.split('\n');
 
     lines.forEach((line, index) => {
       const lineNumber = index + 1;
       if (line.startsWith('# ')) {
         const text = line.substring(2).trim();
+        // level を 1 として明示的に指定
         currentH1 = { level: 1, text, line: lineNumber, children: [] };
         headings.push(currentH1);
       } else if (line.startsWith('## ')) {
         const text = line.substring(3).trim();
-        const h2 = { level: 2, text, line: lineNumber };
+        // level を 2 として明示的に指定
+        const h2: Heading = { level: 2, text, line: lineNumber };
         if (currentH1) {
+          // children も Heading[] 型であることを確認
+          if (!currentH1.children) {
+            currentH1.children = [];
+          }
           currentH1.children.push(h2);
         } else {
-          // H1なしでH2が出現した場合 (ルートレベルのH2として扱うか、エラーにするか要検討。ここではルートに仮追加)
-          // 本来のMarkdown構造的にはH1の下にあるべきだが、柔軟性のため一旦許容
-          headings.push({ level: 1, text: `(No H1) ${text}`, line: lineNumber, children: [h2] });
-          currentH1 = headings[headings.length - 1]; // 次のH2はこの仮H1の下に
+          // H1なしでH2が出現した場合の処理は不要 (型チェックでエラーになるため)
+          // もし許容する場合は、TableOfContents側の型定義も修正が必要
+          // 今回は H1 の下に H2 がある構造のみを抽出する
         }
       }
     });
@@ -1008,16 +1016,18 @@ jupyter: python3
               </Tooltip>
             </div>
             {/* Google Drive */}
-            <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
-               <div className="text-sm mr-1 whitespace-nowrap">Google Drive</div>
-               <Switch
-                 checked={driveEnabled}
-                 onCheckedChange={handleDriveToggle}
-                 disabled={!isAuthenticated} // 非認証時は無効
-                 aria-label="Toggle Google Drive integration"
-               />
-               <GoogleAuth onAuthChange={handleAuthChange} />
-             </div>
+            {process.env.NEXT_PUBLIC_GOOGLE_FLAG !== 'OFF' && (
+              <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
+                <div className="text-sm mr-1 whitespace-nowrap">Google Drive</div>
+                <Switch
+                  checked={driveEnabled}
+                  onCheckedChange={handleDriveToggle}
+                  disabled={!isAuthenticated} // 非認証時は無効
+                  aria-label="Toggle Google Drive integration"
+                />
+                <GoogleAuth onAuthChange={handleAuthChange} />
+              </div>
+            )}
           </div>
         </TooltipProvider>
       </div>
