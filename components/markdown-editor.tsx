@@ -6,51 +6,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
-  Quote,
-  Code,
-  Link,
-  Image,
-  Save,
-  Printer,
-  Heading1,
-  Heading2,
-  Heading3,
-  Table,
-  CheckSquare,
-  Moon,
-  Sun,
-  Smile,
-  Box,
-  MessageSquare,
-  SplitSquareVertical,
-  Trash2,
-  Terminal,
-  Upload,
-  Presentation,
-  Columns,
-  FileDown,
-  FileCode,
-  BotMessageSquare,
-  FileChartColumn,
-  ChartColumn
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
+import { vscDarkPlus, oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism" // スタイルをまとめてインポート
 import CodeMirror from "@uiw/react-codemirror"
-import { markdownLanguage } from "@codemirror/lang-markdown"
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown"
 import { languages } from "@codemirror/language-data"
 import { vscodeDark } from "@uiw/codemirror-theme-vscode"
-import { xcodeLight } from "@uiw/codemirror-theme-xcode"
-import { EditorView } from "@codemirror/view"
-import { markdown } from "@codemirror/lang-markdown"
+import { xcodeLight } from "@uiw/codemirror-theme-xcode" // xcodeLight を別パッケージからインポート
+import { EditorView, keymap, lineNumbers } from "@codemirror/view" // view関連をまとめてインポート
 import { vim } from "@replit/codemirror-vim"
-import { keymap } from "@codemirror/view"
 import { EmojiPicker, EmojiContextMenu } from "./emoji-picker"
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
 import MermaidDiagram from "./mermaid-diagram"
@@ -66,11 +34,8 @@ import GoogleDriveFileList from "./google-drive-file-list"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import MarpPreview from "./marp-preview"
 import QuartoPreview from "./quarto-preview"
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { lineNumbers } from '@codemirror/view'; // 行番号表示のためにインポート
 
-// File System Access API の型定義
+// --- グローバル型定義 ---
 declare global {
   interface Window {
     showSaveFilePicker?: (options?: {
@@ -88,868 +53,243 @@ declare global {
   }
 }
 
+// --- コンポーネント本体 ---
 export default function MarkdownEditor() {
+  // --- State Variables ---
+
+  // Editor State
   const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\nStart typing your markdown here...")
-  const previewRef = useRef<HTMLDivElement>(null)
-  const splitPreviewRef = useRef<HTMLDivElement>(null)
-  const tabPreviewRef = useRef<HTMLDivElement>(null)
-  const [isDarkMode, setIsDarkMode] = useState(false)
   const [isVimMode, setIsVimMode] = useState(false)
-  const editorRef = useRef<EditorView | null>(null)
-  const viewRef = useRef<EditorView | null>(null)
-  const cursorPosRef = useRef<number>(0)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isUploadingImage, setIsUploadingImage] = useState(false) // 画像アップロード中フラグを追加
-  const imageInputRef = useRef<HTMLInputElement>(null); // 画像ファイル選択用refを追加
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
+
+  // UI State
+  const [isDarkMode, setIsDarkMode] = useState(false)
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split'>('split')
-  const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 }); // ステータスバー用のカーソル位置状態
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [isPptxGenerating, setIsPptxGenerating] = useState(false)
+  const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false)
 
-  // Google Drive連携関連の状態 (accessToken のみ保持)
+  // Google Drive State
   const [driveEnabled, setDriveEnabled] = useState(false)
-  const [accessToken, setAccessToken] = useState<string | null>(null) // driveService の代わりに accessToken
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<GoogleFile | null>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false) // 認証状態は引き続き管理
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // useChatフック
+  // AI Chat State (using useChat hook)
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append, reload, stop } = useChat();
 
-  // チャットクリア関数
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-  }, [setMessages]);
+  // --- Refs ---
 
-  // Google認証状態が変更されたときのハンドラ (accessToken をセット)
-  const handleAuthChange = useCallback((authenticated: boolean, token?: string) => {
-    setIsAuthenticated(authenticated)
-    setAccessToken(token || null) // トークンを状態に保存
-    if (!authenticated) {
-      setSelectedFile(null) // ログアウト時に選択ファイルをクリア
-    }
+  // Editor Refs
+  // const editorRef = useRef<EditorView | null>(null) // 以前の未使用のref？ (現在 onCreateEditor で viewRef を使用)
+  const viewRef = useRef<EditorView | null>(null) // CodeMirrorのビューインスタンス用
+  const cursorPosRef = useRef<number>(0) // フォールバック用カーソル位置
+
+  // Preview Refs
+  const previewRef = useRef<HTMLDivElement>(null) // 以前の未使用のref?
+  const splitPreviewRef = useRef<HTMLDivElement>(null) // 印刷用
+  const tabPreviewRef = useRef<HTMLDivElement>(null) // 印刷用
+
+  // UI Refs
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Editor Core Functions ---
+
+  // CodeMirrorの内容変更ハンドラ
+  const handleContentChange = useCallback((value: string) => {
+    setMarkdownContent(value)
   }, [])
 
-  // Google Drive連携の有効/無効を切り替えるハンドラ
-  const handleDriveToggle = useCallback((enabled: boolean) => {
-    setDriveEnabled(enabled)
-    if (!enabled) {
-      setSelectedFile(null)
-    }
-  }, [])
-
-  // Google Driveからファイルを選択したときのハンドラ (API Route を fetch)
-  const handleFileSelect = useCallback(async (file: GoogleFile) => {
-    if (!accessToken) return
-
-    try {
-      const response = await fetch(`/api/drive/read?fileId=${file.id}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
-      }
-
-      // テキストコンテンツを取得
-      const content = await response.text()
-
-      setMarkdownContent(content)
-      setSelectedFile(file)
-    } catch (error: any) {
-      console.error('ファイル読み込みエラー:', error)
-      alert(error.message || 'ファイルを読み込めませんでした')
-    } finally {
-      // 必要であればローディング状態を解除
-    }
-  }, [accessToken])
-
-  // Google Driveにファイルを保存するハンドラ (API Route を fetch)
-  const handleDriveSave = useCallback(async () => {
-    if (!accessToken) return
-
-    setIsSaving(true)
-
-    try {
-      // 1. Markdownの最初の行を取得
-      const firstLine = markdownContent.split('\n')[0] || '';
-      // 2. 見出し記号を除去し、トリム
-      let baseName = firstLine.replace(/^#+\s*/, '').trim();
-      // 3. スペースを除去
-      baseName = baseName.replace(/\s+/g, '');
-      // 4. ファイル名に使えない文字を置換
-      baseName = baseName.replace(/[\/]/g, '_'); 
-
-      // 5. ファイル名が空でないか確認、空ならデフォルト名
-      const potentialFileName = baseName ? `${baseName}.md` : '';
-
-      // 選択中のファイル名、または生成したファイル名、またはデフォルト名を使用
-      const fileName = selectedFile?.name || potentialFileName || `untitled-${uuidv4().substring(0, 8)}.md`;
-      
-      const method = selectedFile ? 'PUT' : 'POST' // 既存ファイルはPUT、新規はPOST
-
-      const response = await fetch('/api/drive/save', {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          name: fileName, // 生成したファイル名を使用
-          content: markdownContent,
-          fileId: selectedFile?.id // 更新時のみ fileId を送信
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
-      }
-
-      const savedFileData = await response.json()
-      console.log('Google Driveに保存しました:', savedFileData)
-
-      // 選択ファイル情報を更新 (IDと更新日時を含む)
-      setSelectedFile({
-        id: savedFileData.id,
-        name: savedFileData.name, // 保存された実際のファイル名で更新
-        mimeType: 'text/markdown', // mimeType は固定
-        modifiedTime: savedFileData.modifiedTime
-        // createdTime は保存APIレスポンスに含まれていないため更新しない
-      })
-
-    } catch (error: any) {
-      console.error('Google Drive保存エラー:', error)
-      alert(error.message || 'Google Driveへの保存に失敗しました')
-    } finally {
-      setIsSaving(false)
-    }
-  }, [accessToken, markdownContent, selectedFile])
-
-  const insertText = (before: string, after = "") => {
-    // For CodeMirror, we'll need to use the editor's API
-    // This is a simplified approach - in a real app, you might want to use a ref
-    const selection = window.getSelection?.()?.toString() || ""
-    const newText = before + selection + after
-
-    // Insert at cursor position or replace selection
-    setMarkdownContent((prev) => {
-      if (selection) {
-        const selectionStart = prev.indexOf(selection)
-        if (selectionStart !== -1) {
-          return prev.substring(0, selectionStart) + newText + prev.substring(selectionStart + selection.length)
-        }
-      }
-      // If no selection or selection not found, append to end
-      return prev + newText
-    })
-  }
-
-  // マウントされた際にエディタにフォーカスを当てる
-  useEffect(() => {
-    // 初期カーソル位置を設定
-    cursorPosRef.current = markdownContent.length;
-    
-    // フォーカスを当てる（オプション）
-    const timeoutId = setTimeout(() => {
-      if (viewRef.current) {
-        viewRef.current.focus();
-      }
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, []);
-
-  // カーソル位置の更新を処理する関数 (行・列を取得)
+  // カーソル位置更新ハンドラ (行・列表示用)
   const handleCursorUpdate = useCallback((view: EditorView | null) => {
     if (view) {
       const pos = view.state.selection.main.head;
       const line = view.state.doc.lineAt(pos);
       const lineNum = line.number;
       const colNum = pos - line.from + 1; // 1-based column
-      // 状態が実際に変化した場合のみ更新
       setCursorPosition(prevPos => {
         if (prevPos.line !== lineNum || prevPos.col !== colNum) {
-          console.log("カーソル位置を更新:", lineNum, colNum);
+          // console.log("カーソル位置を更新:", lineNum, colNum); // デバッグ用
           return { line: lineNum, col: colNum };
         }
-        return prevPos; // 変化がなければ現在の状態を維持
+        return prevPos;
       });
     }
-  }, [setCursorPosition]); // 依存配列を修正
+  }, [setCursorPosition]);
 
+  // CodeMirror拡張機能 (Vimモード切替、行番号、リスナーなど)
+  const editorExtensions = useMemo(() => {
+    const extensions = [
+      lineNumbers(),
+      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      EditorView.lineWrapping,
+      EditorView.updateListener.of((update) => {
+        // デバッグ用枠線 (ここではコメントアウト)
+        /* if (update.docChanged || update.selectionSet || update.focusChanged || update.viewportChanged) { ... } */
+
+        // カーソル位置更新
+        if (update.selectionSet || update.docChanged) {
+          if (update.view.hasFocus) {
+            handleCursorUpdate(update.view);
+          }
+        }
+      }),
+      EditorView.theme({
+        // デバッグ用枠線 (ここではコメントアウト)
+        /* ".cm-tooltip, .cm-panel, ...": { border: "1px dashed blue !important" } */
+      }),
+      EditorView.domEventHandlers({
+        keydown: (event, view) => {
+          // console.log(`Keydown: key=${event.key}, code=${event.code}, ctrl=${event.ctrlKey}, shift=${event.shiftKey}, alt=${event.altKey}, meta=${event.metaKey}`);
+          if (event.ctrlKey && (event.code === "Space" || event.key === " ")) {
+            event.preventDefault(); return true;
+          }
+          if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            const pos = view.state.selection.main.head;
+            view.dispatch({ changes: { from: pos, to: pos, insert: "  " } });
+            event.preventDefault(); return true;
+          }
+          if (event.key === "Escape") {
+            // console.log("Escape key pressed, applying debug borders.");
+            // デバッグ用枠線 (ここではコメントアウト)
+            /* setTimeout(() => { ... }, 10); */
+            return false; // Allow standard escape behavior
+          }
+          return false;
+        }
+      })
+    ];
+    if (isVimMode) {
+      extensions.push(vim({ status: false }));
+    }
+    return extensions;
+  }, [handleCursorUpdate, isVimMode]);
+
+  // --- Editor Action Handlers ---
+
+  // テキスト挿入 (ツールバーボタン用)
+  const insertText = useCallback((before: string, after = "") => {
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const state = view.state;
+      const selection = state.selection.main;
+      const selectedText = state.sliceDoc(selection.from, selection.to);
+      const newText = before + selectedText + after;
+
+      view.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: newText },
+        selection: { anchor: selection.from + before.length, head: selection.from + before.length + selectedText.length },
+        userEvent: "input"
+      });
+      view.focus();
+      // カーソル位置は updateListener で更新される想定
+    } else {
+      // フォールバック (非推奨)
+      console.warn("viewRef is not available for insertText. Falling back.");
+      const selection = window.getSelection?.()?.toString() || "";
+      const newText = before + selection + after;
+      setMarkdownContent((prev) => {
+        const pos = cursorPosRef.current;
+        const safePos = Math.max(0, Math.min(pos, prev.length));
+        // 簡易的な置換または挿入
+        if (selection && prev.includes(selection)) {
+           return prev.replace(selection, newText);
+        } else {
+           const newContent = prev.substring(0, safePos) + newText + prev.substring(safePos);
+           cursorPosRef.current = safePos + newText.length;
+           return newContent;
+        }
+      });
+    }
+  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
+
+  // 絵文字挿入ハンドラ
   const insertEmoji = useCallback((emoji: string) => {
-    console.log("絵文字を挿入:", emoji);
-
-    try {
-      // 1. viewRefを経由した挿入を試みる
-      if (viewRef.current) {
-        const currentPos = viewRef.current.state.selection.main.head; // 現在のカーソル位置
-        // @ts-ignore - TypeScriptエラーを無視 (必要であれば型アサーションを検討)
-        viewRef.current.dispatch({
-          changes: {
-            from: currentPos,
-            to: currentPos,
-            insert: emoji
-          },
-          selection: { anchor: currentPos + emoji.length } // 挿入後にカーソル移動
-        });
-        viewRef.current.focus(); // エディタにフォーカスを戻す
-        // cursorPosRefはupdateListenerで更新されるはずだが、念のため
-        cursorPosRef.current = currentPos + emoji.length;
-        console.log("絵文字挿入 (CodeMirror):", emoji, " 新カーソル位置:", cursorPosRef.current);
-        return;
-      }
-
-      // 2. エディタのコンテンツエリアを探して挿入を試みる (削除)
-      /*
-      const contentArea = document.querySelector('.cm-content');
-      ...
-      */
-
-      // 3. DOMからエディタビューを取得する方法 (削除)
-      /*
-      const editorElement = document.querySelector('.cm-editor');
-      ...
-      */
-
-      // 4. フォールバック: カーソル位置をトラッキングして直接テキストを更新
-      console.warn("viewRef.current is not available for emoji insertion. Falling back.");
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const currentPos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: currentPos, to: currentPos, insert: emoji },
+        selection: { anchor: currentPos + emoji.length }
+      });
+      view.focus();
+      cursorPosRef.current = currentPos + emoji.length; // 一応更新
+    } else {
+      console.warn("viewRef is not available for emoji insertion. Falling back.");
       setMarkdownContent(prev => {
         const pos = cursorPosRef.current;
-        // カーソル位置が有効範囲内か確認
         const safePos = Math.max(0, Math.min(pos, prev.length));
         const newContent = prev.substring(0, safePos) + emoji + prev.substring(safePos);
-        // カーソル位置を更新
         cursorPosRef.current = safePos + emoji.length;
-        console.log("絵文字挿入 (Fallback):", emoji, " 新カーソル位置:", cursorPosRef.current);
         return newContent;
       });
-
-    } catch (error) {
-      console.error("絵文字挿入エラー:", error);
-      // フォールバック: テキストの最後に追加
-      setMarkdownContent(prev => {
-         const newContent = prev + emoji;
-         cursorPosRef.current = newContent.length;
-         return newContent;
-      });
     }
-  // 依存配列に cursorPosRef.current を含めない
-  }, [setMarkdownContent]);
+  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
 
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      
-      // Google Driveが有効で認証済みの場合はGoogle Driveに保存
-      if (driveEnabled && isAuthenticated && accessToken) {
-        await handleDriveSave();
-        return;
-      }
-      
-      // window.showDirectoryPickerがサポートされている場合のみ実行
-      if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
-        // ファイル保存ダイアログを表示
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName: 'document.md',
-          types: [{
-            description: 'Markdown',
-            accept: {
-              'text/markdown': ['.md'],
-            },
-          }],
-        });
-        
-        // ファイルに書き込むためのWritableStreamを取得
-        const writable = await fileHandle.createWritable();
-        
-        // ファイルにマークダウンコンテンツを書き込み
-        await writable.write(markdownContent);
-        
-        // ストリームを閉じて保存を完了
-        await writable.close();
-        
-        console.log("ファイルが保存されました");
-      } else {
-        // 従来の方法にフォールバック
-        const blob = new Blob([markdownContent], { type: "text/markdown" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "document.md";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        console.log("従来の方法でファイルがダウンロードされました");
-      }
-    } catch (error) {
-      console.error("ファイル保存エラー:", error);
-      
-      // エラーの場合は従来の方法にフォールバック
-      const blob = new Blob([markdownContent], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "document.md";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) return
-
-    // 表示中のプレビュー要素を取得
-    // MermaidがレンダリングしたSVGを含む可能性のある要素を優先的に試す
-    const activePreviewElement =
-      document.querySelector('.tabs-content[data-state="active"] .prose') ||
-      splitPreviewRef.current || // Split view のプレビュー
-      tabPreviewRef.current;     // Tab view のプレビュー
-
-    // innerHTML を取得 (レンダリング済み SVG が含まれることを期待)
-    const currentPreviewContent = activePreviewElement?.innerHTML || "";
-
-
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Markdown Preview</title>
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-          }
-          pre {
-            background-color: #1E1E1E; /* Use a specific background for code blocks */
-            border-radius: 3px;
-            padding: 16px;
-            overflow: auto;
-            color: #D4D4D4; /* Light text color for dark background */
-          }
-          /* Ensure code within pre also uses monospace font */
-          pre code {
-            font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
-            background: none; /* Remove background from inline code inside pre */
-            padding: 0; /* Remove padding from inline code inside pre */
-            color: inherit; /* Inherit color from pre */
-          }
-          /* Style for inline code */
-          code:not(pre > code) {
-             font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
-             background-color: rgba(27,31,35,.05); /* Subtle background for inline code */
-             padding: .2em .4em;
-             margin: 0;
-             font-size: 85%;
-             border-radius: 3px;
-          }
-          /* VS Code-like syntax highlighting (placeholder, actual highlighting depends on react-syntax-highlighter's output structure) */
-          .token.comment { color: #6A9955; }
-          .token.string { color: #CE9178; }
-          .token.keyword { color: #569CD6; }
-          .token.function { color: #DCDCAA; }
-          .token.number { color: #B5CEA8; }
-          .token.operator { color: #D4D4D4; }
-          .token.class-name { color: #4EC9B0; }
-          /* Table styles */
-          table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-bottom: 16px;
-            border-spacing: 0;
-          }
-          table th, table td {
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: left;
-          }
-          table tr:nth-child(even) {
-            background-color: #f6f8fa; /* Zebra striping for table rows */
-          }
-          blockquote {
-            border-left: 4px solid #dfe2e5; /* Adjusted color */
-            padding: 0 1em; /* Adjusted padding */
-            margin-left: 0;
-            color: #6a737d; /* Adjusted color */
-          }
-          img {
-            max-width: 100%;
-            height: auto; /* Maintain aspect ratio */
-            display: block; /* Prevent extra space below image */
-          }
-          /* Heading styles */
-          h1, h2, h3, h4, h5, h6 {
-            margin-top: 24px;
-            margin-bottom: 16px;
-            font-weight: 600;
-            line-height: 1.25;
-          }
-          h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-          h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-          h3 { font-size: 1.25em; }
-          h4 { font-size: 1em; }
-          h5 { font-size: .875em; }
-          h6 { font-size: .85em; color: #6a737d; }
-          ul, ol {
-            padding-left: 2em;
-            margin-top: 0; /* Consistent list spacing */
-            margin-bottom: 16px; /* Consistent list spacing */
-          }
-          hr {
-            height: 0.25em;
-            padding: 0;
-            margin: 24px 0;
-            background-color: #e1e4e8;
-            border: 0;
-          }
-          a {
-            color: #0366d6;
-            text-decoration: none;
-          }
-          a:hover {
-            text-decoration: underline;
-          }
-          /* Task list styles */
-          .task-list-item {
-            list-style-type: none;
-          }
-          .task-list-item label {
-            font-weight: normal; /* Override potential bolding */
-          }
-          .task-list-item.enabled label {
-             cursor: pointer;
-          }
-          .task-list-item + .task-list-item {
-             margin-top: 3px;
-          }
-          .task-list-item input[type=checkbox] {
-            margin: 0 0.2em 0.25em -1.6em;
-            vertical-align: middle;
-          }
-          /* Mermaid図表のスタイル (SVGが直接埋め込まれることを想定) */
-          .mermaid {
-            text-align: center; /* Center the container */
-            margin-bottom: 16px; /* Add space below diagram */
-          }
-          .mermaid svg {
-            max-width: 100%; /* Ensure SVG scales down */
-            height: auto !important; /* Maintain aspect ratio */
-            display: block; /* Prevent extra space */
-            margin: 0 auto; /* Center SVG within the container */
-          }
-          /* Add specific styles if MermaidDiagram component wraps SVG */
-          .mermaid > svg { /* Target direct SVG child if applicable */
-             /* Add styles here if needed */
-          }
-        </style>
-      </head>
-      <body>
-        <div id="content">
-          ${currentPreviewContent}
-        </div>
-        <script>
-          // No need to run mermaid.initialize or mermaid.run here
-          // as the content should already contain the rendered SVG.
-          // Just trigger print once the content is loaded.
-          window.onload = function() {
-            console.log('Content loaded, triggering print...');
-            window.print();
-            // Optionally close the window after printing/cancellation
-            // setTimeout(() => { window.close(); }, 500);
-          }
-        </script>
-      </body>
-    </html>
-  `
-
-    printWindow.document.open()
-    printWindow.document.write(htmlContent)
-    printWindow.document.close() // close() is important for window.onload to fire
-  }
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode)
-    document.documentElement.classList.toggle('dark')
-  }
-
-  // Vimモードの切り替え関数
-  const toggleVimMode = () => {
-    const currentCursorPos = cursorPosRef.current;
-    setIsVimMode(!isVimMode);
-    setTimeout(() => {
-      if (viewRef.current) {
-        // viewRef.current.contentDOM.focus(); // デバッグ中はフォーカス移動を一旦コメントアウト
-        try {
-          const state = viewRef.current.state;
-          const transaction = state.update({
-            selection: {anchor: currentCursorPos, head: currentCursorPos}
-          });
-          viewRef.current.dispatch(transaction);
-          // モード切替後もデバッグ用枠線適用
-          console.log("Toggling Vim mode, applying debug borders.");
-          document.querySelectorAll('.cm-tooltip, .cm-panel, .cm-dialog, .cm-vimMode-command-dialog, .cm-search-panel')
-            .forEach(el => {
-               if (el instanceof HTMLElement) {
-                  el.style.setProperty('border', '2px solid orange', 'important'); // Vim切替時はオレンジ枠
-                  el.style.setProperty('visibility', 'visible', 'important');
-                  el.style.setProperty('opacity', '0.7', 'important');
-               }
-            });
-        } catch (error) {
-          console.error("カーソル位置の復元に失敗:", error);
-        }
-      }
-    }, 100);
-  }
-
-  // エディタの内容をクリアする関数
-  const handleClearContent = useCallback(() => {
-    setMarkdownContent("");
-    cursorPosRef.current = 0; // カーソル位置もリセット
-  }, []);
-
-  // マークダウンコンテンツが変更されたときの処理
-  const handleContentChange = useCallback((value: string) => {
-    setMarkdownContent(value)
-  }, [])
-
-  // PowerPointへの変換処理
-  const [isPptxGenerating, setIsPptxGenerating] = useState(false)
-  const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false)
-  
-  const handleExportToPptx = async () => {
-    console.log('PowerPoint変換処理を開始します...');
-    try {
-      setIsPptxGenerating(true)
-      
-      // マークダウンコンテンツが空でないか確認
-      if (!markdownContent.trim()) {
-        console.error('マークダウンコンテンツが空です');
-        alert('マークダウンコンテンツが空です。変換するコンテンツを入力してください。');
-        return;
-      }
-      
-      console.log(`マークダウンコンテンツ (${markdownContent.length}文字) をフォームデータに変換します...`);
-      
-      // マークダウンコンテンツをエンコード
-      const formData = new FormData()
-      formData.append('markdown', markdownContent)
-      
-      // APIエンドポイントを呼び出し
-      console.log('APIエンドポイントを呼び出します...');
-      const response = await fetch('/api/export-to-pptx', {
-        method: 'POST',
-        body: formData
-      })
-      
-      console.log(`APIレスポンス: status=${response.status}, ok=${response.ok}`);
-      
-      // APIからのエラーレスポンスを処理
-      if (!response.ok) {
-        let errorMessage = 'PowerPoint変換エラー';
-        try {
-          // JSONエラーレスポンスを解析
-          const errorData = await response.json();
-          errorMessage = errorData.error || 'PowerPoint変換エラー';
-          console.error('APIエラーレスポンス:', errorData);
-        } catch (jsonError) {
-          // JSONでない場合はテキストを取得
-          const errorText = await response.text();
-          errorMessage = errorText || 'PowerPoint変換エラー';
-          console.error('APIエラーテキスト:', errorText);
-        }
-        throw new Error(errorMessage);
-      }
-      
-      // Content-Typeを確認
-      const contentType = response.headers.get('Content-Type');
-      console.log(`レスポンスのContent-Type: ${contentType}`);
-      
-      if (contentType && contentType.includes('application/json')) {
-        // JSONレスポンスの場合はエラーとして処理
-        const jsonData = await response.json();
-        console.error('JSONレスポンス (エラーの可能性):', jsonData);
-        throw new Error(jsonData.error || 'PowerPoint変換エラー');
-      }
-      
-      // 処理時間のデバッグ情報
-      const processingTime = response.headers.get('X-Processing-Time');
-      if (processingTime) {
-        console.log(`サーバー処理時間: ${processingTime}`);
-      }
-      
-      // BlobとしてPPTXファイルを取得
-      console.log('レスポンスデータをBlobとして取得します...');
-      const pptxBlob = await response.blob();
-      console.log(`Blobサイズ: ${pptxBlob.size} バイト, タイプ: ${pptxBlob.type}`);
-      
-      // ファイルサイズの確認
-      if (pptxBlob.size === 0) {
-        throw new Error('生成されたPPTXファイルが空です');
-      }
-      
-      // ファイル名を決定 - マークダウンの先頭行から決定
-      let fileName = 'presentation.pptx'
-      const firstLine = markdownContent.split('\n')[0] || ''
-      const title = firstLine.replace(/^#+\s*/, '').trim()
-      if (title) {
-        fileName = `${title.replace(/\s+/g, '_').replace(/[\/\\?%*:|"<>]/g, '_')}.pptx`
-      }
-      console.log(`ファイル名: ${fileName}`);
-      
-      // ダウンロード
-      console.log('ファイルをダウンロードします...');
-      const url = URL.createObjectURL(pptxBlob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      
-      // クリーンアップ
-      setTimeout(() => {
-        URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        console.log('ダウンロードリンクのクリーンアップ完了');
-      }, 100)
-      
-      console.log('PowerPointファイルが正常に生成されました')
-    } catch (error) {
-      console.error('PowerPoint変換エラー詳細:', error)
-      alert(error instanceof Error ? error.message : '変換中に不明なエラーが発生しました')
-    } finally {
-      setIsPptxGenerating(false)
-    }
-  }
-
-  // QuartoでのPPTX変換処理
-  const handleExportToQuartoPptx = async () => {
-    console.log('Quarto PowerPoint変換処理を開始します...');
-    try {
-      setIsQuartoPptxGenerating(true)
-      
-      // マークダウンコンテンツが空でないか確認
-      if (!markdownContent.trim()) {
-        console.error('マークダウンコンテンツが空です');
-        alert('マークダウンコンテンツが空です。変換するコンテンツを入力してください。');
-        return;
-      }
-      
-      console.log(`マークダウンコンテンツ (${markdownContent.length}文字) をフォームデータに変換します...`);
-      
-      // マークダウンコンテンツをエンコード
-      const formData = new FormData()
-      formData.append('markdown', markdownContent)
-      formData.append('format', 'pptx')
-      
-      // APIエンドポイントを呼び出し
-      console.log('APIエンドポイントを呼び出します...');
-      const response = await fetch('/api/export-to-quarto', {
-        method: 'POST',
-        body: formData
-      })
-      
-      console.log(`APIレスポンス: status=${response.status}, ok=${response.ok}`);
-      
-      // APIからのエラーレスポンスを処理
-      if (!response.ok) {
-        let errorMessage = 'Quarto PowerPoint変換エラー';
-        try {
-          // JSONエラーレスポンスを解析
-          const errorData = await response.json();
-          errorMessage = errorData.error || 'Quarto PowerPoint変換エラー';
-          console.error('APIエラーレスポンス:', errorData);
-        } catch (jsonError) {
-          // JSONでない場合はテキストを取得
-          const errorText = await response.text();
-          errorMessage = errorText || 'Quarto PowerPoint変換エラー';
-          console.error('APIエラーテキスト:', errorText);
-        }
-        throw new Error(errorMessage);
-      }
-      
-      // Content-Typeを確認
-      const contentType = response.headers.get('Content-Type');
-      console.log(`レスポンスのContent-Type: ${contentType}`);
-      
-      if (contentType && contentType.includes('application/json')) {
-        // JSONレスポンスの場合はエラーとして処理
-        const jsonData = await response.json();
-        console.error('JSONレスポンス (エラーの可能性):', jsonData);
-        throw new Error(jsonData.error || 'Quarto PowerPoint変換エラー');
-      }
-      
-      // 処理時間のデバッグ情報
-      const processingTime = response.headers.get('X-Processing-Time');
-      if (processingTime) {
-        console.log(`サーバー処理時間: ${processingTime}`);
-      }
-      
-      // BlobとしてPPTXファイルを取得
-      console.log('レスポンスデータをBlobとして取得します...');
-      const pptxBlob = await response.blob();
-      console.log(`Blobサイズ: ${pptxBlob.size} バイト, タイプ: ${pptxBlob.type}`);
-      
-      // ファイルサイズの確認
-      if (pptxBlob.size === 0) {
-        throw new Error('生成されたPPTXファイルが空です');
-      }
-      
-      // ファイル名を決定 - マークダウンの先頭行から決定
-      let fileName = 'presentation.pptx'
-      const firstLine = markdownContent.split('\n')[0] || ''
-      const title = firstLine.replace(/^#+\s*/, '').trim()
-      if (title) {
-        fileName = `${title.replace(/\s+/g, '_').replace(/[\/\\?%*:|"<>]/g, '_')}.pptx`
-      }
-      console.log(`ファイル名: ${fileName}`);
-      
-      // ダウンロード
-      console.log('ファイルをダウンロードします...');
-      const url = URL.createObjectURL(pptxBlob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      
-      // クリーンアップ
-      setTimeout(() => {
-        URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        console.log('ダウンロードリンクのクリーンアップ完了');
-      }, 100)
-      
-      console.log('Quarto PowerPointファイルが正常に生成されました')
-    } catch (error) {
-      console.error('Quarto PowerPoint変換エラー詳細:', error)
-      alert(error instanceof Error ? error.message : '変換中に不明なエラーが発生しました')
-    } finally {
-      setIsQuartoPptxGenerating(false)
-    }
-  }
-
-  // AIからのコンテンツをエディタに挿入
+  // AIからのコンテンツ挿入ハンドラ
   const handleAIContentInsert = useCallback((text: string) => {
-    try {
-      // 1. viewRefを経由した挿入を試みる
-      if (viewRef.current) {
-        const currentPos = viewRef.current.state.selection.main.head; // 現在のカーソル位置
-        // @ts-ignore - TypeScriptエラーを無視 (必要であれば型アサーションを検討)
-        viewRef.current.dispatch({
-          changes: {
-            from: currentPos,
-            to: currentPos,
-            insert: text
-          },
-          selection: { anchor: currentPos + text.length } // 挿入後にカーソル移動
-        });
-        viewRef.current.focus(); // エディタにフォーカスを戻す
-        // cursorPosRefはupdateListenerで更新されるはずだが、念のため
-        cursorPosRef.current = currentPos + text.length;
-        console.log("AIコンテンツ挿入 (CodeMirror):", text, " 新カーソル位置:", cursorPosRef.current);
-        return;
-      }
-
-      // 2. エディタのコンテンツエリアを探して挿入を試みる (削除)
-      /*
-      const contentArea = document.querySelector('.cm-content');
-      ...
-      */
-
-      // 3. 最終手段: カーソル位置をトラッキングして直接テキストを更新 (フォールバック)
-      console.warn("viewRef.current is not available. Falling back to direct state update.");
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const currentPos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: currentPos, to: currentPos, insert: text },
+        selection: { anchor: currentPos + text.length }
+      });
+      view.focus();
+      cursorPosRef.current = currentPos + text.length; // 一応更新
+    } else {
+      console.warn("viewRef is not available for AI content insertion. Falling back.");
       setMarkdownContent(prev => {
-        const pos = cursorPosRef.current; // 保存されているカーソル位置を使用
-        // カーソル位置が有効範囲内か確認
+        const pos = cursorPosRef.current;
         const safePos = Math.max(0, Math.min(pos, prev.length));
         const newContent = prev.substring(0, safePos) + text + prev.substring(safePos);
-        // カーソル位置を更新
         cursorPosRef.current = safePos + text.length;
-        console.log("AIコンテンツ挿入 (Fallback):", text, " 新カーソル位置:", cursorPosRef.current);
         return newContent;
       });
-
-    } catch (error) {
-      console.error("AIコンテンツ挿入エラー:", error);
-      // フォールバック: テキストの最後に追加
-      setMarkdownContent(prev => {
-         const newContent = prev + text;
-         cursorPosRef.current = newContent.length; // カーソル位置を最後に設定
-         return newContent;
-      });
     }
-  // 依存配列に cursorPosRef.current を含めない
-  }, [setMarkdownContent]);
+  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
 
-  // 画像アップロード処理
+  // 画像アップロードハンドラ
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    event.target.value = ''; // 同じファイルを連続で選択できるように値をクリア
+    event.target.value = ''; // Reset input
 
-    if (!file) {
-      return;
-    }
-
-    // 画像ファイル以外は処理しない
-    if (!file.type.startsWith('image/')) {
+    if (!file || !file.type.startsWith('image/')) {
       alert('画像ファイルを選択してください。');
       return;
     }
 
     setIsUploadingImage(true);
     const formData = new FormData();
-    formData.append('file', file); // API側のキー名と一致させる
+    formData.append('file', file);
 
     try {
-      const response = await fetch('/api/upload-image', {
-        method: 'POST',
-        body: formData,
-      });
-
+      const response = await fetch('/api/upload-image', { method: 'POST', body: formData });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `画像アップロードエラー: ${response.status}`);
       }
-
       const data = await response.json();
-      const imageUrl = `![](${window.location.origin}${data.url})`; // ポート番号を動的に設定
+      const imageUrl = `![](${window.location.origin}${data.url})`; // Generate markdown image link
 
-      // CodeMirrorに挿入
+      // Insert into CodeMirror
       if (viewRef.current) {
-        const currentPos = viewRef.current.state.selection.main.head;
-        viewRef.current.dispatch({
-          changes: {
-            from: currentPos,
-            to: currentPos,
-            insert: imageUrl,
-          },
+        const view = viewRef.current;
+        const currentPos = view.state.selection.main.head;
+        view.dispatch({
+          changes: { from: currentPos, to: currentPos, insert: imageUrl },
           selection: { anchor: currentPos + imageUrl.length },
         });
-        viewRef.current.focus();
-        cursorPosRef.current = currentPos + imageUrl.length;
-        console.log("画像挿入 (CodeMirror):", imageUrl, " 新カーソル位置:", cursorPosRef.current);
+        view.focus();
+        cursorPosRef.current = currentPos + imageUrl.length; // 一応更新
       } else {
-        // フォールバック (既存のロジックに合わせる)
-        console.warn("viewRef.current is not available for image insertion. Falling back.");
+        console.warn("viewRef is not available for image insertion. Falling back.");
         setMarkdownContent(prev => {
           const pos = cursorPosRef.current;
           const safePos = Math.max(0, Math.min(pos, prev.length));
           const newContent = prev.substring(0, safePos) + imageUrl + prev.substring(safePos);
           cursorPosRef.current = safePos + imageUrl.length;
-          console.log("画像挿入 (Fallback):", imageUrl, " 新カーソル位置:", cursorPosRef.current);
           return newContent;
         });
       }
@@ -959,224 +299,446 @@ export default function MarkdownEditor() {
     } finally {
       setIsUploadingImage(false);
     }
-  }, [setMarkdownContent]); // cursorPosRef.current を依存配列から削除
+  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
 
-  // EditorView.updateListenerを含む拡張機能
-  const editorExtensions = useMemo(() => {
-    const extensions = [
-      lineNumbers(), // 行番号表示を追加
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
-      EditorView.lineWrapping,
-      EditorView.updateListener.of((update) => {
-        // エディタの更新時やフォーカス変更時にポップアップ/パネルに枠線をつける
-        if (update.docChanged || update.selectionSet || update.focusChanged || update.viewportChanged) {
-          setTimeout(() => {
-            // CodeMirrorが生成する可能性のある要素を広範囲に選択
-            document.querySelectorAll(
-              '.cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, .cm-vimMode-command-dialog, .cm-search-panel' // より広範なセレクタ
-            )
-            .forEach(el => {
-              if (el instanceof HTMLElement) {
-                 // デバッグ用に非表示ではなく、赤い枠線をつける
-                 el.style.setProperty('border', '1px solid red', 'important');
-                 // 一時的に表示を維持（ただし操作はできないように）
-                 el.style.setProperty('visibility', 'visible', 'important');
-                 el.style.setProperty('opacity', '0.5', 'important'); // 半透明にする
-                 el.style.setProperty('pointer-events', 'none', 'important');
-                 // 表示位置に関するスタイルは削除（本来の位置で見えるように）
-                 // el.style.removeProperty('position');
-                 // el.style.removeProperty('top');
-                 // el.style.removeProperty('left');
-                 // el.style.removeProperty('display');
-              }
-            });
-            // エディタにフォーカスを戻す
-            // viewRef.current?.contentDOM?.focus(); // デバッグ中はフォーカス移動を一旦コメントアウト
-          }, 50); // 遅延
-        }
-
-        // カーソル位置更新の処理
-        if (update.selectionSet || update.docChanged) {
-          if (update.view.hasFocus) {
-            handleCursorUpdate(update.view); // 修正された関数を呼び出す
-          }
-        }
-      }),
-      // EditorView.theme でデバッグ用の枠線を追加
-      EditorView.theme({
-        ".cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, .cm-vimMode-command-dialog, .cm-search-panel, .cm-completion*, .cm-vim*, .cm-search*, .cm-popup": {
-           /* 非表示スタイルはコメントアウト */
-           /* display: "none !important", */
-           /* visibility: "hidden !important", */
-           /* opacity: "0 !important", */
-           /* pointerEvents: "none !important", */
-           /* position: "absolute !important", */
-           /* top: "-9999px !important", */
-           /* left: "-9999px !important", */
-           border: "1px dashed blue !important" // テーマによる枠線は青い破線
-         },
-      }),
-      // キー入力ハンドラ
-      EditorView.domEventHandlers({
-        keydown: (event, view) => {
-          // デバッグログ：押されたキーを出力
-          console.log(`Keydown: key=${event.key}, code=${event.code}, ctrl=${event.ctrlKey}, shift=${event.shiftKey}, alt=${event.altKey}, meta=${event.metaKey}`);
-
-          // Ctrl+Space は無効化
-          if (event.ctrlKey && (event.code === "Space" || event.key === " ")) {
-            console.log("Ctrl+Space intercepted.");
-            event.preventDefault();
-            return true;
-          }
-          
-          // Tabキーはスペースを挿入
-          if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) {
-            console.log("Tab key intercepted for indent.");
-            const pos = view.state.selection.main.head;
-            const spaces = "  ";
-            view.dispatch({
-              changes: { from: pos, to: pos, insert: spaces }
-            });
-            event.preventDefault();
-            return true;
-          }
-
-          // エスケープキーでポップアップ要素に赤い枠線をつける
-          if (event.key === "Escape") {
-            console.log("Escape key pressed, applying debug borders.");
-            setTimeout(() => {
-              document.querySelectorAll('.cm-tooltip, .cm-panel, .cm-dialog, .cm-vimMode-command-dialog, .cm-search-panel')
-                .forEach(el => {
-                  if (el instanceof HTMLElement) {
-                     el.style.setProperty('border', '2px solid red', 'important');
-                     el.style.setProperty('visibility', 'visible', 'important');
-                     el.style.setProperty('opacity', '0.7', 'important');
-                  }
-                });
-              // view.contentDOM.focus(); // デバッグ中はフォーカス移動を一旦コメントアウト
-            }, 10);
-            return false; // Vimの標準エスケープ処理を許可
-          }
-          
-          return false;
-        }
-      })
-    ];
-    
-    // Vimモードが有効な場合
-    if (isVimMode) {
-      // Vim拡張を追加 (status表示は無効)
-      extensions.push(vim({ status: false }));
+  // エディタ内容クリアハンドラ
+  const handleClearContent = useCallback(() => {
+    setMarkdownContent("");
+    cursorPosRef.current = 0;
+    if (viewRef.current) {
+      viewRef.current.focus();
     }
-    
-    return extensions;
-  }, [handleCursorUpdate, isVimMode]);
+  }, [setMarkdownContent]);
 
-  // エディタコンポーネント
-  const EditorComponent = (
+  // Vimモード切り替えハンドラ
+  const toggleVimMode = useCallback(() => {
+    const currentCursorPos = viewRef.current?.state.selection.main.head ?? cursorPosRef.current;
+    setIsVimMode(prev => !prev);
+    // 遅延実行してVim拡張が再適用されるのを待つ
+    setTimeout(() => {
+      if (viewRef.current) {
+        try {
+          // カーソル位置を復元
+          const state = viewRef.current.state;
+          const transaction = state.update({
+            selection: { anchor: currentCursorPos, head: currentCursorPos }
+          });
+          viewRef.current.dispatch(transaction);
+          viewRef.current.focus();
+        } catch (error) {
+          console.error("カーソル位置の復元に失敗:", error);
+          viewRef.current.focus(); // とりあえずフォーカス
+        }
+      }
+    }, 100);
+  }, [setIsVimMode]); // viewRef は ref なので依存配列に含めない
+
+  // --- File & Export Handlers ---
+
+  // ファイル名生成ヘルパー
+  const generateFileName = (content: string, defaultExt: string = 'md'): string => {
+    const firstLine = content.split('\n')[0] || '';
+    let baseName = firstLine.replace(/^#+\s*/, '').trim();
+    baseName = baseName.replace(/\s+/g, '_'); // スペースをアンダースコアに
+    baseName = baseName.replace(/[\\/:*?"<>|]/g, '_'); // ファイル名に使えない文字を置換
+    const potentialFileName = baseName ? `${baseName}.${defaultExt}` : '';
+    return potentialFileName || `untitled-${uuidv4().substring(0, 8)}.${defaultExt}`;
+  };
+
+  // Google Drive 保存ハンドラ
+  const handleDriveSave = useCallback(async () => {
+    if (!accessToken) return;
+    setIsSaving(true);
+    try {
+      const fileName = selectedFile?.name || generateFileName(markdownContent);
+      const method = selectedFile ? 'PUT' : 'POST';
+      const response = await fetch('/api/drive/save', {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          name: fileName,
+          content: markdownContent,
+          fileId: selectedFile?.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const savedFileData = await response.json();
+      setSelectedFile({
+        id: savedFileData.id,
+        name: savedFileData.name,
+        mimeType: 'text/markdown',
+        modifiedTime: savedFileData.modifiedTime
+      });
+      console.log('Google Driveに保存しました:', savedFileData);
+    } catch (error: any) {
+      console.error('Google Drive保存エラー:', error);
+      alert(error.message || 'Google Driveへの保存に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [accessToken, markdownContent, selectedFile, setSelectedFile]); // generateFileNameは外部関数なので不要
+
+  // ローカル保存ハンドラ (File System Access API or fallback)
+  const handleLocalSave = async () => {
+    setIsSaving(true);
+    try {
+      const suggestedName = generateFileName(markdownContent);
+      if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(markdownContent);
+        await writable.close();
+        console.log("ファイルが保存されました (File System Access API)");
+      } else {
+        // Fallback
+        const blob = new Blob([markdownContent], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = suggestedName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log("従来の方法でファイルがダウンロードされました");
+      }
+    } catch (error) {
+      console.error("ファイル保存エラー:", error);
+      // エラー時もフォールバックを試みる (ユーザーキャンセルを除く)
+      if ((error as DOMException).name !== 'AbortError') {
+         try {
+           const suggestedName = generateFileName(markdownContent);
+           const blob = new Blob([markdownContent], { type: "text/markdown" });
+           const url = URL.createObjectURL(blob);
+           const a = document.createElement("a"); a.href = url; a.download = suggestedName;
+           document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+         } catch (fallbackError) {
+           console.error("フォールバック保存エラー:", fallbackError);
+           alert("ファイルの保存に失敗しました。");
+         }
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 統合保存ハンドラ
+  const handleSave = useCallback(async () => {
+    if (driveEnabled && isAuthenticated && accessToken) {
+      await handleDriveSave();
+    } else {
+      await handleLocalSave();
+    }
+  }, [driveEnabled, isAuthenticated, accessToken, handleDriveSave, handleLocalSave]); // 依存関係を修正
+
+  // 印刷ハンドラ
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    // 表示中のプレビュー要素を取得
+    // MermaidがレンダリングしたSVGを含む可能性のある要素を優先的に試す
+    const activePreviewElement =
+      document.querySelector('.tabs-content[data-state="active"] .prose') ||
+      splitPreviewRef.current || // Split view のプレビュー
+      tabPreviewRef.current;     // Tab view のプレビュー
+
+    const currentPreviewContent = activePreviewElement?.innerHTML || "プレビューコンテンツが見つかりません。";
+    const htmlContent = `
+    <!DOCTYPE html><html><head><title>Markdown Preview</title><style>
+    body{font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;}
+    pre{background-color:#1E1E1E;border-radius:3px;padding:16px;overflow:auto;color:#D4D4D4;}
+    pre code{font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background:none;padding:0;color:inherit;}
+    code:not(pre > code){font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background-color:rgba(27,31,35,.05);padding:.2em .4em;margin:0;font-size:85%;border-radius:3px;}
+    .token.comment{color:#6A9955;}.token.string{color:#CE9178;}.token.keyword{color:#569CD6;}.token.function{color:#DCDCAA;}.token.number{color:#B5CEA8;}.token.operator{color:#D4D4D4;}.token.class-name{color:#4EC9B0;}
+    table{border-collapse:collapse;width:100%;margin-bottom:16px;border-spacing:0;}
+    table th, table td{border:1px solid #ddd;padding:8px 12px;text-align:left;}
+    table tr:nth-child(even){background-color:#f6f8fa;}
+    blockquote{border-left:4px solid #dfe2e5;padding:0 1em;margin-left:0;color:#6a737d;}
+    img{max-width:100%;height:auto;display:block;}
+    h1,h2,h3,h4,h5,h6{margin-top:24px;margin-bottom:16px;font-weight:600;line-height:1.25;}
+    h1{font-size:2em;border-bottom:1px solid #eaecef;padding-bottom:0.3em;}
+    h2{font-size:1.5em;border-bottom:1px solid #eaecef;padding-bottom:0.3em;}
+    h3{font-size:1.25em;} h4{font-size:1em;} h5{font-size:.875em;} h6{font-size:.85em;color:#6a737d;}
+    ul, ol{padding-left:2em;margin-top:0;margin-bottom:16px;}
+    hr{height:0.25em;padding:0;margin:24px 0;background-color:#e1e4e8;border:0;}
+    a{color:#0366d6;text-decoration:none;} a:hover{text-decoration:underline;}
+    .task-list-item{list-style-type:none;} .task-list-item label{font-weight:normal;}
+    .task-list-item.enabled label{cursor:pointer;} .task-list-item + .task-list-item{margin-top:3px;}
+    .task-list-item input[type=checkbox]{margin:0 0.2em 0.25em -1.6em;vertical-align:middle;}
+    .mermaid{text-align:center;margin-bottom:16px;}
+    .mermaid svg{max-width:100%;height:auto !important;display:block;margin:0 auto;}
+    /* Marp/Quarto 用のスタイルを追加 */
+    /* (必要に応じて Marp/Quarto のデフォルトスタイルシートをリンクするか、主要なスタイルをここにコピー) */
+    .marp-preview-slide, .quarto-slide { /* スライドの基本スタイル */
+       border: 1px solid #ccc;
+       margin-bottom: 1em;
+       /* 他、Marp/Quarto が生成する HTML 構造に合わせたスタイル */
+    }
+    </style></head><body><div id="content">${currentPreviewContent}</div>
+    <script>window.onload=function(){console.log('Content loaded, triggering print...');window.print();/* setTimeout(() => { window.close(); }, 500); */}</script>
+    </body></html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  // PowerPoint (PptxGenJS) へのエクスポートハンドラ
+  const handleExportToPptx = async () => {
+    console.log('PowerPoint変換処理を開始します...');
+    setIsPptxGenerating(true);
+    try {
+      if (!markdownContent.trim()) {
+        alert('マークダウンコンテンツが空です。'); return;
+      }
+      const formData = new FormData();
+      formData.append('markdown', markdownContent);
+      const response = await fetch('/api/export-to-pptx', { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        let errorMessage = 'PowerPoint変換エラー';
+        try { const errorData = await response.json(); errorMessage = errorData.error || errorMessage; }
+        catch (e) { const errorText = await response.text(); errorMessage = errorText || errorMessage; }
+        throw new Error(errorMessage);
+      }
+
+      const contentType = response.headers.get('Content-Type');
+      if (contentType?.includes('application/json')) {
+        const jsonData = await response.json(); throw new Error(jsonData.error || 'PPTX変換エラー');
+      }
+      if (response.headers.get('X-Processing-Time')) console.log(`サーバー処理時間: ${response.headers.get('X-Processing-Time')}`);
+
+      const pptxBlob = await response.blob();
+      if (pptxBlob.size === 0) throw new Error('生成されたPPTXファイルが空です');
+
+      const fileName = generateFileName(markdownContent, 'pptx');
+      const url = URL.createObjectURL(pptxBlob);
+      const a = document.createElement('a'); a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 100);
+      console.log('PowerPointファイルが正常に生成されました');
+    } catch (error) {
+      console.error('PowerPoint変換エラー詳細:', error);
+      alert(error instanceof Error ? error.message : '変換中に不明なエラーが発生しました');
+    } finally {
+      setIsPptxGenerating(false);
+    }
+  };
+
+  // Quarto (PPTX) へのエクスポートハンドラ
+  const handleExportToQuartoPptx = async () => {
+    console.log('Quarto PowerPoint変換処理を開始します...');
+    setIsQuartoPptxGenerating(true);
+    try {
+      if (!markdownContent.trim()) {
+        alert('マークダウンコンテンツが空です。'); return;
+      }
+      const formData = new FormData();
+      formData.append('markdown', markdownContent);
+      formData.append('format', 'pptx'); // Quarto APIにフォーマットを指定
+      const response = await fetch('/api/export-to-quarto', { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        let errorMessage = 'Quarto PowerPoint変換エラー';
+        try { const errorData = await response.json(); errorMessage = errorData.error || errorMessage; }
+        catch (e) { const errorText = await response.text(); errorMessage = errorText || errorMessage; }
+        throw new Error(errorMessage);
+      }
+
+      const contentType = response.headers.get('Content-Type');
+      if (contentType?.includes('application/json')) {
+        const jsonData = await response.json(); throw new Error(jsonData.error || 'Quarto PPTX変換エラー');
+      }
+       if (response.headers.get('X-Processing-Time')) console.log(`サーバー処理時間: ${response.headers.get('X-Processing-Time')}`);
+
+      const pptxBlob = await response.blob();
+      if (pptxBlob.size === 0) throw new Error('生成されたPPTXファイルが空です');
+
+      const fileName = generateFileName(markdownContent, 'pptx');
+      const url = URL.createObjectURL(pptxBlob);
+      const a = document.createElement('a'); a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 100);
+      console.log('Quarto PowerPointファイルが正常に生成されました');
+    } catch (error) {
+      console.error('Quarto PowerPoint変換エラー詳細:', error);
+      alert(error instanceof Error ? error.message : '変換中に不明なエラーが発生しました');
+    } finally {
+      setIsQuartoPptxGenerating(false);
+    }
+  };
+
+  // --- Google Drive Handlers ---
+
+  // 認証状態変更ハンドラ
+  const handleAuthChange = useCallback((authenticated: boolean, token?: string) => {
+    setIsAuthenticated(authenticated);
+    setAccessToken(token || null);
+    if (!authenticated) {
+      setSelectedFile(null); // Logout clears selection
+      setDriveEnabled(false); // Logout disables Drive integration
+    }
+  }, []); // No dependencies needed
+
+  // Google Drive 有効/無効 切り替えハンドラ
+  const handleDriveToggle = useCallback((enabled: boolean) => {
+    if (enabled && !isAuthenticated) {
+       alert("Google Driveにログインしてください。");
+       return;
+    }
+    setDriveEnabled(enabled);
+    if (!enabled) {
+      setSelectedFile(null);
+    }
+  }, [isAuthenticated]); // isAuthenticated に依存
+
+  // Google Drive ファイル選択ハンドラ
+  const handleFileSelect = useCallback(async (file: GoogleFile) => {
+    if (!accessToken) return;
+    try {
+      // APIルート経由でファイル内容を取得
+      const response = await fetch(`/api/drive/read?fileId=${file.id}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const content = await response.text();
+      setMarkdownContent(content);
+      setSelectedFile(file);
+      // ファイル選択後、エディタにフォーカスを戻す
+      if (viewRef.current) {
+          viewRef.current.focus();
+          // 必要であればカーソルを先頭に移動
+          viewRef.current.dispatch({ selection: { anchor: 0 } });
+      }
+    } catch (error: any) {
+      console.error('ファイル読み込みエラー:', error);
+      alert(error.message || 'ファイルを読み込めませんでした');
+    }
+  }, [accessToken, setMarkdownContent]); // viewRef は ref なので依存配列に含めない
+
+  // --- AI Chat Handlers ---
+
+  // チャットメッセージクリア
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, [setMessages]);
+
+  // --- UI Handlers ---
+
+  // ダークモード切り替えハンドラ
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const newMode = !prev;
+      document.documentElement.classList.toggle('dark', newMode);
+      return newMode;
+    });
+  };
+
+  // プレビューモード名取得ヘルパー
+  const getPreviewModeName = () => {
+    if (viewMode.includes('marp')) return 'Marp';
+    if (viewMode.includes('quarto')) return 'Quarto';
+    if (viewMode.includes('preview') || viewMode.includes('split')) return 'Markdown';
+    return null;
+  };
+
+  // --- Effects ---
+
+  // 初期フォーカス設定
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (viewRef.current) {
+        viewRef.current.focus();
+        // 初期カーソル位置を設定 (例: 末尾)
+        const endPos = viewRef.current.state.doc.length;
+        viewRef.current.dispatch({ selection: { anchor: endPos } });
+        cursorPosRef.current = endPos; // フォールバック用も更新
+        handleCursorUpdate(viewRef.current); // 初期カーソル位置をステータスバーに反映
+      }
+    }, 100);
+    return () => clearTimeout(timeoutId);
+  }, [handleCursorUpdate]); // handleCursorUpdate を依存配列に追加
+
+  // // CodeMirror選択範囲のスタイル設定
+  // useEffect(() => {
+  //   const styleId = 'codemirror-selection-styles';
+  //   let styleElement = document.getElementById(styleId) as HTMLStyleElement | null;
+  //   if (!styleElement) {
+  //     styleElement = document.createElement('style');
+  //     styleElement.id = styleId;
+  //     document.head.appendChild(styleElement);
+  //   }
+  //   // スタイル内容はダークモード状態に応じて変更しない (CSS側で .dark セレクタを使う)
+  //   styleElement.textContent = `
+  //     .cm-editor:not(.cm-focused) .cm-selectionBackground { background-color: rgba(255, 213, 0, 0.4) !important; }
+  //     .cm-editor.cm-focused .cm-selectionBackground { background-color: rgba(255, 213, 0, 0.7) !important; }
+  //     .dark .cm-editor:not(.cm-focused) .cm-selectionBackground { background-color: rgba(100, 100, 150, 0.4) !important; }
+  //     .dark .cm-editor.cm-focused .cm-selectionBackground { background-color: rgba(100, 100, 170, 0.6) !important; }
+  //   `;
+  //   // クリーンアップは不要 (スタイルはモード切り替えで永続的に必要)
+  // }, []); // 初回マウント時のみ実行
+
+  // --- Component Definitions ---
+
+  // CodeMirror エディタコンポーネント
+  const EditorComponent = useMemo(() => (
     <EmojiContextMenu onEmojiSelect={insertEmoji}>
       <CodeMirror
         value={markdownContent}
-        height="100%"
+        height="100%" // 親要素の高さに追従
         extensions={editorExtensions}
         onChange={handleContentChange}
-        theme={isDarkMode ? vscodeDark : xcodeLight}
-        className={`text-md ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}
+        theme={isDarkMode ? vscodeDark : xcodeLight} // 修正: xcodeLight を使用
+        className={`text-md h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`} // h-full を追加
         onCreateEditor={(view, state) => {
           viewRef.current = view;
-          console.log("CodeMirror editor instance created and viewRef set.");
-          handleCursorUpdate(view);
-          
-          // CSSによるポップアップ非表示スタイルを削除またはコメントアウト
-          const styleId = 'codemirror-popup-hider';
-          let styleElement = document.getElementById(styleId);
-          if (styleElement) {
-             // 既存の非表示スタイルを削除
-             // styleElement.remove(); 
-             // またはデバッグ用に内容を書き換え
-             styleElement.textContent = `
-               /* Debug Styles - Apply borders to potential popups */
-               .cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, 
-               .cm-vimMode-command-dialog, .cm-search-panel, 
-               .cm-completion*, .cm-vim*, .cm-search*, .cm-popup {
-                 border: 1px solid lime !important; /* 初期状態は緑の枠線 */
-                 opacity: 0.8 !important; 
-                 pointer-events: auto !important; /* イベントを一時的に許可してデバッグしやすくする */
-                 /* visibility: visible !important; */ /* 必要ならコメント解除 */
-               }
-             `;
-          } else {
-             // 新しくデバッグ用スタイルを作成
-             styleElement = document.createElement('style');
-             styleElement.id = styleId;
-             styleElement.textContent = `
-               /* Debug Styles - Apply borders to potential popups */
-               .cm-tooltip, .cm-panel, .cm-dialog, .cm-widgetBuffer, 
-               .cm-vimMode-command-dialog, .cm-search-panel, 
-               .cm-completion*, .cm-vim*, .cm-search*, .cm-popup {
-                 border: 1px solid lime !important; /* 初期状態は緑の枠線 */
-                 opacity: 0.8 !important; 
-                 pointer-events: auto !important; /* イベントを一時的に許可してデバッグしやすくする */
-                 /* visibility: visible !important; */ /* 必要ならコメント解除 */
-               }
-             `;
-             document.head.appendChild(styleElement);
-          }
-          // 初期フォーカス設定
-          // view.contentDOM.focus(); // デバッグ中は一旦コメントアウト
+          handleCursorUpdate(view); // 初期カーソル位置を取得
+          // デバッグ用スタイル設定 (ここではコメントアウト)
+          /* const styleId = 'codemirror-popup-hider'; ... */
         }}
-        // basicSetup を削除
-        /* basicSetup={{
-          lineNumbers: true,
-          allowMultipleSelections: true, 
-          syntaxHighlighting: true, 
-          autocompletion: false, 
-          tabSize: 2,
-        }} */
       />
     </EmojiContextMenu>
-  )
+  ), [markdownContent, editorExtensions, handleContentChange, isDarkMode, insertEmoji, handleCursorUpdate]); // 依存関係を整理
 
-  // 通常のMarkdownプレビューコンポーネント（ReactMarkdownを使用）
-  const PreviewComponent = (
+  // 標準Markdownプレビューコンポーネント
+  const PreviewComponent = useMemo(() => (
     <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-      <div ref={tabPreviewRef} className="markdown-preview p-4">
+      <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
           components={{
-            // node.position を使ってインライン判定を行う
             code({ node, className, children, ...props }) {
-              const { ref, ...restProps } = props; // propsからはrefのみ除外
               const match = /language-(\w+)/.exec(className || '');
-              
-              // nodeオブジェクトとpositionプロパティの存在を確認
-              const isInline = node && node.position 
-                                ? node.position.start.line === node.position.end.line 
-                                : false; // nodeやpositionがない場合はブロックとして扱う（フォールバック）
+              const isInline = node?.position && node.position.start.line === node.position.end.line;
 
-              // Mermaid の処理 (変更なし)
-              if (match && match[1] === 'mermaid') {
+              if (match?.[1] === 'mermaid') {
                 return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
               }
-
-              // インラインコードの場合 (isInlineで判定)
               if (isInline) {
-                return (
-                  <code className={className} {...restProps}>
-                    {children}
-                  </code>
-                );
+                return <code className={className} {...props}>{children}</code>;
               }
-
-              // ブロックコードの場合 (SyntaxHighlighterを使用)
               return (
-                <div>
-                  <div className={`code-language ${isDarkMode ? 'dark-language' : 'light-language'}`}>
-                    {match ? match[1] : 'code'} {/* matchがない場合は 'code' とする */}
+                <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
+                  <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                    {match ? match[1] : 'code'}
                   </div>
                   <SyntaxHighlighter
-                    language={match ? match[1] : undefined} // matchがない場合はundefined
+                    language={match?.[1]}
                     PreTag="div"
                     style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
                     customStyle={isDarkMode ? { 
@@ -1186,327 +748,137 @@ export default function MarkdownEditor() {
                       padding: '1em',
                       margin: '1em 0'
                     } : {}}
-                    // {...restProps} // <-- 不要なpropsは渡さない
                   >
                     {String(children).replace(/\n$/, '')}
                   </SyntaxHighlighter>
                 </div>
               );
             },
+            // テーブルのスタイル調整
+            table({ children }) {
+              return <div className="overflow-x-auto"><table className="my-4 w-full">{children}</table></div>;
+            },
+            th({ children }) {
+              return <th className={`p-2 border ${isDarkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-100'}`}>{children}</th>;
+            },
+            td({ children }) {
+              return <td className={`p-2 border ${isDarkMode ? 'border-gray-700' : 'border-gray-600'}`}>{children}</td>;
+            },
+            // 他の要素も必要に応じて調整
+            blockquote({ children }) {
+              return <blockquote className={`border-l-4 pl-4 italic my-4 ${isDarkMode ? 'border-gray-600 text-gray-400' : 'border-gray-300 text-gray-600'}`}>{children}</blockquote>
+            }
           }}
         >
           {markdownContent}
         </ReactMarkdown>
       </div>
     </div>
-  )
+  ), [markdownContent, isDarkMode]); // tabPreviewRef は ref なので依存配列に含めない
 
-  // Marpプレビューコンポーネント（MarpPreviewを使用）
-  const MarpPreviewComponent = (
+  // Marp プレビューコンポーネント
+  const MarpPreviewComponent = useMemo(() => (
     <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-      <div ref={tabPreviewRef} className="markdown-preview p-4">
-        <MarpPreview 
-          markdown={markdownContent} 
-          isDarkMode={isDarkMode} 
+      <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
+        <MarpPreview
+          markdown={markdownContent}
+          isDarkMode={isDarkMode}
         />
       </div>
     </div>
-  )
+  ), [markdownContent, isDarkMode]); // tabPreviewRef は ref なので依存配列に含めない
 
-  // Quartoプレビューコンポーネント
-  const QuartoPreviewComponent = (
-    <div className="quarto-preview-wrapper h-full overflow-auto h-[calc(100vh-8rem)]">
-      <div ref={tabPreviewRef} className="markdown-preview h-full">
+  // Quarto プレビューコンポーネント
+  const QuartoPreviewComponent = useMemo(() => (
+     <div className="quarto-preview-wrapper h-full overflow-auto"> {/* h-[calc(100vh-8rem)] は削除 */}
+      <div ref={tabPreviewRef} className="markdown-preview h-full"> {/* ref は印刷用 */}
         <QuartoPreview
           markdown={markdownContent}
           isDarkMode={isDarkMode}
         />
       </div>
     </div>
-  );
+  ), [markdownContent, isDarkMode]); // tabPreviewRef は ref なので依存配列に含めない
 
-  // 選択範囲の色を設定するためのuseEffect
-  useEffect(() => {
-    // スタイルシートを動的に追加
-    const styleElement = document.createElement('style');
-    styleElement.id = 'codemirror-selection-styles';
-    
-    // Lightモード用の選択範囲スタイル (より鮮明な黄色系)
-    const lightModeStyles = `
-      .cm-editor:not(.cm-focused) .cm-selectionBackground {
-        background-color: rgba(255, 213, 0, 0.4) !important;
-      }
-      .cm-editor.cm-focused .cm-selectionBackground {
-        background-color: rgba(255, 213, 0, 0.7) !important;
-      }
-    `;
-    
-    // Darkモード用の選択範囲スタイル
-    const darkModeStyles = `
-      .dark .cm-editor .cm-selectionBackground {
-        background-color: rgba(100, 100, 150, 0.4) !important;
-      }
-      .dark .cm-editor.cm-focused .cm-selectionBackground {
-        background-color: rgba(100, 100, 170, 0.6) !important;
-      }
-    `;
-    
-    styleElement.textContent = lightModeStyles + darkModeStyles;
-    document.head.appendChild(styleElement);
-    
-    // クリーンアップ関数
-    return () => {
-      const existingStyle = document.getElementById('codemirror-selection-styles');
-      if (existingStyle) {
-        existingStyle.remove();
-      }
-    };
-  }, []); // 空の依存配列でマウント時のみ実行
 
-  // プレビューモードの表示名を取得するヘルパー関数
-  const getPreviewModeName = () => {
-    if (viewMode.includes('marp')) {
-      return 'Marp';
-    }
-    if (viewMode.includes('quarto')) {
-      return 'Quarto';
-    }
-    if (viewMode.includes('preview') || viewMode.includes('split')) {
-      return 'Markdown';
-    }
-    return null; // プレビューが表示されていない場合
-  };
-
+  // --- Render ---
   return (
-    // ルート要素を Flexbox コンテナに変更してステータスバーを配置
-    <div className={`flex flex-col h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
-      {/* 上部セクション: タイトルと保存ボタン等 */}
-      <div className="flex justify-between items-center mb-2 pl-0 pr-2 py-2">
-        <h1 className="text-xl font-bold pl-1">Markdown Editor</h1>
-        
+    <div className={`flex flex-col h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
+      {/* --- Top Bar --- */}
+      <div className="flex justify-between items-center mb-2 pl-1 pr-2 py-2">
+        <h1 className="text-xl font-bold">Markdown Editor</h1>
         <div className="flex items-center space-x-2">
           <TooltipProvider>
+            {/* Save Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving}>
-                  {isSaving ? (
-                    <>
-                      <span className="animate-spin mr-1">⌛</span>
-                      <span className="hidden sm:inline">保存中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      <span className="hidden sm:inline">Save</span>
-                    </>
-                  )}
+                <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving || (driveEnabled && !isAuthenticated)}>
+                  {isSaving ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">保存中...</span></> : <><Save className="h-4 w-4" /><span className="hidden sm:inline">Save</span></>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                {driveEnabled && isAuthenticated 
-                  ? "Google Driveに保存" 
-                  : "ローカルに保存"}
-              </TooltipContent>
+              <TooltipContent>{driveEnabled && isAuthenticated ? `Google Driveに保存 (${selectedFile?.name || '新規'})` : "ローカルに保存"}</TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
+            {/* Print Button */}
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1">
-                  <Printer className="h-4 w-4" />
-                  <span className="hidden sm:inline">Print</span>
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger asChild><Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1"><Printer className="h-4 w-4" /><span className="hidden sm:inline">Print</span></Button></TooltipTrigger>
               <TooltipContent>Print Preview</TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
+            {/* PPTX Export Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleExportToPptx} 
-                  className="h-8 gap-1"
-                  disabled={isPptxGenerating}
-                >
-                  {isPptxGenerating ? (
-                    <>
-                      <span className="animate-spin mr-1">⌛</span>
-                      <span className="hidden sm:inline">変換中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileDown className="h-4 w-4" />
-                      <span className="hidden sm:inline">PPTX</span>
-                    </>
-                  )}
+                <Button variant="outline" size="sm" onClick={handleExportToPptx} className="h-8 gap-1" disabled={isPptxGenerating}>
+                  {isPptxGenerating ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">変換中...</span></> : <><FileDown className="h-4 w-4" /><span className="hidden sm:inline">PPTX</span></>}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>PowerPointとして出力</TooltipContent>
+              <TooltipContent>PowerPointとして出力 (PptxGenJS)</TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
+            {/* Quarto PPTX Export Button */}
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleExportToQuartoPptx} 
-                  className="h-8 gap-1"
-                  disabled={isQuartoPptxGenerating}
-                >
-                  {isQuartoPptxGenerating ? (
-                    <>
-                      <span className="animate-spin mr-1">⌛</span>
-                      <span className="hidden sm:inline">変換中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileDown className="h-4 w-4" />
-                      <span className="hidden sm:inline">Q-PPTX</span>
-                    </>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>QuartoでPowerPointとして出力</TooltipContent>
-            </Tooltip>
+               <TooltipTrigger asChild>
+                 <Button variant="outline" size="sm" onClick={handleExportToQuartoPptx} className="h-8 gap-1" disabled={isQuartoPptxGenerating}>
+                   {isQuartoPptxGenerating ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">変換中...</span></> : <><FileDown className="h-4 w-4" /><span className="hidden sm:inline">Q-PPTX</span></>}
+                 </Button>
+               </TooltipTrigger>
+               <TooltipContent>QuartoでPowerPointとして出力</TooltipContent>
+             </Tooltip>
           </TooltipProvider>
         </div>
       </div>
-      
-      {/* 下部セクション: メインツールバー */}
+
+      {/* --- Toolbar --- */}
       <div className="bg-muted pl-1 pr-2 py-2 flex justify-start items-center mb-2 rounded-md">
         <TooltipProvider>
-          <div className="flex space-x-0 items-center"> {/* space-x-1から space-x-0 に変更 */}
+          <div className="flex space-x-0 items-center">
             {/* Headings */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("# ", "\n")}>
-                    <Heading1 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Heading 1</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("## ", "\n")}>
-                    <Heading2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Heading 2</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("### ", "\n")}>
-                    <Heading3 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Heading 3</TooltipContent>
-              </Tooltip>
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("# ", "\n")}><Heading1 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 1</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("## ", "\n")}><Heading2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 2</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("### ", "\n")}><Heading3 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 3</TooltipContent></Tooltip>
             </div>
-
-            {/* Text formatting */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("**", "**")}>
-                    <Bold className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Bold</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("*", "*")}>
-                    <Italic className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Italic</TooltipContent>
-              </Tooltip>
+            {/* Text Formatting */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("**", "**")}><Bold className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bold</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("*", "*")}><Italic className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Italic</TooltipContent></Tooltip>
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Smile className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0">
-                  <EmojiPicker onEmojiSelect={insertEmoji} />
-                </PopoverContent>
+                <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
+                <PopoverContent className="w-80 p-0"><EmojiPicker onEmojiSelect={insertEmoji} /></PopoverContent>
               </Popover>
             </div>
-
             {/* Lists */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- ", "\n")}>
-                    <List className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Bullet List</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("1. ", "\n")}>
-                    <ListOrdered className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Numbered List</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- [ ] ", "\n")}>
-                    <CheckSquare className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Task List</TooltipContent>
-              </Tooltip>
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- ", "\n")}><List className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bullet List</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("1. ", "\n")}><ListOrdered className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Numbered List</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- [ ] ", "\n")}><CheckSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Task List</TooltipContent></Tooltip>
             </div>
-
-            {/* Block elements */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
+            {/* Block Elements */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("> ", "\n")}>
-                    <Quote className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Quote</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```\n", "\n```")}>
-                    <Code className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Code Block</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}>
-                    <Table className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Table</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}>
-                    <Box className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Mermaidダイアグラム</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                    const marpHeader = `---
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---
 marp: true
 theme: default
 ${isDarkMode ? 'class: invert' : '# class: invert'}
@@ -1515,20 +887,12 @@ header: "ヘッダ"
 footer: "フッタ"
 ---
 
-`;
-                    // エディタの先頭に挿入
-                    setMarkdownContent(marpHeader + markdownContent);
-                  }}>
-                    <Presentation className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Marpヘッダ</TooltipContent>
+`, "")}><Presentation className="h-4 w-4" /></Button>
+                </TooltipTrigger><TooltipContent>Marp Header</TooltipContent>
               </Tooltip>
-
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                    const quartoHeader = `---
+                 <TooltipTrigger asChild>
+                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---
 title: "Quarto Basics"
 format:
   html:
@@ -1536,428 +900,200 @@ format:
 jupyter: python3
 ---
 
-`;
-                    // エディタの先頭に挿入
-                    setMarkdownContent(quartoHeader + markdownContent);
-                  }}>
-                    <FileCode className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Quartoヘッダ</TooltipContent>
-              </Tooltip>
+`, "")}><FileCode className="h-4 w-4" /></Button>
+                 </TooltipTrigger><TooltipContent>Quarto Header (HTML)</TooltipContent>
+               </Tooltip>
             </div>
-
-            {/* Links and images */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
+            {/* Links & Images & Clear */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("[", "](url)")}><Link className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Link</TooltipContent></Tooltip>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("[", "](url)")}>
-                    <Link className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Link</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/* 画像ボタンのonClickを修正 */}
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>
-                    {isUploadingImage ? (
-                      <span className="animate-spin h-4 w-4">⌛</span> // アップロード中インジケータ
-                    ) : (
-                      <Image className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>{isUploadingImage ? <span className="animate-spin h-4 w-4">⌛</span> : <Image className="h-4 w-4" />}</Button></TooltipTrigger>
                 <TooltipContent>Image</TooltipContent>
               </Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClearContent}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent>Clear Editor</TooltipContent></Tooltip>
+            </div>
+            {/* View Mode */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'editor' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('editor')} className="h-8 w-8"><Code size={18} /></Button></TooltipTrigger><TooltipContent>Editor Only</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('preview')} className="h-8 w-8"><Box size={18} /></Button></TooltipTrigger><TooltipContent>Preview Only</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('split')} className="h-8 w-8"><SplitSquareVertical size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Markdown)</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-preview')} className="h-8 w-8"><Presentation size={18} /></Button></TooltipTrigger><TooltipContent>Marp Preview</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-split')} className="h-8 w-8"><Columns size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Marp)</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-preview')} className="h-8 w-8"><FileChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Quarto Preview</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-split')} className="h-8 w-8"><ChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Quarto)</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'triple' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('triple')} className="h-8 w-8"><BotMessageSquare size={18} /></Button></TooltipTrigger><TooltipContent>AI Chat View</TooltipContent></Tooltip>
+            </div>
+            {/* Settings */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+               <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={toggleDarkMode} className="h-8 w-8">{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent>{isDarkMode ? "Light Mode" : "Dark Mode"}</TooltipContent></Tooltip>
+             </div>
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClearContent}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>エディタの内容をクリア</TooltipContent>
+                <TooltipTrigger asChild><Button variant="outline" size="sm" onClick={toggleVimMode} className="h-8 gap-1"><Terminal className="h-4 w-4" /><span className="hidden sm:inline">{isVimMode ? "Vim:ON" : "Vim:OFF"}</span></Button></TooltipTrigger>
+                <TooltipContent>{isVimMode ? "Disable Vim Mode" : "Enable Vim Mode"}</TooltipContent>
               </Tooltip>
             </div>
-
-            {/* ビューモード切り替えボタン - ここに移動 */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'editor' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('editor')}
-                      className="h-8 w-8"
-                    >
-                      <Code size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>エディタのみ表示</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'preview' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('preview')}
-                      className="h-8 w-8"
-                    >
-                      <Box size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>プレビューのみ表示</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'split' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('split')}
-                      className="h-8 w-8"
-                    >
-                      <SplitSquareVertical size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>エディタとプレビューを分割表示</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'marp-preview' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('marp-preview')}
-                      className="h-8 w-8"
-                    >
-                      <Presentation size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Marpプレゼンテーションプレビュー</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'marp-split' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('marp-split')}
-                      className="h-8 w-8"
-                    >
-                      <Columns size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>エディタとMarpプレビューを分割表示</TooltipContent>
-                </Tooltip>
-                 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'quarto-preview' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('quarto-preview')}
-                      className="h-8 w-8"
-                    >
-                      <FileChartColumn size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Quartoプレビュー</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'quarto-split' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('quarto-split')}
-                      className="h-8 w-8"
-                    >
-                      <ChartColumn size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>エディタとQuartoプレビューを分割表示</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'triple' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => setViewMode('triple')}
-                      className="h-8 w-8"
-                    >
-                      <BotMessageSquare size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>AIチャット表示</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-
-            {/* ダークモード・Vimモード・Google Drive連携 - 左側に移動 */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={toggleDarkMode} className="h-8 w-8 p-0">
-                    {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{isDarkMode ? "ライトモード" : "ダークモード"}</TooltipContent>
-              </Tooltip>
-            </div>
-
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={toggleVimMode} className="h-8 gap-1">
-                    <Terminal className="h-4 w-4" />
-                    <span className="hidden sm:inline">{isVimMode ? "Vim:ON" : "Vim:OFF"}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{isVimMode ? "Vimモードをオフにする" : "Vimモードをオンにする"}</TooltipContent>
-              </Tooltip>
-            </div>
-            
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md">
-              <div className="text-sm mr-1">Google Drive連携</div>
-              <Switch 
-                checked={driveEnabled} 
-                onCheckedChange={handleDriveToggle}
-                disabled={!isAuthenticated}
-              />
-              <GoogleAuth onAuthChange={handleAuthChange} />
-            </div>
+            {/* Google Drive */}
+            <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
+               <div className="text-sm mr-1 whitespace-nowrap">Google Drive</div>
+               <Switch
+                 checked={driveEnabled}
+                 onCheckedChange={handleDriveToggle}
+                 disabled={!isAuthenticated} // 非認証時は無効
+                 aria-label="Toggle Google Drive integration"
+               />
+               <GoogleAuth onAuthChange={handleAuthChange} />
+             </div>
           </div>
         </TooltipProvider>
       </div>
 
-      {/* メインコンテンツエリア (エディタ/プレビュー) */}
-      <div className="flex-grow h-[calc(100%-3rem-4px)]"> {/* ツールバーとステータスバーの高さを引く */}
+      {/* --- Main Content Area --- */}
+      <div className="flex-grow overflow-hidden"> {/* Prevent content overflow */}
+        {/* ビューモードに応じて表示を切り替え */}
         {viewMode === 'editor' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full pl-0`}>
+          <ResizablePanelGroup direction="horizontal" className="h-full">
             {driveEnabled && isAuthenticated && accessToken && (
               <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-                  <GoogleDriveFileList 
-                    accessToken={accessToken} 
-                    onFileSelect={handleFileSelect}
-                    selectedFileId={selectedFile?.id}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                <ResizableHandle withHandle />
               </>
             )}
-            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
-              <div className="h-full overflow-auto pl-0">
-                {EditorComponent}
-              </div>
+            <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+              <div className="h-full overflow-auto">{EditorComponent}</div>
             </ResizablePanel>
           </ResizablePanelGroup>
         )}
-        
+
         {viewMode === 'preview' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full pl-0`}>
-            {driveEnabled && isAuthenticated && accessToken && (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-                  <GoogleDriveFileList 
-                    accessToken={accessToken} 
-                    onFileSelect={handleFileSelect}
-                    selectedFileId={selectedFile?.id}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-              </>
-            )}
-            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
-              {PreviewComponent}
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
-        
-        {viewMode === 'split' && (
-          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} pl-0`}>
-            {driveEnabled && isAuthenticated && accessToken && (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-                  <GoogleDriveFileList 
-                    accessToken={accessToken} 
-                    onFileSelect={handleFileSelect}
-                    selectedFileId={selectedFile?.id}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-              </>
-            )}
-            <ResizablePanel defaultSize={driveEnabled ? 42 : 50}>
-              <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full overflow-auto`}>
-                {EditorComponent}
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-            <ResizablePanel defaultSize={driveEnabled ? 43 : 50}>
-              <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
-                {PreviewComponent}
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
-        
-        {viewMode === 'triple' && (
-          <TripleLayout
-            editorComponent={
-              <div className="h-full overflow-auto pl-0">
-                {EditorComponent}
-              </div>
-            }
-            previewComponent={PreviewComponent}
-            onAIContentInsert={handleAIContentInsert}
-            isDarkMode={isDarkMode}
-            messages={messages}
-            input={input}
-            handleInputChange={handleInputChange}
-            handleSubmit={handleSubmit}
-            isLoading={isLoading}
-            clearMessages={clearMessages}
-            driveEnabled={driveEnabled && isAuthenticated}
-            driveFileListComponent={
-              driveEnabled && isAuthenticated && accessToken ? (
-                <GoogleDriveFileList 
-                  accessToken={accessToken} 
-                  onFileSelect={handleFileSelect}
-                  selectedFileId={selectedFile?.id}
-                />
-              ) : null
-            }
-            getEditorContent={() => markdownContent}
-            setInput={setInput}
-            append={append as any}
-          />
-        )}
+           <ResizablePanelGroup direction="horizontal" className="h-full">
+             {driveEnabled && isAuthenticated && accessToken && (
+               <>
+                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                 <ResizableHandle withHandle />
+               </>
+             )}
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+               {PreviewComponent}
+             </ResizablePanel>
+           </ResizablePanelGroup>
+         )}
+
+         {viewMode === 'split' && (
+           <ResizablePanelGroup direction="horizontal" className="h-full">
+             {driveEnabled && isAuthenticated && accessToken && (
+               <>
+                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                 <ResizableHandle withHandle />
+               </>
+             )}
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 42 : 50}>
+               <div className="h-full overflow-auto">{EditorComponent}</div>
+             </ResizablePanel>
+             <ResizableHandle withHandle />
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 43 : 50}>
+               {PreviewComponent}
+             </ResizablePanel>
+           </ResizablePanelGroup>
+         )}
+
+         {viewMode === 'triple' && (
+           <TripleLayout
+             editorComponent={<div className="h-full overflow-auto">{EditorComponent}</div>}
+             previewComponent={PreviewComponent}
+             onAIContentInsert={handleAIContentInsert}
+             isDarkMode={isDarkMode}
+             messages={messages}
+             input={input}
+             handleInputChange={handleInputChange}
+             handleSubmit={handleSubmit}
+             isLoading={isLoading}
+             clearMessages={clearMessages}
+             driveEnabled={driveEnabled && isAuthenticated}
+             driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
+             getEditorContent={() => markdownContent}
+             setInput={setInput}
+             append={append as any}
+           />
+         )}
 
         {viewMode === 'marp-preview' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full pl-0`}>
-            {driveEnabled && isAuthenticated && accessToken && (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-                  <GoogleDriveFileList 
-                    accessToken={accessToken} 
-                    onFileSelect={handleFileSelect}
-                    selectedFileId={selectedFile?.id}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-              </>
-            )}
-            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
-              {MarpPreviewComponent}
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
+           <ResizablePanelGroup direction="horizontal" className="h-full">
+             {driveEnabled && isAuthenticated && accessToken && (
+               <>
+                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                 <ResizableHandle withHandle />
+               </>
+             )}
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+               {MarpPreviewComponent}
+             </ResizablePanel>
+           </ResizablePanelGroup>
+         )}
 
-        {viewMode === 'quarto-preview' && (
-          <ResizablePanelGroup direction="horizontal" className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full pl-0`}>
-            {driveEnabled && isAuthenticated && accessToken && (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-                  <GoogleDriveFileList 
-                    accessToken={accessToken} 
-                    onFileSelect={handleFileSelect}
-                    selectedFileId={selectedFile?.id}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-              </>
-            )}
-            <ResizablePanel defaultSize={driveEnabled ? 85 : 100}>
-              {QuartoPreviewComponent}
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
+         {viewMode === 'marp-split' && (
+           <ResizablePanelGroup direction="horizontal" className="h-full">
+             {driveEnabled && isAuthenticated && accessToken && (
+               <>
+                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                 <ResizableHandle withHandle />
+               </>
+             )}
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 42 : 50}>
+               <div className="h-full overflow-auto">{EditorComponent}</div>
+             </ResizablePanel>
+             <ResizableHandle withHandle />
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 43 : 50}>
+               {MarpPreviewComponent}
+             </ResizablePanel>
+           </ResizablePanelGroup>
+         )}
 
-        {viewMode === 'marp-split' && (
-          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} pl-0`}>
-            {driveEnabled && isAuthenticated && accessToken && (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-                  <GoogleDriveFileList 
-                    accessToken={accessToken} 
-                    onFileSelect={handleFileSelect}
-                    selectedFileId={selectedFile?.id}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-              </>
-            )}
-            <ResizablePanel defaultSize={driveEnabled ? 42 : 50}>
-              <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full overflow-auto`}>
-                {EditorComponent}
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-            <ResizablePanel defaultSize={driveEnabled ? 43 : 50}>
-              <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
-                {MarpPreviewComponent}
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
+         {viewMode === 'quarto-preview' && (
+           <ResizablePanelGroup direction="horizontal" className="h-full">
+             {driveEnabled && isAuthenticated && accessToken && (
+               <>
+                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                 <ResizableHandle withHandle />
+               </>
+             )}
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+               {QuartoPreviewComponent}
+             </ResizablePanel>
+           </ResizablePanelGroup>
+         )}
 
-        {viewMode === 'quarto-split' && (
-          <ResizablePanelGroup direction="horizontal" className={`h-full gap-2 ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} pl-0`}>
-            {driveEnabled && isAuthenticated && accessToken && (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-                  <GoogleDriveFileList 
-                    accessToken={accessToken} 
-                    onFileSelect={handleFileSelect}
-                    selectedFileId={selectedFile?.id}
-                  />
-                </ResizablePanel>
-                <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-              </>
-            )}
-            <ResizablePanel defaultSize={driveEnabled ? 42 : 50}>
-              <div className={`${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'} h-full overflow-auto`}>
-                {EditorComponent}
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} />
-            <ResizablePanel defaultSize={driveEnabled ? 43 : 50}>
-              <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} h-full`}>
-                {QuartoPreviewComponent}
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
+         {viewMode === 'quarto-split' && (
+           <ResizablePanelGroup direction="horizontal" className="h-full">
+             {driveEnabled && isAuthenticated && accessToken && (
+               <>
+                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                 <ResizableHandle withHandle />
+               </>
+             )}
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 42 : 50}>
+               <div className="h-full overflow-auto">{EditorComponent}</div>
+             </ResizablePanel>
+             <ResizableHandle withHandle />
+             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 43 : 50}>
+               {QuartoPreviewComponent}
+             </ResizablePanel>
+           </ResizablePanelGroup>
+         )}
       </div>
 
-      {/* Status Bar */}
-      <div className={`p-1 border-t text-xs flex justify-between items-center ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
-        {/* Left side: Cursor position */}
+      {/* --- Status Bar --- */}
+      <div className={`p-1 border-t text-xs flex justify-between items-center shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
+        <div>Ln {cursorPosition.line}, Col {cursorPosition.col}</div>
         <div>
-          <span>Ln {cursorPosition.line}, Col {cursorPosition.col}</span>
+          {getPreviewModeName() && <span>Preview: {getPreviewModeName()}</span>}
+          {isVimMode && <span className="ml-2 font-bold text-green-500">VIM</span>}
         </div>
-        {/* Right side: Preview mode */}
-        <div>
-          {getPreviewModeName() && (
-            <span>Preview: {getPreviewModeName()}</span>
-          )}
-        </div>
-        {/* Add other status info if needed */}
       </div>
 
-      {/* ファイル選択用の非表示input要素を追加 */}
-      <input
-        type="file"
-        ref={imageInputRef}
-        accept="image/*" // 画像ファイルのみ受け入れる
-        style={{ display: 'none' }} // 常に非表示
-        onChange={handleImageUpload}
-      />
+      {/* Hidden file input for image upload */}
+      <input type="file" ref={imageInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
     </div>
   )
 }
