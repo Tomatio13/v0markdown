@@ -15,6 +15,8 @@ interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 
   getEditorContent?: () => string
   setInput?: (value: string) => void
   append?: (message: { content: string, role: 'user' | 'assistant' | 'system' | 'function' }) => Promise<void>
+  tocVisible?: boolean
+  tocComponent?: React.ReactNode
 }
 
 export const TripleLayout = ({ 
@@ -32,7 +34,9 @@ export const TripleLayout = ({
   driveFileListComponent,
   getEditorContent,
   setInput,
-  append
+  append,
+  tocVisible = false,
+  tocComponent
 }: TripleLayoutProps) => {
   return (
     <ResizablePanelGroup direction="horizontal" className={`h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
@@ -49,9 +53,22 @@ export const TripleLayout = ({
         </>
       )}
       
+      {/* 目次パネル（Drive無効かつToc有効時のみ表示） */}
+      {!driveEnabled && tocVisible && tocComponent && (
+        <>
+          <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
+            {tocComponent}
+          </ResizablePanel>
+          <ResizableHandle 
+            withHandle 
+            className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+          />
+        </>
+      )}
+      
       {/* エディタパネル */}
       <ResizablePanel 
-        defaultSize={driveEnabled ? 50 : 50} 
+        defaultSize={driveEnabled ? 50 : (!driveEnabled && tocVisible ? 50 : 50)}
         minSize={30} 
         className={isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}
       >
@@ -65,7 +82,7 @@ export const TripleLayout = ({
       
       {/* AIチャットパネル */}
       <ResizablePanel 
-        defaultSize={driveEnabled ? 35 : 50} 
+        defaultSize={driveEnabled ? 35 : (!driveEnabled && tocVisible ? 35 : 50)}
         minSize={30} 
         className={isDarkMode ? 'bg-[#2c2c2c]' : 'bg-gray-100'}
       >

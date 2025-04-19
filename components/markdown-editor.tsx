@@ -34,6 +34,7 @@ import GoogleDriveFileList from "./google-drive-file-list"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import MarpPreview from "./marp-preview"
 import QuartoPreview from "./quarto-preview"
+import TableOfContents from "./table-of-contents"
 
 // --- グローバル型定義 ---
 declare global {
@@ -58,7 +59,7 @@ export default function MarkdownEditor() {
   // --- State Variables ---
 
   // Editor State
-  const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\nStart typing your markdown here...")
+  const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\n## Section 1\nSome text\n\n## Section 2\nMore text")
   const [isVimMode, setIsVimMode] = useState(false)
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
 
@@ -69,6 +70,7 @@ export default function MarkdownEditor() {
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isPptxGenerating, setIsPptxGenerating] = useState(false)
   const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false)
+  const [isTocVisible, setIsTocVisible] = useState(false);
 
   // Google Drive State
   const [driveEnabled, setDriveEnabled] = useState(false)
@@ -93,6 +95,36 @@ export default function MarkdownEditor() {
 
   // UI Refs
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Derived State ---
+  // H1/H2見出し抽出 (ネスト構造、行番号は1-based)
+  const extractedHeadings = useMemo(() => {
+    const headings: { level: number; text: string; line: number; children: { level: number; text: string; line: number }[] }[] = [];
+    let currentH1: { level: number; text: string; line: number; children: { level: number; text: string; line: number }[] } | null = null;
+    const lines = markdownContent.split('\n');
+
+    lines.forEach((line, index) => {
+      const lineNumber = index + 1;
+      if (line.startsWith('# ')) {
+        const text = line.substring(2).trim();
+        currentH1 = { level: 1, text, line: lineNumber, children: [] };
+        headings.push(currentH1);
+      } else if (line.startsWith('## ')) {
+        const text = line.substring(3).trim();
+        const h2 = { level: 2, text, line: lineNumber };
+        if (currentH1) {
+          currentH1.children.push(h2);
+        } else {
+          // H1なしでH2が出現した場合 (ルートレベルのH2として扱うか、エラーにするか要検討。ここではルートに仮追加)
+          // 本来のMarkdown構造的にはH1の下にあるべきだが、柔軟性のため一旦許容
+          headings.push({ level: 1, text: `(No H1) ${text}`, line: lineNumber, children: [h2] });
+          currentH1 = headings[headings.length - 1]; // 次のH2はこの仮H1の下に
+        }
+      }
+    });
+
+    return headings;
+  }, [markdownContent]);
 
   // --- Editor Core Functions ---
 
@@ -312,26 +344,49 @@ export default function MarkdownEditor() {
 
   // Vimモード切り替えハンドラ
   const toggleVimMode = useCallback(() => {
-    const currentCursorPos = viewRef.current?.state.selection.main.head ?? cursorPosRef.current;
+    if (viewRef.current) {
+      // 現在のカーソル位置を取得 (Vim切替時のカーソル維持のため)
+      cursorPosRef.current = viewRef.current.state.selection.main.head;
+      // console.log('Vimモード切り替え前のカーソル位置:', cursorPosRef.current);
+    }
     setIsVimMode(prev => !prev);
     // 遅延実行してVim拡張が再適用されるのを待つ
     setTimeout(() => {
       if (viewRef.current) {
+        // console.log('Vimモード切り替え後にフォーカスとカーソル位置設定試行');
+        viewRef.current.focus();
         try {
-          // カーソル位置を復元
-          const state = viewRef.current.state;
-          const transaction = state.update({
-            selection: { anchor: currentCursorPos, head: currentCursorPos }
-          });
-          viewRef.current.dispatch(transaction);
-          viewRef.current.focus();
-        } catch (error) {
-          console.error("カーソル位置の復元に失敗:", error);
-          viewRef.current.focus(); // とりあえずフォーカス
+           viewRef.current.dispatch({ selection: { anchor: cursorPosRef.current } });
+          // console.log('カーソル位置設定成功:', cursorPosRef.current);
+        } catch (e) {
+          console.error("カーソル位置の設定に失敗しました:", e)
         }
       }
-    }, 100);
+    }, 100); // 100ms待つ
   }, [setIsVimMode]); // viewRef は ref なので依存配列に含めない
+
+  // 目次表示切り替えハンドラ ★追加
+  const toggleToc = useCallback(() => {
+    setIsTocVisible(prev => !prev);
+  }, [setIsTocVisible]);
+
+  // --- Jump Function ---
+  const handleTocJump = useCallback((lineNumber: number) => {
+    if (viewRef.current) {
+      const view = viewRef.current;
+      try {
+        const line = view.state.doc.line(lineNumber); // lineNumber は 1-based
+        const position = line.from;
+        view.dispatch({
+          effects: EditorView.scrollIntoView(position, { y: "start", yMargin: 10 }), // 少しマージンを持たせる
+          selection: { anchor: position } // カーソルも移動
+        });
+        view.focus(); // エディタにフォーカスを戻す
+      } catch (e) {
+        console.error(`Failed to jump to line ${lineNumber}:`, e);
+      }
+    }
+  }, []); // viewRef は ref なので依存配列に含めない
 
   // --- File & Export Handlers ---
 
@@ -934,6 +989,24 @@ jupyter: python3
                 <TooltipContent>{isVimMode ? "Disable Vim Mode" : "Enable Vim Mode"}</TooltipContent>
               </Tooltip>
             </div>
+            {/* 目次表示ボタン ★追加 */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isTocVisible ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={toggleToc}
+                    className="h-8 gap-1"
+                    disabled={driveEnabled} // Google Drive有効時は無効化
+                  >
+                    <List className="h-4 w-4" />
+                    <span className="hidden sm:inline">{isTocVisible ? "Toc:ON" : "Toc:OFF"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isTocVisible ? "Hide Table of Contents" : "Show Table of Contents"}{driveEnabled ? " (Disabled when Google Drive is ON)" : ""}</TooltipContent>
+              </Tooltip>
+            </div>
             {/* Google Drive */}
             <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
                <div className="text-sm mr-1 whitespace-nowrap">Google Drive</div>
@@ -954,13 +1027,21 @@ jupyter: python3
         {/* ビューモードに応じて表示を切り替え */}
         {viewMode === 'editor' && (
           <ResizablePanelGroup direction="horizontal" className="h-full">
-            {driveEnabled && isAuthenticated && accessToken && (
+            {/* 左ペイン: Google Drive または 目次 */}
+            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
               <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
+                  {driveEnabled && isAuthenticated && accessToken ? (
+                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                  ) : (
+                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  )}
+                </ResizablePanel>
                 <ResizableHandle withHandle />
               </>
-            )}
-            <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+            ) : null}
+            {/* エディタペイン */}
+            <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
               <div className="h-full overflow-auto">{EditorComponent}</div>
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -968,13 +1049,21 @@ jupyter: python3
 
         {viewMode === 'preview' && (
            <ResizablePanelGroup direction="horizontal" className="h-full">
-             {driveEnabled && isAuthenticated && accessToken && (
-               <>
-                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
-                 <ResizableHandle withHandle />
-               </>
-             )}
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+             {/* 左ペイン: Google Drive または 目次 */}
+             {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
+                  {driveEnabled && isAuthenticated && accessToken ? (
+                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                  ) : (
+                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  )}
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+              </>
+            ) : null}
+             {/* プレビューペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
                {PreviewComponent}
              </ResizablePanel>
            </ResizablePanelGroup>
@@ -982,17 +1071,26 @@ jupyter: python3
 
          {viewMode === 'split' && (
            <ResizablePanelGroup direction="horizontal" className="h-full">
-             {driveEnabled && isAuthenticated && accessToken && (
-               <>
-                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
-                 <ResizableHandle withHandle />
-               </>
-             )}
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 42 : 50}>
+             {/* 左ペイン: Google Drive または 目次 */}
+            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
+                  {driveEnabled && isAuthenticated && accessToken ? (
+                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                  ) : (
+                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  )}
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+              </>
+            ) : null}
+             {/* エディタペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 42 : 50}>
                <div className="h-full overflow-auto">{EditorComponent}</div>
              </ResizablePanel>
              <ResizableHandle withHandle />
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 43 : 50}>
+             {/* プレビューペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 43 : 50}>
                {PreviewComponent}
              </ResizablePanel>
            </ResizablePanelGroup>
@@ -1012,6 +1110,12 @@ jupyter: python3
              clearMessages={clearMessages}
              driveEnabled={driveEnabled && isAuthenticated}
              driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
+             tocVisible={!driveEnabled && isTocVisible}
+             tocComponent={
+               (!driveEnabled && isTocVisible) ? 
+               <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} /> 
+               : null
+             }
              getEditorContent={() => markdownContent}
              setInput={setInput}
              append={append as any}
@@ -1020,13 +1124,21 @@ jupyter: python3
 
         {viewMode === 'marp-preview' && (
            <ResizablePanelGroup direction="horizontal" className="h-full">
-             {driveEnabled && isAuthenticated && accessToken && (
-               <>
-                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
-                 <ResizableHandle withHandle />
-               </>
-             )}
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+             {/* 左ペイン: Google Drive または 目次 */}
+            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
+                  {driveEnabled && isAuthenticated && accessToken ? (
+                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                  ) : (
+                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  )}
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+              </>
+            ) : null}
+             {/* Marpプレビューペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
                {MarpPreviewComponent}
              </ResizablePanel>
            </ResizablePanelGroup>
@@ -1034,17 +1146,26 @@ jupyter: python3
 
          {viewMode === 'marp-split' && (
            <ResizablePanelGroup direction="horizontal" className="h-full">
-             {driveEnabled && isAuthenticated && accessToken && (
-               <>
-                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
-                 <ResizableHandle withHandle />
-               </>
-             )}
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 42 : 50}>
+             {/* 左ペイン: Google Drive または 目次 */}
+            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
+                  {driveEnabled && isAuthenticated && accessToken ? (
+                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                  ) : (
+                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  )}
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+              </>
+            ) : null}
+             {/* エディタペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 42 : 50}>
                <div className="h-full overflow-auto">{EditorComponent}</div>
              </ResizablePanel>
              <ResizableHandle withHandle />
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 43 : 50}>
+             {/* Marpプレビューペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 43 : 50}>
                {MarpPreviewComponent}
              </ResizablePanel>
            </ResizablePanelGroup>
@@ -1052,13 +1173,21 @@ jupyter: python3
 
          {viewMode === 'quarto-preview' && (
            <ResizablePanelGroup direction="horizontal" className="h-full">
-             {driveEnabled && isAuthenticated && accessToken && (
-               <>
-                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
-                 <ResizableHandle withHandle />
-               </>
-             )}
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 85 : 100}>
+             {/* 左ペイン: Google Drive または 目次 */}
+            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
+                  {driveEnabled && isAuthenticated && accessToken ? (
+                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                  ) : (
+                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  )}
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+              </>
+            ) : null}
+             {/* Quartoプレビューペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
                {QuartoPreviewComponent}
              </ResizablePanel>
            </ResizablePanelGroup>
@@ -1066,17 +1195,26 @@ jupyter: python3
 
          {viewMode === 'quarto-split' && (
            <ResizablePanelGroup direction="horizontal" className="h-full">
-             {driveEnabled && isAuthenticated && accessToken && (
-               <>
-                 <ResizablePanel defaultSize={15} minSize={10} maxSize={30}><GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /></ResizablePanel>
-                 <ResizableHandle withHandle />
-               </>
-             )}
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 42 : 50}>
+             {/* 左ペイン: Google Drive または 目次 */}
+            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+              <>
+                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
+                  {driveEnabled && isAuthenticated && accessToken ? (
+                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                  ) : (
+                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  )}
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+              </>
+            ) : null}
+             {/* エディタペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 42 : 50}>
                <div className="h-full overflow-auto">{EditorComponent}</div>
              </ResizablePanel>
              <ResizableHandle withHandle />
-             <ResizablePanel defaultSize={driveEnabled && isAuthenticated ? 43 : 50}>
+             {/* Quartoプレビューペイン */}
+             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 43 : 50}>
                {QuartoPreviewComponent}
              </ResizablePanel>
            </ResizablePanelGroup>
