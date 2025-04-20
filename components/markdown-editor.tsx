@@ -38,6 +38,8 @@ import TableOfContents from "./table-of-contents" // Heading をここからイ�
 import { ScrollArea } from "@/components/ui/scroll-area"
 // Heading 型を TableOfContents からインポート
 import { type Heading } from "./table-of-contents"; // 'type' を使ったインポートに修正
+import { useAutoSave } from "@/hooks/use-auto-save";
+import { loadDraft, deleteDraft } from "@/lib/draft-storage";
 
 // --- グローバル型定義 ---
 declare global {
@@ -767,6 +769,51 @@ export default function MarkdownEditor() {
   //   `;
   //   // クリーンアップは不要 (スタイルはモード切り替えで永続的に必要)
   // }, []); // 初回マウント時のみ実行
+
+  // --- Auto Save & Draft Restore ---
+  useAutoSave({ content: markdownContent, fileId: selectedFile?.id });
+
+  useEffect(() => {
+    const restoreDraft = async () => {
+      if (typeof window === 'undefined') return;
+      const lastId = localStorage.getItem('lastDraftId');
+      if (!lastId) return;
+
+      try {
+        const draft = await loadDraft(lastId);
+
+        if (draft && draft.content) {
+          // ドラフトが存在し、内容がある場合
+          if (window.confirm('前回の自動保存データを復元しますか？')) {
+            setMarkdownContent(draft.content);
+            // オプション: 復元したらlocalStorageのIDはクリアしても良いかも
+            // localStorage.removeItem('lastDraftId');
+          } else {
+            // 復元しない場合はドラフト削除
+            await deleteDraft(lastId);
+            localStorage.removeItem('lastDraftId');
+          }
+        } else if (draft === null) {
+          // IndexedDBにデータがない場合 (破損など) はlocalStorageのIDも削除
+          console.warn(`Draft data for ID ${lastId} not found in IndexedDB. Removing stale ID from localStorage.`);
+          localStorage.removeItem('lastDraftId');
+        }
+        // draft.contentが空の場合は何もしない（復元する価値がない）
+      } catch (error) {
+        console.error("Error loading draft:", error);
+        // エラーが発生した場合も、問題のあるIDをlocalStorageから削除する方が安全
+        localStorage.removeItem('lastDraftId');
+      }
+    };
+
+    // 少し遅延させて実行し、初期レンダリングとの競合を避ける
+    const timerId = setTimeout(restoreDraft, 100);
+
+    // クリーンアップ関数
+    return () => clearTimeout(timerId);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // マウント時に一度だけ実行
 
   // --- Component Definitions ---
 
