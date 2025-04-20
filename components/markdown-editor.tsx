@@ -401,6 +401,14 @@ export default function MarkdownEditor() {
     window.open(previewUrl, '_blank');
   }, []);
 
+  // Quartoマニュアル表示ハンドラ
+  const handleOpenQuartoManual = useCallback(() => {
+    // 新しいAPIエンドポイントを使用
+    const manualPath = '/manual/quatro_manual.md';
+    const previewUrl = `/api/preview-markdown?path=${encodeURIComponent(manualPath)}`;
+    window.open(previewUrl, '_blank');
+  }, []);
+
   // --- Jump Function ---
   const handleTocJump = useCallback((lineNumber: number) => {
     if (viewRef.current) {
@@ -1091,6 +1099,22 @@ jupyter: python3
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Marpマニュアルを開く</TooltipContent>
+              </Tooltip>
+            </div>
+            {/* Quartoマニュアルボタン */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleOpenQuartoManual}
+                    className="h-8 gap-1"
+                  >
+                    <span className="inline-flex items-center">💡Quarto</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Quartoマニュアルを開く</TooltipContent>
               </Tooltip>
             </div>
           </div>
