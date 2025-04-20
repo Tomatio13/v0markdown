@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { useGoogleLogin, googleLogout } from '@react-oauth/google'
+import { UploadCloud, LogOut } from 'lucide-react'
 
 interface GoogleAuthProps {
   // 認証状態とアクセストークンを渡す
@@ -56,24 +57,26 @@ export default function GoogleAuth({ onAuthChange }: GoogleAuthProps) {
   }, [accessToken, onAuthChange]);
 
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex items-center">
       {!accessToken ? (
         <Button
-          variant="outline"
-          size="sm"
-          onClick={() => login()} // ボタンクリックでログイン開始
-          className="text-xs px-2 py-1 h-8"
+          variant="ghost"
+          size="icon"
+          onClick={() => login()}
+          className="h-10 w-10"
+          title="Login to Google"
         >
-          Googleでログイン
+          <UploadCloud className="h-6 w-6 opacity-50" />
         </Button>
       ) : (
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           onClick={handleLogout}
-          className="text-xs px-2 py-1 h-8"
+          className="h-10 w-10"
+          title="Logout from Google"
         >
-          Google連携解除
+          <LogOut className="h-6 w-6" />
         </Button>
       )}
     </div>

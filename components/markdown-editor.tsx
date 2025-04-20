@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp // 追加アイコン
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -70,6 +70,10 @@ export default function MarkdownEditor() {
 
   // UI State
   const [isDarkMode, setIsDarkMode] = useState(false)
+  // --- ▼ ADDED ▼ ---
+  // 出力モードの状態を追加 (markdown, marp, quarto)
+  const [outputMode, setOutputMode] = useState<'markdown' | 'marp' | 'quarto'>('markdown')
+  // --- ▲ ADDED ▲ ---
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split'>('split')
   const [isSaving, setIsSaving] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
@@ -87,24 +91,16 @@ export default function MarkdownEditor() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append, reload, stop } = useChat();
 
   // --- Refs ---
-
-  // Editor Refs
-  // const editorRef = useRef<EditorView | null>(null) // 以前の未使用のref？ (現在 onCreateEditor で viewRef を使用)
-  const viewRef = useRef<EditorView | null>(null) // CodeMirrorのビューインスタンス用
-  const cursorPosRef = useRef<number>(0) // フォールバック用カーソル位置
-
-  // Preview Refs
-  const previewRef = useRef<HTMLDivElement>(null) // 以前の未使用のref?
-  const splitPreviewRef = useRef<HTMLDivElement>(null) // 印刷用
-  const tabPreviewRef = useRef<HTMLDivElement>(null) // 印刷用
-
-  // UI Refs
+  const viewRef = useRef<EditorView | null>(null)
+  const cursorPosRef = useRef<number>(0)
+  const splitPreviewRef = useRef<HTMLDivElement>(null)
+  const tabPreviewRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   // --- Derived State ---
-  // H1/H2見出し抽出 (ネスト構造、行番号は1-based)
   const extractedHeadings = useMemo(() => {
-    const headings: Heading[] = []; // 型を Heading[] に指定
+    // ... (ここは変更なし) ...
+     const headings: Heading[] = []; // 型を Heading[] に指定
     let currentH1: Heading | null = null;
     const lines = markdownContent.split('\n');
     let inCodeBlock = false; // コードブロック内かどうかのフラグ
@@ -150,15 +146,13 @@ export default function MarkdownEditor() {
   }, [markdownContent]);
 
   // --- Editor Core Functions ---
-
-  // CodeMirrorの内容変更ハンドラ
   const handleContentChange = useCallback((value: string) => {
     setMarkdownContent(value)
   }, [])
 
-  // カーソル位置更新ハンドラ (行・列表示用)
   const handleCursorUpdate = useCallback((view: EditorView | null) => {
-    if (view) {
+    // ... (ここは変更なし) ...
+     if (view) {
       const pos = view.state.selection.main.head;
       const line = view.state.doc.lineAt(pos);
       const lineNum = line.number;
@@ -173,9 +167,9 @@ export default function MarkdownEditor() {
     }
   }, [setCursorPosition]);
 
-  // CodeMirror拡張機能 (Vimモード切替、行番号、リスナーなど)
   const editorExtensions = useMemo(() => {
-    const extensions = [
+    // ... (ここは変更なし) ...
+     const extensions = [
       lineNumbers(),
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
@@ -222,10 +216,9 @@ export default function MarkdownEditor() {
   }, [handleCursorUpdate, isVimMode]);
 
   // --- Editor Action Handlers ---
-
-  // テキスト挿入 (ツールバーボタン用)
   const insertText = useCallback((before: string, after = "") => {
-    if (viewRef.current) {
+    // ... (ここは変更なし) ...
+     if (viewRef.current) {
       const view = viewRef.current;
       const state = view.state;
       const selection = state.selection.main;
@@ -257,11 +250,11 @@ export default function MarkdownEditor() {
         }
       });
     }
-  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
+  }, [setMarkdownContent]);
 
-  // 絵文字挿入ハンドラ
   const insertEmoji = useCallback((emoji: string) => {
-    if (viewRef.current) {
+    // ... (ここは変更なし) ...
+     if (viewRef.current) {
       const view = viewRef.current;
       const currentPos = view.state.selection.main.head;
       view.dispatch({
@@ -280,11 +273,11 @@ export default function MarkdownEditor() {
         return newContent;
       });
     }
-  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
+  }, [setMarkdownContent]);
 
-  // AIからのコンテンツ挿入ハンドラ
   const handleAIContentInsert = useCallback((text: string) => {
-    if (viewRef.current) {
+    // ... (ここは変更なし) ...
+     if (viewRef.current) {
       const view = viewRef.current;
       const currentPos = view.state.selection.main.head;
       view.dispatch({
@@ -303,11 +296,11 @@ export default function MarkdownEditor() {
         return newContent;
       });
     }
-  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
+  }, [setMarkdownContent]);
 
-  // 画像アップロードハンドラ
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    // ... (ここは変更なし) ...
+     const file = event.target.files?.[0];
     event.target.value = ''; // Reset input
 
     if (!file || !file.type.startsWith('image/')) {
@@ -354,20 +347,20 @@ export default function MarkdownEditor() {
     } finally {
       setIsUploadingImage(false);
     }
-  }, [setMarkdownContent]); // viewRef は ref なので依存配列に含めない
+  }, [setMarkdownContent]);
 
-  // エディタ内容クリアハンドラ
   const handleClearContent = useCallback(() => {
-    setMarkdownContent("");
+    // ... (ここは変更なし) ...
+     setMarkdownContent("");
     cursorPosRef.current = 0;
     if (viewRef.current) {
       viewRef.current.focus();
     }
   }, [setMarkdownContent]);
 
-  // Vimモード切り替えハンドラ
   const toggleVimMode = useCallback(() => {
-    if (viewRef.current) {
+    // ... (ここは変更なし) ...
+     if (viewRef.current) {
       // 現在のカーソル位置を取得 (Vim切替時のカーソル維持のため)
       cursorPosRef.current = viewRef.current.state.selection.main.head;
       // console.log('Vimモード切り替え前のカーソル位置:', cursorPosRef.current);
@@ -386,32 +379,21 @@ export default function MarkdownEditor() {
         }
       }
     }, 100); // 100ms待つ
-  }, [setIsVimMode]); // viewRef は ref なので依存配列に含めない
+  }, [setIsVimMode]);
 
-  // 目次表示切り替えハンドラ ★追加
   const toggleToc = useCallback(() => {
     setIsTocVisible(prev => !prev);
   }, [setIsTocVisible]);
 
-  // Marpマニュアル表示ハンドラ
-  const handleOpenMarpManual = useCallback(() => {
-    // 新しいAPIエンドポイントを使用
-    const manualPath = '/manual/marp_manual.md';
-    const previewUrl = `/api/preview-markdown?path=${encodeURIComponent(manualPath)}`;
-    window.open(previewUrl, '_blank');
-  }, []);
+  // --- ▼ MOVED/REMOVED ▼ ---
+  // マニュアル表示ハンドラは不要になるか、別の場所に移動
+  // const handleOpenMarpManual = useCallback(() => { ... });
+  // const handleOpenQuartoManual = useCallback(() => { ... });
+  // --- ▲ MOVED/REMOVED ▲ ---
 
-  // Quartoマニュアル表示ハンドラ
-  const handleOpenQuartoManual = useCallback(() => {
-    // 新しいAPIエンドポイントを使用
-    const manualPath = '/manual/quatro_manual.md';
-    const previewUrl = `/api/preview-markdown?path=${encodeURIComponent(manualPath)}`;
-    window.open(previewUrl, '_blank');
-  }, []);
-
-  // --- Jump Function ---
   const handleTocJump = useCallback((lineNumber: number) => {
-    if (viewRef.current) {
+    // ... (ここは変更なし) ...
+     if (viewRef.current) {
       const view = viewRef.current;
       try {
         const line = view.state.doc.line(lineNumber); // lineNumber は 1-based
@@ -425,13 +407,12 @@ export default function MarkdownEditor() {
         console.error(`Failed to jump to line ${lineNumber}:`, e);
       }
     }
-  }, []); // viewRef は ref なので依存配列に含めない
+  }, []);
 
   // --- File & Export Handlers ---
-
-  // ファイル名生成ヘルパー
   const generateFileName = (content: string, defaultExt: string = 'md'): string => {
-    const firstLine = content.split('\n')[0] || '';
+    // ... (ここは変更なし) ...
+     const firstLine = content.split('\n')[0] || '';
     let baseName = firstLine.replace(/^#+\s*/, '').trim();
     baseName = baseName.replace(/\s+/g, '_'); // スペースをアンダースコアに
     baseName = baseName.replace(/[\\/:*?"<>|]/g, '_'); // ファイル名に使えない文字を置換
@@ -439,9 +420,9 @@ export default function MarkdownEditor() {
     return potentialFileName || `untitled-${uuidv4().substring(0, 8)}.${defaultExt}`;
   };
 
-  // Google Drive 保存ハンドラ
   const handleDriveSave = useCallback(async () => {
-    if (!accessToken) return;
+    // ... (ここは変更なし) ...
+     if (!accessToken) return;
     setIsSaving(true);
     try {
       const fileName = selectedFile?.name || generateFileName(markdownContent);
@@ -477,11 +458,11 @@ export default function MarkdownEditor() {
     } finally {
       setIsSaving(false);
     }
-  }, [accessToken, markdownContent, selectedFile, setSelectedFile]); // generateFileNameは外部関数なので不要
+  }, [accessToken, markdownContent, selectedFile, setSelectedFile]);
 
-  // ローカル保存ハンドラ (File System Access API or fallback)
   const handleLocalSave = async () => {
-    setIsSaving(true);
+    // ... (ここは変更なし) ...
+     setIsSaving(true);
     try {
       const suggestedName = generateFileName(markdownContent);
       if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
@@ -526,18 +507,18 @@ export default function MarkdownEditor() {
     }
   };
 
-  // 統合保存ハンドラ
   const handleSave = useCallback(async () => {
-    if (driveEnabled && isAuthenticated && accessToken) {
+    // ... (ここは変更なし) ...
+     if (driveEnabled && isAuthenticated && accessToken) {
       await handleDriveSave();
     } else {
       await handleLocalSave();
     }
-  }, [driveEnabled, isAuthenticated, accessToken, handleDriveSave, handleLocalSave]); // 依存関係を修正
+  }, [driveEnabled, isAuthenticated, accessToken, handleDriveSave, handleLocalSave]);
 
-  // 印刷ハンドラ
   const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
+    // ... (ここは変更なし、ただし後で handleExport に統合) ...
+     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
     // 表示中のプレビュー要素を取得
@@ -588,9 +569,9 @@ export default function MarkdownEditor() {
     printWindow.document.close();
   };
 
-  // PowerPoint (PptxGenJS) へのエクスポートハンドラ
   const handleExportToPptx = async () => {
-    console.log('PowerPoint変換処理を開始します...');
+    // ... (ここは変更なし、ただし後で handleExport に統合) ...
+     console.log('PowerPoint変換処理を開始します...');
     setIsPptxGenerating(true);
     try {
       if (!markdownContent.trim()) {
@@ -630,9 +611,9 @@ export default function MarkdownEditor() {
     }
   };
 
-  // Quarto (PPTX) へのエクスポートハンドラ
   const handleExportToQuartoPptx = async () => {
-    console.log('Quarto PowerPoint変換処理を開始します...');
+    // ... (ここは変更なし、ただし後で handleExport に統合) ...
+     console.log('Quarto PowerPoint変換処理を開始します...');
     setIsQuartoPptxGenerating(true);
     try {
       if (!markdownContent.trim()) {
@@ -673,21 +654,62 @@ export default function MarkdownEditor() {
     }
   };
 
-  // --- Google Drive Handlers ---
+  // --- ▼ ADDED ▼ ---
+  // 統合エクスポートハンドラ
+  const handleExport = useCallback(async () => {
+    switch (outputMode) {
+      case 'markdown':
+        handlePrint();
+        break;
+      case 'marp':
+        await handleExportToPptx();
+        break;
+      case 'quarto':
+        await handleExportToQuartoPptx();
+        break;
+      default:
+        console.warn(`Unsupported output mode for export: ${outputMode}`);
+    }
+  }, [outputMode, handlePrint, handleExportToPptx, handleExportToQuartoPptx]); // 依存関係を修正
 
-  // 認証状態変更ハンドラ
+  // Exportボタンのツールチップとアイコンを動的に取得
+  const getExportButtonProps = () => {
+    switch (outputMode) {
+      case 'markdown':
+        return { tooltip: "印刷プレビュー", icon: <Printer className="h-4 w-4" />, label: "Export" };
+      case 'marp':
+        return { tooltip: "PowerPointとして出力 (Marp)", icon: <FileDown className="h-4 w-4" />, label: "Export" };
+      case 'quarto':
+        return { tooltip: "PowerPointとして出力 (Quarto)", icon: <FileDown className="h-4 w-4" />, label: "Export" };
+      default:
+        return { tooltip: "エクスポート", icon: <DownloadCloud className="h-4 w-4" />, label: "Export" }; // Fallback
+    }
+  };
+
+  // Exportボタンのローディング状態を判定
+  const isExporting = useMemo(() => {
+    switch (outputMode) {
+      case 'marp': return isPptxGenerating;
+      case 'quarto': return isQuartoPptxGenerating;
+      default: return false; // MarkdownのPrintは非同期ではない
+    }
+  }, [outputMode, isPptxGenerating, isQuartoPptxGenerating]);
+  // --- ▲ ADDED ▲ ---
+
+  // --- Google Drive Handlers ---
   const handleAuthChange = useCallback((authenticated: boolean, token?: string) => {
-    setIsAuthenticated(authenticated);
+    // ... (ここは変更なし) ...
+     setIsAuthenticated(authenticated);
     setAccessToken(token || null);
     if (!authenticated) {
       setSelectedFile(null); // Logout clears selection
       setDriveEnabled(false); // Logout disables Drive integration
     }
-  }, []); // No dependencies needed
+  }, []);
 
-  // Google Drive 有効/無効 切り替えハンドラ
   const handleDriveToggle = useCallback((enabled: boolean) => {
-    if (enabled && !isAuthenticated) {
+    // ... (ここは変更なし) ...
+     if (enabled && !isAuthenticated) {
        alert("Google Driveにログインしてください。");
        return;
     }
@@ -695,11 +717,11 @@ export default function MarkdownEditor() {
     if (!enabled) {
       setSelectedFile(null);
     }
-  }, [isAuthenticated]); // isAuthenticated に依存
+  }, [isAuthenticated]);
 
-  // Google Drive ファイル選択ハンドラ
   const handleFileSelect = useCallback(async (file: GoogleFile) => {
-    if (!accessToken) return;
+    // ... (ここは変更なし) ...
+     if (!accessToken) return;
     try {
       // APIルート経由でファイル内容を取得
       const response = await fetch(`/api/drive/read?fileId=${file.id}`, {
@@ -722,27 +744,44 @@ export default function MarkdownEditor() {
       console.error('ファイル読み込みエラー:', error);
       alert(error.message || 'ファイルを読み込めませんでした');
     }
-  }, [accessToken, setMarkdownContent]); // viewRef は ref なので依存配列に含めない
+  }, [accessToken, setMarkdownContent]);
 
   // --- AI Chat Handlers ---
-
-  // チャットメッセージクリア
   const clearMessages = useCallback(() => {
-    setMessages([]);
+    // ... (ここは変更なし) ...
+     setMessages([]);
   }, [setMessages]);
 
   // --- UI Handlers ---
-
-  // ダークモード切り替えハンドラ
   const toggleDarkMode = () => {
-    setIsDarkMode(prev => {
+    // ... (ここは変更なし) ...
+     setIsDarkMode(prev => {
       const newMode = !prev;
       document.documentElement.classList.toggle('dark', newMode);
       return newMode;
     });
   };
 
-  // プレビューモード名取得ヘルパー
+  // --- ▼ ADDED ▼ ---
+  // サイドバーでのモード切替ハンドラ
+  const handleModeChange = useCallback((newMode: 'markdown' | 'marp' | 'quarto') => {
+    setOutputMode(newMode);
+    // viewMode も連動して切り替える (Splitをデフォルトにする)
+    switch (newMode) {
+      case 'markdown':
+        setViewMode('split');
+        break;
+      case 'marp':
+        setViewMode('marp-split');
+        break;
+      case 'quarto':
+        setViewMode('quarto-split');
+        break;
+    }
+  }, [setOutputMode, setViewMode]);
+  // --- ▲ ADDED ▲ ---
+
+  // プレビューモード名取得ヘルパー (変更なし)
   const getPreviewModeName = () => {
     if (viewMode.includes('marp')) return 'Marp';
     if (viewMode.includes('quarto')) return 'Quarto';
@@ -751,10 +790,9 @@ export default function MarkdownEditor() {
   };
 
   // --- Effects ---
-
-  // 初期フォーカス設定
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    // ... (初期フォーカス、変更なし) ...
+     const timeoutId = setTimeout(() => {
       if (viewRef.current) {
         viewRef.current.focus();
         // 初期カーソル位置を設定 (例: 末尾)
@@ -765,13 +803,13 @@ export default function MarkdownEditor() {
       }
     }, 100);
     return () => clearTimeout(timeoutId);
-  }, [handleCursorUpdate]); // handleCursorUpdate を依存配列に追加
+  }, [handleCursorUpdate]);
 
-  // --- Auto Save & Draft Restore ---
   useAutoSave({ content: markdownContent, fileId: selectedFile?.id });
 
   useEffect(() => {
-    const restoreDraft = async () => {
+    // ... (ドラフト復元、変更なし) ...
+     const restoreDraft = async () => {
       if (typeof window === 'undefined') return;
       const lastId = localStorage.getItem('lastDraftId');
       if (!lastId) return;
@@ -810,13 +848,12 @@ export default function MarkdownEditor() {
     return () => clearTimeout(timerId);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // マウント時に一度だけ実行
+  }, []);
 
   // --- Component Definitions ---
-
-  // CodeMirror エディタコンポーネント
   const EditorComponent = useMemo(() => (
-    <EmojiContextMenu onEmojiSelect={insertEmoji}>
+    // ... (変更なし) ...
+     <EmojiContextMenu onEmojiSelect={insertEmoji}>
       <CodeMirror
         value={markdownContent}
         height="100%" // 親要素の高さに追従
@@ -832,11 +869,11 @@ export default function MarkdownEditor() {
         }}
       />
     </EmojiContextMenu>
-  ), [markdownContent, editorExtensions, handleContentChange, isDarkMode, insertEmoji, handleCursorUpdate]); // 依存関係を整理
+  ), [markdownContent, editorExtensions, handleContentChange, isDarkMode, insertEmoji, handleCursorUpdate]);
 
-  // 標準Markdownプレビューコンポーネント
   const PreviewComponent = useMemo(() => (
-    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+    // ... (変更なし) ...
+     <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
@@ -847,7 +884,27 @@ export default function MarkdownEditor() {
               const isInline = node?.position && node.position.start.line === node.position.end.line;
 
               if (match?.[1] === 'mermaid') {
-                return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
+                // Mermaid は markdown モードでのみ有効にする (ツールバーの表示に合わせる)
+                if (outputMode === 'markdown') {
+                    return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
+                } else {
+                    // Marp/Quarto ではコードブロックとして表示
+                    return (
+                      <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
+                        <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                          mermaid
+                        </div>
+                        <SyntaxHighlighter
+                          language={'mermaid'}
+                          PreTag="div"
+                          style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
+                          customStyle={isDarkMode ? { backgroundColor: '#000000', border: 'none', borderRadius: '6px', padding: '1em', margin: '1em 0'} : {}}
+                        >
+                          {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                      </div>
+                    );
+                }
               }
               if (isInline) {
                 return <code className={className} {...props}>{children}</code>;
@@ -861,8 +918,8 @@ export default function MarkdownEditor() {
                     language={match?.[1]}
                     PreTag="div"
                     style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
-                    customStyle={isDarkMode ? { 
-                      backgroundColor: '#000000', 
+                    customStyle={isDarkMode ? {
+                      backgroundColor: '#000000',
                       border: 'none',
                       borderRadius: '6px',
                       padding: '1em',
@@ -894,11 +951,13 @@ export default function MarkdownEditor() {
         </ReactMarkdown>
       </div>
     </div>
-  ), [markdownContent, isDarkMode]); // tabPreviewRef は ref なので依存配列に含めない
+  // --- ▼ MODIFIED ▼ ---
+  ), [markdownContent, isDarkMode, outputMode]); // outputMode を依存配列に追加
+  // --- ▲ MODIFIED ▲ ---
 
-  // Marp プレビューコンポーネント
   const MarpPreviewComponent = useMemo(() => (
-    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+    // ... (変更なし) ...
+     <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
         <MarpPreview
           markdown={markdownContent}
@@ -906,11 +965,11 @@ export default function MarkdownEditor() {
         />
       </div>
     </div>
-  ), [markdownContent, isDarkMode]); // tabPreviewRef は ref なので依存配列に含めない
+  ), [markdownContent, isDarkMode]);
 
-  // Quarto プレビューコンポーネント
   const QuartoPreviewComponent = useMemo(() => (
-     <div className="quarto-preview-wrapper h-full overflow-auto"> {/* h-[calc(100vh-8rem)] は削除 */}
+    // ... (変更なし) ...
+      <div className="quarto-preview-wrapper h-full overflow-auto"> {/* h-[calc(100vh-8rem)] は削除 */}
       <div ref={tabPreviewRef} className="markdown-preview h-full"> {/* ref は印刷用 */}
         <QuartoPreview
           markdown={markdownContent}
@@ -918,420 +977,457 @@ export default function MarkdownEditor() {
         />
       </div>
     </div>
-  ), [markdownContent, isDarkMode]); // tabPreviewRef は ref なので依存配列に含めない
+  ), [markdownContent, isDarkMode]);
 
+  // --- ▼ ADDED ▼ ---
+  // ツールバーボタンの表示/非表示を決定するヘルパー
+  const showToolbarButton = (buttonName: string): boolean => {
+    switch (outputMode) {
+      case 'markdown':
+        // MarkdownモードではMarp/Quarto関連ヘッダとマニュアルボタンを非表示
+        return !['Marp Header', 'Quatro Header', '💡Marp', '💡Quatro'].includes(buttonName);
+      case 'marp':
+        // MarpモードではMermaid、Quartoヘッダ、Quartoマニュアルを非表示
+        return !['Mermaid', 'Quatro Header', '💡Quatro'].includes(buttonName);
+      case 'quarto':
+        // QuartoモードではMermaid、Marpヘッダ、Marpマニュアルを非表示
+        return !['Mermaid', 'Marp Header', '💡Marp'].includes(buttonName); // 💡Quatro を表示許可
+      default:
+        return false;
+    }
+  };
+  // --- ▲ ADDED ▲ ---
 
   // --- Render ---
   return (
-    <div className={`flex flex-col h-[calc(100vh-8rem)] ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
-      {/* --- Top Bar --- */}
-      <div className="flex justify-between items-center mb-2 pl-1 pr-2 py-2">
-        <h1 className="text-xl font-bold">Markdown Editor</h1>
-        <div className="flex items-center space-x-2">
-          <TooltipProvider>
-            {/* Save Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving || (driveEnabled && !isAuthenticated)}>
-                  {isSaving ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">保存中...</span></> : <><Save className="h-4 w-4" /><span className="hidden sm:inline">Save</span></>}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{driveEnabled && isAuthenticated ? `Google Driveに保存 (${selectedFile?.name || '新規'})` : "ローカルに保存"}</TooltipContent>
-            </Tooltip>
-            {/* Print Button */}
-            <Tooltip>
-              <TooltipTrigger asChild><Button variant="outline" size="sm" onClick={handlePrint} className="h-8 gap-1"><Printer className="h-4 w-4" /><span className="hidden sm:inline">Print</span></Button></TooltipTrigger>
-              <TooltipContent>Print Preview</TooltipContent>
-            </Tooltip>
-            {/* PPTX Export Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleExportToPptx} className="h-8 gap-1" disabled={isPptxGenerating}>
-                  {isPptxGenerating ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">変換中...</span></> : <><FileDown className="h-4 w-4" /><span className="hidden sm:inline">PPTX</span></>}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>PowerPointとして出力 (PptxGenJS)</TooltipContent>
-            </Tooltip>
-            {/* Quarto PPTX Export Button */}
-            <Tooltip>
-               <TooltipTrigger asChild>
-                 <Button variant="outline" size="sm" onClick={handleExportToQuartoPptx} className="h-8 gap-1" disabled={isQuartoPptxGenerating}>
-                   {isQuartoPptxGenerating ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">変換中...</span></> : <><FileDown className="h-4 w-4" /><span className="hidden sm:inline">Q-PPTX</span></>}
-                 </Button>
-               </TooltipTrigger>
-               <TooltipContent>QuartoでPowerPointとして出力</TooltipContent>
-             </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-
-      {/* --- Toolbar --- */}
-      <div className="bg-muted pl-1 pr-2 py-2 flex justify-start items-center mb-2 rounded-md">
+    <div className={`fixed inset-0 flex ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
+      {/* --- Sidebar --- */}
+      <div className={`w-16 flex flex-col items-center py-4 space-y-4 border-r ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'}`}>
         <TooltipProvider>
-          <div className="flex space-x-0 items-center">
-            {/* Headings */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("# ", "\n")}><Heading1 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 1</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("## ", "\n")}><Heading2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 2</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("### ", "\n")}><Heading3 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 3</TooltipContent></Tooltip>
-            </div>
-            {/* Text Formatting */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("**", "**")}><Bold className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bold</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("*", "*")}><Italic className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Italic</TooltipContent></Tooltip>
-              <Popover>
-                <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
-                <PopoverContent className="w-80 p-0"><EmojiPicker onEmojiSelect={insertEmoji} /></PopoverContent>
-              </Popover>
-            </div>
-            {/* Lists */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- ", "\n")}><List className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bullet List</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("1. ", "\n")}><ListOrdered className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Numbered List</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- [ ] ", "\n")}><CheckSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Task List</TooltipContent></Tooltip>
-            </div>
-            {/* Block Elements */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---
-marp: true
-theme: default
-${isDarkMode ? 'class: invert' : '# class: invert'}
-paginate: true
-header: "ヘッダ"
-footer: "フッタ"
----
+          {/* Mode Buttons */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={outputMode === 'markdown' ? 'secondary' : 'ghost'} size="icon" className="h-10 w-10" onClick={() => handleModeChange('markdown')}>
+                <FileText className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Markdown Mode</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={outputMode === 'marp' ? 'secondary' : 'ghost'} size="icon" className="h-10 w-10" onClick={() => handleModeChange('marp')}>
+                <Presentation className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Marp Mode</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={outputMode === 'quarto' ? 'secondary' : 'ghost'} size="icon" className="h-10 w-10" onClick={() => handleModeChange('quarto')}>
+                <FileChartColumn className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Quarto Mode</TooltipContent>
+          </Tooltip>
 
-`, "")}><Presentation className="h-4 w-4" /></Button>
-                </TooltipTrigger><TooltipContent>Marp Header</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                 <TooltipTrigger asChild>
-                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---
-title: "Quarto Basics"
-format:
-  html:
-    code-fold: true
-jupyter: python3
----
+          <div className="w-full border-t my-2"></div>
 
-`, "")}><FileCode className="h-4 w-4" /></Button>
-                 </TooltipTrigger><TooltipContent>Quarto Header (HTML)</TooltipContent>
-               </Tooltip>
-            </div>
-            {/* Links & Images & Clear */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("[", "](url)")}><Link className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Link</TooltipContent></Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>{isUploadingImage ? <span className="animate-spin h-4 w-4">⌛</span> : <Image className="h-4 w-4" />}</Button></TooltipTrigger>
-                <TooltipContent>Image</TooltipContent>
-              </Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClearContent}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent>Clear Editor</TooltipContent></Tooltip>
-            </div>
-            {/* View Mode */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'editor' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('editor')} className="h-8 w-8"><Code size={18} /></Button></TooltipTrigger><TooltipContent>Editor Only</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('preview')} className="h-8 w-8"><Box size={18} /></Button></TooltipTrigger><TooltipContent>Preview Only</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('split')} className="h-8 w-8"><SplitSquareVertical size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Markdown)</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-preview')} className="h-8 w-8"><Presentation size={18} /></Button></TooltipTrigger><TooltipContent>Marp Preview</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-split')} className="h-8 w-8"><Columns size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Marp)</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-preview')} className="h-8 w-8"><FileChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Quarto Preview</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-split')} className="h-8 w-8"><ChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Quarto)</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'triple' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('triple')} className="h-8 w-8"><BotMessageSquare size={18} /></Button></TooltipTrigger><TooltipContent>AI Chat View</TooltipContent></Tooltip>
-            </div>
-            {/* Settings */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-               <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={toggleDarkMode} className="h-8 w-8">{isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button></TooltipTrigger><TooltipContent>{isDarkMode ? "Light Mode" : "Dark Mode"}</TooltipContent></Tooltip>
-             </div>
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild><Button variant="outline" size="sm" onClick={toggleVimMode} className="h-8 gap-1"><Terminal className="h-4 w-4" /><span className="hidden sm:inline">{isVimMode ? "Vim:ON" : "Vim:OFF"}</span></Button></TooltipTrigger>
-                <TooltipContent>{isVimMode ? "Disable Vim Mode" : "Enable Vim Mode"}</TooltipContent>
-              </Tooltip>
-            </div>
-            {/* 目次表示ボタン ★追加 */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={isTocVisible ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={toggleToc}
-                    className="h-8 gap-1"
-                    disabled={driveEnabled} // Google Drive有効時は無効化
-                  >
-                    <List className="h-4 w-4" />
-                    <span className="hidden sm:inline">{isTocVisible ? "Toc:ON" : "Toc:OFF"}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{isTocVisible ? "Hide Table of Contents" : "Show Table of Contents"}{driveEnabled ? " (Disabled when Google Drive is ON)" : ""}</TooltipContent>
-              </Tooltip>
-            </div>
-            {/* Google Drive */}
-            {process.env.NEXT_PUBLIC_GOOGLE_FLAG !== 'OFF' && (
-              <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
-                <div className="text-sm mr-1 whitespace-nowrap">Google Drive</div>
-                <Switch
-                  checked={driveEnabled}
-                  onCheckedChange={handleDriveToggle}
-                  disabled={!isAuthenticated} // 非認証時は無効
-                  aria-label="Toggle Google Drive integration"
-                />
-                <GoogleAuth onAuthChange={handleAuthChange} />
-              </div>
-            )}
-            {/* Marpマニュアルボタン（一番右に配置） */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleOpenMarpManual}
-                    className="h-8 gap-1"
-                  >
-                    <span className="inline-flex items-center">💡Marp</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Marpマニュアルを開く</TooltipContent>
-              </Tooltip>
-            </div>
-            {/* Quartoマニュアルボタン */}
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleOpenQuartoManual}
-                    className="h-8 gap-1"
-                  >
-                    <span className="inline-flex items-center">💡Quarto</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Quartoマニュアルを開く</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
+          {/* Google Login/Status */}
+          {process.env.NEXT_PUBLIC_GOOGLE_FLAG !== 'OFF' && (
+            // --- ▼ MODIFIED ▼ ---
+            // GoogleAuth を TooltipTrigger の子として直接配置し、
+            // isAuthenticated 状態に応じたアイコンを GoogleAuth の子要素として渡す試み -> GoogleAuth内部でアイコンを出すように変更したので、元の呼び出し方に戻す
+            <Tooltip>
+              <TooltipTrigger asChild>
+                 {/* GoogleAuth を直接配置。アイコン表示は GoogleAuth 内部で行う */}
+                 <GoogleAuth onAuthChange={handleAuthChange} />
+              </TooltipTrigger>
+              {/* ツールチップの内容も認証状態に応じて変更 */} 
+              <TooltipContent side="right">{isAuthenticated ? "Googleからログアウト" : "Googleにログイン"}</TooltipContent>
+            </Tooltip>
+            // --- ▲ MODIFIED ▲ ---
+          )}
+
+          {/* Dark Mode Toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="h-10 w-10">
+                {isDarkMode ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{isDarkMode ? "ライトモードに切替" : "ダークモードに切替"}</TooltipContent>
+          </Tooltip>
         </TooltipProvider>
       </div>
 
       {/* --- Main Content Area --- */}
-      <div className="flex-grow overflow-hidden"> {/* Prevent content overflow */}
-        {/* ビューモードに応じて表示を切り替え */}
-        {viewMode === 'editor' && (
-          <ResizablePanelGroup direction="horizontal" className="h-full">
-            {/* 左ペイン: Google Drive または 目次 */}
-            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
-                  {driveEnabled && isAuthenticated && accessToken ? (
-                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                  ) : (
-                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                  )}
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            ) : null}
-            {/* エディタペイン */}
-            <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
-              <div className="h-full overflow-auto">{EditorComponent}</div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
-
-        {viewMode === 'preview' && (
-           <ResizablePanelGroup direction="horizontal" className="h-full">
-             {/* 左ペイン: Google Drive または 目次 */}
-             {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
-                  {driveEnabled && isAuthenticated && accessToken ? (
-                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                  ) : (
-                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                  )}
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            ) : null}
-             {/* プレビューペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
-               {PreviewComponent}
-             </ResizablePanel>
-           </ResizablePanelGroup>
-         )}
-
-         {viewMode === 'split' && (
-           <ResizablePanelGroup direction="horizontal" className="h-full">
-             {/* 左ペイン: Google Drive または 目次 */}
-            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
-                  {driveEnabled && isAuthenticated && accessToken ? (
-                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                  ) : (
-                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                  )}
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            ) : null}
-             {/* エディタペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 42 : 50}>
-               <div className="h-full overflow-auto">{EditorComponent}</div>
-             </ResizablePanel>
-             <ResizableHandle withHandle />
-             {/* プレビューペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 43 : 50}>
-               {PreviewComponent}
-             </ResizablePanel>
-           </ResizablePanelGroup>
-         )}
-
-         {viewMode === 'triple' && (
-           <TripleLayout
-             editorComponent={<div className="h-full overflow-auto">{EditorComponent}</div>}
-             previewComponent={PreviewComponent}
-             onAIContentInsert={handleAIContentInsert}
-             isDarkMode={isDarkMode}
-             messages={messages}
-             input={input}
-             handleInputChange={handleInputChange}
-             handleSubmit={handleSubmit}
-             isLoading={isLoading}
-             clearMessages={clearMessages}
-             driveEnabled={driveEnabled && isAuthenticated}
-             driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
-             tocVisible={!driveEnabled && isTocVisible}
-             tocComponent={
-               (!driveEnabled && isTocVisible) ? 
-               <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} /> 
-               : null
-             }
-             getEditorContent={() => markdownContent}
-             setInput={setInput}
-             append={append as any}
-           />
-         )}
-
-        {viewMode === 'marp-preview' && (
-           <ResizablePanelGroup direction="horizontal" className="h-full">
-             {/* 左ペイン: Google Drive または 目次 */}
-            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
-                  {driveEnabled && isAuthenticated && accessToken ? (
-                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                  ) : (
-                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                  )}
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            ) : null}
-             {/* Marpプレビューペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
-               {MarpPreviewComponent}
-             </ResizablePanel>
-           </ResizablePanelGroup>
-         )}
-
-         {viewMode === 'marp-split' && (
-           <ResizablePanelGroup direction="horizontal" className="h-full">
-             {/* 左ペイン: Google Drive または 目次 */}
-            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
-                  {driveEnabled && isAuthenticated && accessToken ? (
-                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                  ) : (
-                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                  )}
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            ) : null}
-             {/* エディタペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 42 : 50}>
-               <div className="h-full overflow-auto">{EditorComponent}</div>
-             </ResizablePanel>
-             <ResizableHandle withHandle />
-             {/* Marpプレビューペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 43 : 50}>
-               {MarpPreviewComponent}
-             </ResizablePanel>
-           </ResizablePanelGroup>
-         )}
-
-         {viewMode === 'quarto-preview' && (
-           <ResizablePanelGroup direction="horizontal" className="h-full">
-             {/* 左ペイン: Google Drive または 目次 */}
-            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
-                  {driveEnabled && isAuthenticated && accessToken ? (
-                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                  ) : (
-                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                  )}
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            ) : null}
-             {/* Quartoプレビューペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 85 : 100}>
-               {QuartoPreviewComponent}
-             </ResizablePanel>
-           </ResizablePanelGroup>
-         )}
-
-         {viewMode === 'quarto-split' && (
-           <ResizablePanelGroup direction="horizontal" className="h-full">
-             {/* 左ペイン: Google Drive または 目次 */}
-            {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-              <>
-                <ResizablePanel defaultSize={15} minSize={10} maxSize={30}>
-                  {driveEnabled && isAuthenticated && accessToken ? (
-                    <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                  ) : (
-                    <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                  )}
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-              </>
-            ) : null}
-             {/* エディタペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 42 : 50}>
-               <div className="h-full overflow-auto">{EditorComponent}</div>
-             </ResizablePanel>
-             <ResizableHandle withHandle />
-             {/* Quartoプレビューペイン */}
-             <ResizablePanel defaultSize={(driveEnabled && isAuthenticated) || (!driveEnabled && isTocVisible) ? 43 : 50}>
-               {QuartoPreviewComponent}
-             </ResizablePanel>
-           </ResizablePanelGroup>
-         )}
-      </div>
-
-      {/* --- Status Bar --- */}
-      <div className={`p-1 border-t text-xs flex justify-between items-center shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
-        <div>Ln {cursorPosition.line}, Col {cursorPosition.col}</div>
-        <div>
-          {getPreviewModeName() && <span>Preview: {getPreviewModeName()}</span>}
-          {isVimMode && <span className="ml-2 font-bold text-green-500">VIM</span>}
+      <div className="flex flex-col flex-grow overflow-hidden">
+        {/* --- Menu Bar (Top) --- */}
+        <div className={`flex justify-between items-center px-4 py-2 border-b shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-300'}`}>
+          <h1 className="text-lg font-semibold">Markdown Editor</h1>
+          <div className="flex items-center space-x-2">
+            <TooltipProvider>
+              {/* Save Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving || (driveEnabled && !isAuthenticated)}>
+                    {isSaving ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">保存中...</span></> : <><Save className="h-4 w-4" /><span className="hidden sm:inline">Save</span></>}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{driveEnabled && isAuthenticated ? `Google Driveに保存 (${selectedFile?.name || '新規'})` : "ローカルに保存"}</TooltipContent>
+              </Tooltip>
+              {/* Export Button (Dynamic) */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleExport} className="h-8 gap-1" disabled={isExporting}>
+                    {isExporting ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">処理中...</span></> : <>{getExportButtonProps().icon}<span className="hidden sm:inline">{getExportButtonProps().label}</span></>}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{getExportButtonProps().tooltip}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
-      </div>
 
-      {/* Hidden file input for image upload */}
-      <input type="file" ref={imageInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
-    </div>
+        {/* --- Toolbar --- */}
+        <div className={`bg-muted pl-1 pr-2 py-1 flex justify-start items-center border-b shrink-0 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} overflow-x-auto whitespace-nowrap`}>
+          <TooltipProvider>
+            <div className="flex space-x-0 items-center">
+              {/* Headings */}
+              {showToolbarButton('H1') && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("# ", "\n")}><Heading1 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 1</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("## ", "\n")}><Heading2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 2</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("### ", "\n")}><Heading3 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 3</TooltipContent></Tooltip>
+              </div>}
+              {/* Text Formatting */}
+              {(showToolbarButton('Bold') || showToolbarButton('Italic') || showToolbarButton('Emoji')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Bold') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("**", "**")}><Bold className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bold</TooltipContent></Tooltip>}
+                {showToolbarButton('Italic') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("*", "*")}><Italic className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Italic</TooltipContent></Tooltip>}
+                {showToolbarButton('Emoji') && <Popover>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
+                  <PopoverContent className="w-80 p-0"><EmojiPicker onEmojiSelect={insertEmoji} /></PopoverContent>
+                </Popover>}
+              </div>}
+              {/* Lists */}
+              {(showToolbarButton('Bullet List') || showToolbarButton('Numberd List') || showToolbarButton('Task List')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Bullet List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- ", "\n")}><List className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bullet List</TooltipContent></Tooltip>}
+                {showToolbarButton('Numberd List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("1. ", "\n")}><ListOrdered className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Numbered List</TooltipContent></Tooltip>}
+                {showToolbarButton('Task List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- [ ] ", "\n")}><CheckSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Task List</TooltipContent></Tooltip>}
+              </div>}
+              {/* Block Elements */}
+              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid') || showToolbarButton('Marp Header') || showToolbarButton('Quatro Header')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Quato') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>}
+                {showToolbarButton('Code Block') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>}
+                {showToolbarButton('Table') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>}
+                {showToolbarButton('Mermaid') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>}
+                {showToolbarButton('Marp Header') && <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---\nmarp: true\ntheme: default\n${isDarkMode ? 'class: invert' : '# class: invert'}\npaginate: true\nheader: "Header"\nfooter: "Footer"\n---\n\n`, "")}><Presentation className="h-4 w-4" /></Button>
+                  </TooltipTrigger><TooltipContent>Marp Header</TooltipContent>
+                </Tooltip>}
+                {showToolbarButton('Quatro Header') && <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---\ntitle: "Quarto Presentation"\nformat: revealjs # or pptx, pdf etc.\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
+                  </TooltipTrigger><TooltipContent>Quarto Header</TooltipContent>
+                </Tooltip>}
+              </div>}
+              {/* Links & Images & Clear */}
+              {(showToolbarButton('Link') || showToolbarButton('Image') || showToolbarButton('Clear Editor')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Link') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("[", "](url)")}><Link className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Link</TooltipContent></Tooltip>}
+                {showToolbarButton('Image') && <Tooltip>
+                  <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>{isUploadingImage ? <span className="animate-spin h-4 w-4">⌛</span> : <Image className="h-4 w-4" />}</Button></TooltipTrigger>
+                  <TooltipContent>Image</TooltipContent>
+                </Tooltip>}
+                {showToolbarButton('Clear Editor') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClearContent}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent>Clear Editor</TooltipContent></Tooltip>}
+              </div>}
+              {/* View Mode Buttons */}
+              <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'editor' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('editor')} className="h-8 w-8"><Code size={18} /></Button></TooltipTrigger><TooltipContent>Editor Only</TooltipContent></Tooltip>
+                {outputMode === 'markdown' && (
+                  <>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('preview')} className="h-8 w-8"><Box size={18} /></Button></TooltipTrigger><TooltipContent>Preview Only</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('split')} className="h-8 w-8"><SplitSquareVertical size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Markdown)</TooltipContent></Tooltip>
+                  </>
+                )}
+                {outputMode === 'marp' && (
+                  <>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-preview')} className="h-8 w-8"><Presentation size={18} /></Button></TooltipTrigger><TooltipContent>Marp Preview</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-split')} className="h-8 w-8"><Columns size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Marp)</TooltipContent></Tooltip>
+                  </>
+                )}
+                {outputMode === 'quarto' && (
+                  <>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-preview')} className="h-8 w-8"><FileChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Quarto Preview</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-split')} className="h-8 w-8"><ChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Quarto)</TooltipContent></Tooltip>
+                  </>
+                )}
+                {showToolbarButton('AI Chat View') && <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'triple' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('triple')} className="h-8 w-8"><BotMessageSquare size={18} /></Button></TooltipTrigger><TooltipContent>AI Chat View</TooltipContent></Tooltip>}
+              </div>
+              {/* Settings & Drive & Manuals */}
+              {/* --- ▼ MODIFIED ▼ --- */}
+              {/* マニュアルボタンの条件分岐を修正 */}
+              <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('VIM ON/OFF') && <Tooltip>
+                  <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={toggleVimMode} className="h-8 w-8"><Terminal className="h-4 w-4" /></Button></TooltipTrigger>
+                  <TooltipContent>{isVimMode ? "Disable Vim Mode" : "Enable Vim Mode"}</TooltipContent>
+                </Tooltip>}
+                {showToolbarButton('Toc ON/OFF') && <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isTocVisible ? 'secondary' : 'ghost'}
+                      size="icon"
+                      onClick={toggleToc}
+                      className="h-8 w-8"
+                      disabled={driveEnabled}
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{isTocVisible ? "Hide Table of Contents" : "Show Table of Contents"}{driveEnabled ? " (Disabled when Google Drive is ON)" : ""}</TooltipContent>
+                </Tooltip>}
+                {process.env.NEXT_PUBLIC_GOOGLE_FLAG !== 'OFF' && showToolbarButton('Google Drivew ON/OFF') && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDriveToggle(!driveEnabled)}
+                        disabled={!isAuthenticated}
+                        className={`h-8 w-8 ${driveEnabled ? 'text-blue-500' : ''}`}
+                        aria-label="Toggle Google Drive integration"
+                      >
+                       {driveEnabled ? <UploadCloud className="h-4 w-4" /> : <UploadCloud className="h-4 w-4 opacity-50" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{driveEnabled ? "Disable Google Drive" : "Enable Google Drive"}{!isAuthenticated ? " (Login required)" : ""}</TooltipContent>
+                  </Tooltip>
+                )}
+                {/* Marp マニュアル */}
+                {showToolbarButton('💡Marp') &&
+                 <Tooltip>
+                   <TooltipTrigger asChild>
+                     <Button variant="ghost" size="icon" onClick={() => window.open(`/api/preview-markdown?path=${encodeURIComponent('/manual/marp_manual.md')}`, '_blank')} className="h-8 w-8">
+                       <CircleHelp className="h-4 w-4" />
+                     </Button>
+                   </TooltipTrigger>
+                   <TooltipContent>Marpマニュアルを開く</TooltipContent>
+                 </Tooltip>
+                }
+                {/* Quarto マニュアル */}
+                {showToolbarButton('💡Quatro') && // 条件を '💡Quatro' に修正
+                 <Tooltip>
+                   <TooltipTrigger asChild>
+                     <Button variant="ghost" size="icon" onClick={() => window.open(`/api/preview-markdown?path=${encodeURIComponent('/manual/quatro_manual.md')}`, '_blank')} className="h-8 w-8"> {/* quatro -> quarto */}
+                       <CircleHelp className="h-4 w-4" />
+                     </Button>
+                   </TooltipTrigger>
+                   <TooltipContent>Quartoマニュアルを開く</TooltipContent> {/* quarto */}
+                 </Tooltip>
+                }
+              </div>
+              {/* --- ▲ MODIFIED ▲ --- */}
+            </div>
+          </TooltipProvider>
+        </div>
+
+        {/* --- Main Content Area (Editor/Preview) --- */}
+        {/* --- ▼ MODIFIED ▼ --- */}
+        {/* flex-grow を適用し、残りの高さを埋めるようにする */}
+        <div className="flex-grow overflow-auto">
+          {/* ResizablePanelGroup and view modes */}
+          {/* (ここの内部構造は変更なし、ただし親要素の高さ管理が変わった) */}
+          {viewMode === 'editor' && (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    {driveEnabled && isAuthenticated && accessToken ? (
+                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                    ) : (
+                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                    )}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                <div className="h-full overflow-auto">{EditorComponent}</div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+          {/* ...他の viewMode の分岐も同様 ... */}
+           {viewMode === 'preview' && (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    {driveEnabled && isAuthenticated && accessToken ? (
+                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                    ) : (
+                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                    )}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                {PreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+           {viewMode === 'split' && (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    {driveEnabled && isAuthenticated && accessToken ? (
+                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                    ) : (
+                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                    )}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                <div className="h-full overflow-auto">{EditorComponent}</div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                {PreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+           {viewMode === 'triple' && (
+             <TripleLayout
+                editorComponent={<div className="h-full overflow-auto">{EditorComponent}</div>}
+                previewComponent={
+                    outputMode === 'marp' ? MarpPreviewComponent :
+                    outputMode === 'quarto' ? QuartoPreviewComponent :
+                    PreviewComponent
+                }
+                onAIContentInsert={handleAIContentInsert}
+                isDarkMode={isDarkMode}
+                messages={messages}
+                input={input}
+                handleInputChange={handleInputChange}
+                handleSubmit={handleSubmit}
+                isLoading={isLoading}
+                clearMessages={clearMessages}
+                driveEnabled={driveEnabled && isAuthenticated}
+                driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
+                tocVisible={!driveEnabled && isTocVisible}
+                tocComponent={
+                  (!driveEnabled && isTocVisible) ?
+                  <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                  : null
+                }
+                getEditorContent={() => markdownContent}
+                setInput={setInput}
+                append={append as any}
+              />
+          )}
+           {viewMode === 'marp-preview' && (
+             <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    {driveEnabled && isAuthenticated && accessToken ? (
+                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                    ) : (
+                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                    )}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                {MarpPreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+           {viewMode === 'marp-split' && (
+             <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    {driveEnabled && isAuthenticated && accessToken ? (
+                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                    ) : (
+                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                    )}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                <div className="h-full overflow-auto">{EditorComponent}</div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                {MarpPreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+           {viewMode === 'quarto-preview' && (
+             <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    {driveEnabled && isAuthenticated && accessToken ? (
+                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                    ) : (
+                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                    )}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                {QuartoPreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+           {viewMode === 'quarto-split' && (
+             <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    {driveEnabled && isAuthenticated && accessToken ? (
+                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                    ) : (
+                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                    )}
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                <div className="h-full overflow-auto">{EditorComponent}</div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                {QuartoPreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+        </div>
+        {/* --- ▲ MODIFIED ▲ --- */}
+
+        {/* --- Status Bar --- */}
+        <div className={`sticky bottom-0 left-0 right-0 p-1 border-t text-xs flex justify-between items-center shrink-0 z-10 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
+          <div>Ln {cursorPosition.line}, Col {cursorPosition.col}</div>
+          <div>
+            <span>Mode: {outputMode.charAt(0).toUpperCase() + outputMode.slice(1)}</span>
+            {getPreviewModeName() && <span className="ml-2">Preview: {getPreviewModeName()}</span>}
+            {isVimMode && <span className="ml-2 font-bold text-green-500">VIM</span>}
+          </div>
+        </div>
+
+        {/* Hidden file input for image upload */}
+        <input type="file" ref={imageInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+      </div> {/* End Main Content Area Flex Col */}
+    </div> /* End Top Level Flex Container */
   )
 }
 
