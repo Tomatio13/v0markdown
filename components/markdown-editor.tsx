@@ -393,6 +393,14 @@ export default function MarkdownEditor() {
     setIsTocVisible(prev => !prev);
   }, [setIsTocVisible]);
 
+  // Marpマニュアル表示ハンドラ
+  const handleOpenMarpManual = useCallback(() => {
+    // 新しいAPIエンドポイントを使用
+    const manualPath = '/manual/marp_manual.md';
+    const previewUrl = `/api/preview-markdown?path=${encodeURIComponent(manualPath)}`;
+    window.open(previewUrl, '_blank');
+  }, []);
+
   // --- Jump Function ---
   const handleTocJump = useCallback((lineNumber: number) => {
     if (viewRef.current) {
@@ -751,25 +759,6 @@ export default function MarkdownEditor() {
     return () => clearTimeout(timeoutId);
   }, [handleCursorUpdate]); // handleCursorUpdate を依存配列に追加
 
-  // // CodeMirror選択範囲のスタイル設定
-  // useEffect(() => {
-  //   const styleId = 'codemirror-selection-styles';
-  //   let styleElement = document.getElementById(styleId) as HTMLStyleElement | null;
-  //   if (!styleElement) {
-  //     styleElement = document.createElement('style');
-  //     styleElement.id = styleId;
-  //     document.head.appendChild(styleElement);
-  //   }
-  //   // スタイル内容はダークモード状態に応じて変更しない (CSS側で .dark セレクタを使う)
-  //   styleElement.textContent = `
-  //     .cm-editor:not(.cm-focused) .cm-selectionBackground { background-color: rgba(255, 213, 0, 0.4) !important; }
-  //     .cm-editor.cm-focused .cm-selectionBackground { background-color: rgba(255, 213, 0, 0.7) !important; }
-  //     .dark .cm-editor:not(.cm-focused) .cm-selectionBackground { background-color: rgba(100, 100, 150, 0.4) !important; }
-  //     .dark .cm-editor.cm-focused .cm-selectionBackground { background-color: rgba(100, 100, 170, 0.6) !important; }
-  //   `;
-  //   // クリーンアップは不要 (スタイルはモード切り替えで永続的に必要)
-  // }, []); // 初回マウント時のみ実行
-
   // --- Auto Save & Draft Restore ---
   useAutoSave({ content: markdownContent, fileId: selectedFile?.id });
 
@@ -1088,6 +1077,22 @@ jupyter: python3
                 <GoogleAuth onAuthChange={handleAuthChange} />
               </div>
             )}
+            {/* Marpマニュアルボタン（一番右に配置） */}
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md flex-shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleOpenMarpManual}
+                    className="h-8 gap-1"
+                  >
+                    <span className="inline-flex items-center">💡Marp</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Marpマニュアルを開く</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </TooltipProvider>
       </div>
