@@ -37,6 +37,34 @@ title: "はじめてのQuartoドキュメント"
 author: "あなたの名前"
 format: html
 ---
+```
+
+#### ヘッダの例
+
+PDF変換時に日本語含めて表示する際には以下を指定してください。
+```markdown
+---
+title: "Quarto Basics"
+format: pdf
+pdf-engine: lualatex
+documentclass: ltjsarticle 
+editor: visual
+jupter: python3
+---
+```
+PowerPoint変換時に日本語含めて表示する際には以下を指定してください。
+
+```markdown
+---
+title: "Quarto Basics"
+format:
+ html:
+  code-fold: true
+jupter: python3
+---
+```
+
+上記は一例です。様々なカスタム方法があります。
 
 ## はじめに
 
@@ -53,7 +81,7 @@ y = np.sin(x)
 plt.plot(x, y)
 plt.title("正弦波")
 plt.show()
-```　
+```EOF
 ```
 
 ## 2. ドキュメント作成テクニック
@@ -180,7 +208,7 @@ x = np.random.randn(100)
 y = x + np.random.randn(100) * 0.5
 plt.scatter(x, y)
 plt.show()
-```　
+```EOF
 ```
 
 主なコードブロックオプション：
@@ -335,7 +363,7 @@ data = pd.DataFrame({
     'y': np.random.normal(0, 1, 100)
 })
 data.describe()
-```　
+```EOF
 
 ## 可視化
 
@@ -352,7 +380,7 @@ plt.figure(figsize=(10, 6))
 sns.scatterplot(data=data, x='x', y='y')
 plt.title('散布図')
 plt.show()
-```　
+```EOF
 
 # 結論
 
@@ -390,7 +418,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # データと方法の説明コード
-```　
+```EOF
 
 ## 結果
 
