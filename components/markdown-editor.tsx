@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp // 追加アイコン
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon // File を FileIcon としてインポート
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -79,6 +79,7 @@ export default function MarkdownEditor() {
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isPptxGenerating, setIsPptxGenerating] = useState(false)
   const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false)
+  const [isQuartoPdfGenerating, setIsQuartoPdfGenerating] = useState(false); // PDF生成用のローディング状態を追加
   const [isTocVisible, setIsTocVisible] = useState(false);
 
   // Google Drive State
@@ -654,9 +655,60 @@ export default function MarkdownEditor() {
     }
   };
 
+  // Quarto PDF出力ハンドラを追加
+  const handleExportToQuartoPdf = async () => {
+    console.log('Quarto PDF変換処理を開始します...');
+    setIsQuartoPdfGenerating(true);
+    try {
+      if (!markdownContent.trim()) {
+        alert('マークダウンコンテンツが空です。'); return;
+      }
+      const formData = new FormData();
+      formData.append('markdown', markdownContent);
+      formData.append('format', 'pdf'); // Quarto APIにPDFフォーマットを指定
+      const response = await fetch('/api/export-to-quarto', { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        let errorMessage = 'Quarto PDF変換エラー';
+        try { const errorData = await response.json(); errorMessage = errorData.error || errorMessage; }
+        catch (e) { const errorText = await response.text(); errorMessage = errorText || errorMessage; }
+        throw new Error(errorMessage);
+      }
+
+      const contentType = response.headers.get('Content-Type');
+      if (contentType?.includes('application/json')) {
+        const jsonData = await response.json(); throw new Error(jsonData.error || 'Quarto PDF変換エラー');
+      }
+      if (!contentType?.includes('application/pdf')) {
+        console.warn('Expected PDF response, but received:', contentType);
+        // PDFでない場合は、テキストとしてエラーメッセージを表示しようと試みる
+        const errorText = await response.text();
+        throw new Error(errorText || 'サーバーから予期しない応答がありました。');
+      }
+      if (response.headers.get('X-Processing-Time')) console.log(`サーバー処理時間: ${response.headers.get('X-Processing-Time')}`);
+
+
+      const pdfBlob = await response.blob();
+      if (pdfBlob.size === 0) throw new Error('生成されたPDFファイルが空です');
+
+      const fileName = generateFileName(markdownContent, 'pdf');
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a'); a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 100);
+      console.log('Quarto PDFファイルが正常に生成されました');
+    } catch (error) {
+      console.error('Quarto PDF変換エラー詳細:', error);
+      alert(error instanceof Error ? error.message : 'PDF変換中に不明なエラーが発生しました');
+    } finally {
+      setIsQuartoPdfGenerating(false);
+    }
+  };
+
   // --- ▼ ADDED ▼ ---
   // 統合エクスポートハンドラ
   const handleExport = useCallback(async () => {
+    // ... (変更なし) ...
     switch (outputMode) {
       case 'markdown':
         handlePrint();
@@ -665,6 +717,7 @@ export default function MarkdownEditor() {
         await handleExportToPptx();
         break;
       case 'quarto':
+        // Quartoモードの既存のExportボタンはPPTX出力とする
         await handleExportToQuartoPptx();
         break;
       default:
@@ -674,13 +727,15 @@ export default function MarkdownEditor() {
 
   // Exportボタンのツールチップとアイコンを動的に取得
   const getExportButtonProps = () => {
+    // ... (変更なし) ...
     switch (outputMode) {
       case 'markdown':
-        return { tooltip: "印刷プレビュー", icon: <Printer className="h-4 w-4" />, label: "Export" };
+        return { tooltip: "印刷プレビュー", icon: <Printer className="h-4 w-4" />, label: "Print" }; // ラベルをPrintに変更
       case 'marp':
-        return { tooltip: "PowerPointとして出力 (Marp)", icon: <FileDown className="h-4 w-4" />, label: "Export" };
+        return { tooltip: "PowerPointとして出力 (Marp)", icon: <FileDown className="h-4 w-4" />, label: "PPTX" }; // ラベルを具体的に
       case 'quarto':
-        return { tooltip: "PowerPointとして出力 (Quarto)", icon: <FileDown className="h-4 w-4" />, label: "Export" };
+        // Quartoモードの既存ExportボタンはPPTX用とする
+        return { tooltip: "PowerPointとして出力 (Quarto)", icon: <FileDown className="h-4 w-4" />, label: "PPTX" }; // ラベルを具体的に
       default:
         return { tooltip: "エクスポート", icon: <DownloadCloud className="h-4 w-4" />, label: "Export" }; // Fallback
     }
@@ -688,9 +743,10 @@ export default function MarkdownEditor() {
 
   // Exportボタンのローディング状態を判定
   const isExporting = useMemo(() => {
+    // ... (変更なし) ...
     switch (outputMode) {
       case 'marp': return isPptxGenerating;
-      case 'quarto': return isQuartoPptxGenerating;
+      case 'quarto': return isQuartoPptxGenerating; // PPTX生成状態を見る
       default: return false; // MarkdownのPrintは非同期ではない
     }
   }, [outputMode, isPptxGenerating, isQuartoPptxGenerating]);
@@ -1076,15 +1132,36 @@ export default function MarkdownEditor() {
                 </TooltipTrigger>
                 <TooltipContent>{driveEnabled && isAuthenticated ? `Google Driveに保存 (${selectedFile?.name || '新規'})` : "ローカルに保存"}</TooltipContent>
               </Tooltip>
-              {/* Export Button (Dynamic) */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={handleExport} className="h-8 gap-1" disabled={isExporting}>
-                    {isExporting ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">処理中...</span></> : <>{getExportButtonProps().icon}<span className="hidden sm:inline">{getExportButtonProps().label}</span></>}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{getExportButtonProps().tooltip}</TooltipContent>
-              </Tooltip>
+
+              {/* --- ▼ ADDED ▼ --- */}
+              {/* Quarto PDF Export Button (Conditional) */}
+              {outputMode === 'quarto' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={handleExportToQuartoPdf} className="h-8 gap-1" disabled={isQuartoPdfGenerating}>
+                      {/* --- ▼ MODIFIED ▼ --- */}
+                      {/* File を FileIcon に変更 */}
+                      {isQuartoPdfGenerating ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">生成中...</span></> : <><FileIcon className="h-4 w-4" /><span className="hidden sm:inline">PDF</span></>}
+                      {/* --- ▲ MODIFIED ▲ --- */}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>PDFとして出力 (Quarto)</TooltipContent>
+                </Tooltip>
+              )}
+              {/* --- ▲ ADDED ▲ --- */}
+
+              {/* Export Button (Dynamic: PPTX/Print) */}
+              {/* Markdownモードでは印刷、Marp/QuartoモードではPPTX出力 */}
+              {(outputMode === 'markdown' || outputMode === 'marp' || outputMode === 'quarto') && ( // 表示条件を確認
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={handleExport} className="h-8 gap-1" disabled={isExporting}>
+                        {isExporting ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">処理中...</span></> : <>{getExportButtonProps().icon}<span className="hidden sm:inline">{getExportButtonProps().label}</span></>}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{getExportButtonProps().tooltip}</TooltipContent>
+                  </Tooltip>
+              )}
             </TooltipProvider>
           </div>
         </div>
@@ -1127,7 +1204,7 @@ export default function MarkdownEditor() {
                 </Tooltip>}
                 {showToolbarButton('Quatro Header') && <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---\ntitle: "Quarto Presentation"\nformat: revealjs # or pptx, pdf etc.\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n html:\n  code-fold: true\njupter: python3\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
                   </TooltipTrigger><TooltipContent>Quarto Header</TooltipContent>
                 </Tooltip>}
               </div>}

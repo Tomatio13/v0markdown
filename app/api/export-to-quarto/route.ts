@@ -6,7 +6,7 @@ import os from 'os'
 import { v4 as uuidv4 } from 'uuid'
 
 // デバッグログフラグ（本番環境では false に設定）
-const DEBUG = true
+const DEBUG = false
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -207,6 +207,9 @@ fi
       } else if (format === 'html') {
         contentType = 'text/html'
         fileName = 'document.html'
+      } else if (format === 'pdf') {
+        contentType = 'application/pdf';
+        fileName = 'document.pdf';
       }
       
       return new NextResponse(outputData, {
