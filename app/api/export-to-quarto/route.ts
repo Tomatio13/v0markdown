@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawn } from 'child_process'
+import { spawn, exec } from 'child_process'
 import { promises as fs } from 'fs'
 import path from 'path'
 import os from 'os'
 import { v4 as uuidv4 } from 'uuid'
+import util from 'util'
+
+// execをPromise化
+const execPromise = util.promisify(exec)
 
 // デバッグログフラグ（本番環境では false に設定）
-const DEBUG = true
+const DEBUG = false
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   const sessionId = uuidv4().substring(0, 8) // リクエスト追跡用の短いID
+  const tmpDir = path.join(os.tmpdir(), `quarto-${sessionId}`)
   
   // ログヘルパー関数
   const log = (message: string) => {
@@ -25,7 +30,7 @@ export async function POST(request: NextRequest) {
     // リクエストからマークダウンデータとフォーマット（pptxかhtml）を取得
     log('リクエストデータの解析中...')
     const formData = await request.formData()
-    const markdownContent = formData.get('markdown')
+    let markdownContent = formData.get('markdown')
     const format = (formData.get('format') as string) || 'pptx' // デフォルトはpptx
     
     if (!markdownContent || typeof markdownContent !== 'string') {
@@ -36,13 +41,99 @@ export async function POST(request: NextRequest) {
     log(`マークダウン文字数: ${markdownContent.length}文字, フォーマット: ${format}`)
     
     // 一時ディレクトリの作成
-    const tmpDir = path.join(os.tmpdir(), `quarto-${sessionId}`)
     log(`一時ディレクトリを作成: ${tmpDir}`)
     await fs.mkdir(tmpDir, { recursive: true })
     
+    // --- Puppeteer設定ファイル作成 ---
+    const puppeteerConfigPath = path.join(tmpDir, 'puppeteer-config.json')
+    const puppeteerConfigContent = JSON.stringify({ args: ['--no-sandbox'] })
+    try {
+      log(`Puppeteer設定ファイル作成: ${puppeteerConfigPath}`)
+      await fs.writeFile(puppeteerConfigPath, puppeteerConfigContent)
+    } catch (writeErr) {
+      log(`エラー: Puppeteer設定ファイルの書き込みに失敗: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`)
+      throw new Error('Puppeteer設定ファイルの作成に失敗しました')
+    }
+    // --- Puppeteer設定ファイル作成 終了 ---
+
+    // --- Mermaid処理 ---
+    log('Mermaidコードブロックの検索と変換開始...')
+    const mermaidRegex = /```mermaid\s*([\s\S]*?)```/g
+    const mermaidBlocks = []
+    let match
+    while ((match = mermaidRegex.exec(markdownContent)) !== null) {
+      mermaidBlocks.push({ fullMatch: match[0], code: match[1].trim() })
+    }
+
+    if (mermaidBlocks.length > 0) {
+      log(`${mermaidBlocks.length}個のMermaidブロックを検出`)
+      const projectRoot = process.cwd()
+      const mmdcPath = path.join(projectRoot, 'node_modules', '.bin', 'mmdc')
+
+      try {
+        await fs.access(mmdcPath)
+        log(`mmdcパス確認: ${mmdcPath}`)
+      } catch (err) {
+        log(`エラー: mmdcが見つかりません (${mmdcPath})。 mermaid-cliのインストールを確認してください。`)
+        return NextResponse.json({
+          error: `Mermaid処理に必要なツール (mmdc) が見つかりません。サーバー管理者に連絡してください。`,
+        }, { status: 500 })
+      }
+
+      for (let i = 0; i < mermaidBlocks.length; i++) {
+        const block = mermaidBlocks[i]
+        const mmdInputPath = path.join(tmpDir, `mermaid-input-${i}.mmd`)
+        // SVG -> PNG に変更
+        const pngOutputPath = path.join(tmpDir, `mermaid-output-${i}.png`)
+        const pngRelativePath = `./mermaid-output-${i}.png` // パスも変更
+
+        log(`[Mermaid ${i}] 一時入力ファイル作成: ${mmdInputPath}`)
+        await fs.writeFile(mmdInputPath, block.code)
+
+        // mmdcコマンド実行 (puppeteer設定ファイル -p を追加、出力ファイルを .png に変更)
+        // 背景は透明のままにしますが、PPTXで問題が続く場合は -b white など試す価値あり
+        const mmdcCommand = `"${mmdcPath}" -i "${path.basename(mmdInputPath)}" -o "${path.basename(pngOutputPath)}" -p "${path.basename(puppeteerConfigPath)}" -b transparent`
+        log(`[Mermaid ${i}] mmdc実行 (PNG) (in ${tmpDir}): ${mmdcCommand}`) // ログ変更 (PNG)
+        try {
+          // mmdcコマンドをtmpDirで実行
+          const { stdout, stderr } = await execPromise(mmdcCommand, { cwd: tmpDir })
+          if (stderr) {
+            // mmdcは警告をstderrに出力することがあるため、エラーとは限らない
+            log(`[Mermaid ${i}] mmdc stderr: ${stderr}`)
+          }
+          log(`[Mermaid ${i}] mmdc stdout: ${stdout}`)
+          // PNGファイルが存在するか確認
+          await fs.access(pngOutputPath);
+          log(`[Mermaid ${i}] PNG生成成功: ${pngOutputPath}`) // ログ変更
+
+          // Markdown内のコードブロックを ![](...) 形式の画像リンクに置換 (.png を参照)
+          // 前後に改行を追加して、他の要素との間隔を確保する
+          const imgTag = `\n\n![](${pngRelativePath})\n\n` // 参照先変更
+          markdownContent = markdownContent.replace(block.fullMatch, imgTag)
+
+        } catch (error) {
+          log(`[Mermaid ${i}] mmdc実行エラー (PNG): ${error instanceof Error ? error.message : String(error)}`) // ログ変更 (PNG)
+          // エラーメッセージをコードブロックとして挿入（デバッグ用）
+          const errorBlock = `\n\`\`\`\nError rendering Mermaid diagram ${i} to PNG: ${error instanceof Error ? error.message : String(error)}\n\`\`\`\n` // ログ変更
+          markdownContent = markdownContent.replace(block.fullMatch, `\n\n${errorBlock}\n\n`)
+          // エラー時も処理を続行する
+        }
+      }
+      log('MermaidコードブロックのPNGへの置換完了') // ログ変更
+    } else {
+      log('Mermaidブロックは見つかりませんでした')
+    }
+    // --- Mermaid処理 終了 ---
+
+    // デバッグ用: 処理後のMarkdown内容を出力
+    if (DEBUG) {
+      log(`処理済みマークダウン内容:\n----\n${markdownContent}\n----`)
+    }
+
     // 一時ファイルの作成 - 拡張子はqmdにする必要がある
     const qmdFilePath = path.join(tmpDir, 'document.qmd')
     log(`Quartoファイルを作成: ${qmdFilePath}`)
+    // Mermaid処理後のmarkdownContentを書き込む
     await fs.writeFile(qmdFilePath, markdownContent)
     
     // 出力ファイルのパス
@@ -64,110 +155,117 @@ export async function POST(request: NextRequest) {
     try {
       // タイムアウトを設定
       const TIMEOUT_MS = 60000; // 60秒
-      log(`タイムアウト設定: ${TIMEOUT_MS}ms`);
-      
-      // プロジェクトルートディレクトリを取得
-      const projectRoot = process.cwd();
+      log(`タイムアウト設定: ${TIMEOUT_MS}ms`)
       
       // シェルスクリプトファイルを作成
-      const scriptPath = path.join(tmpDir, 'convert.sh');
+      const scriptPath = path.join(tmpDir, 'convert.sh')
       const scriptContent = `#!/bin/bash
-cd "${projectRoot}"
+
 echo "Quarto変換開始: $(date)"
 
 # Jupyter環境をアクティベート
 cd "${jupyterPath}"
 source "venv/bin/activate"
+# 一時ディレクトリに移動してQuartoを実行 (SVGの相対パス解決のため)
+cd "${tmpDir}"
 
-# Quartoコマンド実行
+
+# Quartoコマンド実行 (入力と出力ファイルをbasenameに変更)
+# HTMLの場合は --embed-resources を維持
 if [ "${format}" = "html" ]; then
-  "${quartoPath}/quarto" render "${qmdFilePath}" --to ${format} --embed-resources
+  "${quartoPath}/quarto" render "${path.basename(qmdFilePath)}" --to ${format} --embed-resources
+elif [ "${format}" = "pdf" ]; then
+  # PDFの場合、追加の設定が必要な場合がある (LaTeXなど)
+  "${quartoPath}/quarto" render "${path.basename(qmdFilePath)}" --to ${format}
 else
-  "${quartoPath}/quarto" render "${qmdFilePath}" --to ${format}
+  # PPTXなど他のフォーマット
+  "${quartoPath}/quarto" render "${path.basename(qmdFilePath)}" --to ${format}
 fi
 
 EXIT_CODE=$?
 echo "変換終了: $(date), 終了コード: $EXIT_CODE"
 
-# 環境をデアクティベート
-deactivate
+# 環境をデアクティベート (必要に応じて継続)
+# deactivate
 
-if [ -f "${outputFilePath}" ] && [ -s "${outputFilePath}" ]; then
-  echo "生成ファイル: $(du -h "${outputFilePath}" | cut -f1)"
+# 出力ファイルを確認 (basenameを使用)
+if [ -f "${path.basename(outputFilePath)}" ] && [ -s "${path.basename(outputFilePath)}" ]; then
+  echo "生成ファイル: $(du -h "${path.basename(outputFilePath)}" | cut -f1)"
   exit $EXIT_CODE
 else
-  echo "エラー: ファイル生成失敗"
+  echo "エラー: ファイル生成失敗 (${path.basename(outputFilePath)}が見つからないか空です)"
+  # 変換時のstderrも確認すると良い
   exit 1
 fi
-`;
+`
       
-      log(`シェルスクリプト作成: ${scriptPath}`);
-      await fs.writeFile(scriptPath, scriptContent);
-      await fs.chmod(scriptPath, 0o755); // 実行権限を付与
+      log(`シェルスクリプト作成: ${scriptPath}`)
+      await fs.writeFile(scriptPath, scriptContent)
+      await fs.chmod(scriptPath, 0o755) // 実行権限を付与
       
-      log(`シェルスクリプト内容:\n${scriptContent}`);
+      log(`シェルスクリプト内容:\n${scriptContent}`)
       
       // シェルスクリプト実行
-      log(`シェルスクリプト実行: ${scriptPath}`);
+      log(`シェルスクリプト実行: ${scriptPath}`)
       
       await new Promise<void>((resolve, reject) => {
-        log('スクリプト実行開始...');
+        log('スクリプト実行開始...')
         
         // タイムアウトタイマー
         const timeoutId = setTimeout(() => {
-          log(`タイムアウト発生: ${TIMEOUT_MS}ms 経過`);
-          reject(new Error(`スクリプト実行がタイムアウトしました: ${TIMEOUT_MS}ms`));
-        }, TIMEOUT_MS);
+          log(`タイムアウト発生: ${TIMEOUT_MS}ms 経過`)
+          reject(new Error(`スクリプト実行がタイムアウトしました: ${TIMEOUT_MS}ms`))
+        }, TIMEOUT_MS)
         
-        // シェルスクリプトを実行
+        // シェルスクリプトを実行 (CWD を tmpDir に変更)
         const childProcess = spawn(scriptPath, [], {
           shell: true,
-          cwd: projectRoot
-        });
+          cwd: tmpDir // CWDをtmpDirに設定
+        })
         
         // プロセスIDをログ出力
         if (childProcess.pid) {
-          log(`プロセスID: ${childProcess.pid}`);
+          log(`プロセスID: ${childProcess.pid}`)
         }
         
-        let stdoutData = '';
-        let stderrData = '';
+        let stdoutData = ''
+        let stderrData = ''
         
         // 標準出力
         childProcess.stdout.on('data', (data: Buffer) => {
-          const chunk = data.toString();
-          stdoutData += chunk;
-          log(`スクリプト stdout: ${chunk}`);
-        });
+          const chunk = data.toString()
+          stdoutData += chunk
+          log(`スクリプト stdout: ${chunk}`)
+        })
         
         // 標準エラー出力
         childProcess.stderr.on('data', (data: Buffer) => {
-          const chunk = data.toString();
-          stderrData += chunk;
-          log(`スクリプト stderr: ${chunk}`);
-        });
+          const chunk = data.toString()
+          stderrData += chunk
+          log(`スクリプト stderr: ${chunk}`)
+        })
         
         // プロセス終了時の処理
         childProcess.on('close', (code: number | null) => {
-          clearTimeout(timeoutId);
-          log(`スクリプト終了 (コード: ${code})`);
+          clearTimeout(timeoutId)
+          log(`スクリプト終了 (コード: ${code})`)
           
           if (code === 0) {
-            log(`スクリプト完了 (stdout: ${stdoutData.length}文字, stderr: ${stderrData.length}文字)`);
-            resolve();
+            log(`スクリプト完了 (stdout: ${stdoutData.length}文字, stderr: ${stderrData.length}文字)`)
+            resolve()
           } else {
-            log(`スクリプトエラー - 出力: ${stdoutData}\nエラー: ${stderrData}`);
-            reject(new Error(`変換スクリプト失敗 (コード: ${code})`));
+            log(`スクリプトエラー - 出力: ${stdoutData}\nエラー: ${stderrData}`)
+            reject(new Error(`変換スクリプト失敗 (コード: ${code})`))
           }
-        });
+        })
         
         // エラー処理
         childProcess.on('error', (err: Error) => {
-          clearTimeout(timeoutId);
-          log(`スクリプト実行エラー: ${err.message}`);
-          reject(err);
-        });
-      });
+          clearTimeout(timeoutId)
+          log(`スクリプト実行エラー: ${err.message}`)
+          reject(err)
+        })
+      })
       
       // ファイルが存在するか確認
       try {
@@ -208,8 +306,8 @@ fi
         contentType = 'text/html'
         fileName = 'document.html'
       } else if (format === 'pdf') {
-        contentType = 'application/pdf';
-        fileName = 'document.pdf';
+        contentType = 'application/pdf'
+        fileName = 'document.pdf'
       }
       
       return new NextResponse(outputData, {
