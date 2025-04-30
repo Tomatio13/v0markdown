@@ -79,9 +79,15 @@
     - 連携機能のオン/オフを切り替えられます。
 - **ローカルファイル保存:** Google Drive連携が無効な場合、ファイルをローカルにダウンロードできます。
 - **印刷機能:** プレビュー内容を印刷またはPDFとして保存できます。
-- **AIチャット機能 (オプション):** エディタの内容についてAIと対話できます（別途API設定が必要）。
-  - `@editor` と入力することで、エディタの現在の内容をコンテキストとしてAIに送信できます。
-  - 会話履歴をクリアする機能があります。
+- **AIチャット機能 (オプション):**
+   - エディタの内容についてAIと対話できます（別途API設定が必要）。
+   - `@editor` と入力することで、エディタの現在の内容をコンテキストとしてAIに送信できます。
+   - 会話履歴をクリアする機能があります。
+  - **Model Context Protocol (MCP) 連携:**
+    - `.env.local` の `MCP_SERVERS_JSON` で設定した外部ツールサーバーに接続し、そのツールをAIが利用できるようになります。
+    - 各サーバーのツールは `サーバーキー_ツール名` 形式に自動でリネームされ、OpenAIのツール名制約（英数字アンダースコア64文字以内）に対応します。
+  - **ローカルメモリツール:**
+    - `memory_get` / `memory_set` ツールにより、会話中に一時的な情報を記憶・参照できます（サーバー再起動でリセットされます）。
 
 ## 🛠️ 技術スタック
 
@@ -155,8 +161,21 @@ NEXT_PUBLIC_GOOGLE_API_KEY="your_google_api_key"
 NEXT_PUBLIC_REDIRECT_URI="http://localhost:3000"
 NEXT_PUBLIC_GOOGLE_FLAG=ON
 
+# AI Provider API Keys (いずれか、または両方が必要)
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 GROK_API_KEY="YOUR_GROK_API_KEY" 
 
+# Model Context Protocol (MCP) Servers (オプション)
+# 外部ツールサーバーをJSON形式で指定します。
+# キー名は英数字アンダースコアのみを推奨 (OpenAIツール名制約のため)。
+# 例:
+# MCP_SERVERS_JSON='{
+#   "tavily":  { "url": "http://localhost:5001/sse" },
+#   "web_search": { "url": "http://localhost:5002/sse", "headers": { "Authorization": "Bearer YOUR_TOKEN" } }
+# }'
+MCP_SERVERS_JSON=''
+
+# Paths for External Tools (オプション)
 JUPYTER_PATH=/path/to/jupyter
 QUARTO_PATH=/path/to/quarto/bin
 ```
@@ -225,6 +244,13 @@ pnpm install
     *   「Export to PPTX」ボタンをクリックすると、PowerPointファイルとして出力されます。
     *   出力されたPPTXファイルはMicrosoft PowerPointやLibreOfficeなどで編集可能です。
     *   Quarto記法で記述されたマークダウンも同様に「Export Quarto to PPTX」ボタンで変換できます。
+9.  **AIチャット (オプション):**
+    *   `app/api/chat/route.ts` で使用するAIモデル (OpenAI/Grok) を選択します。
+    *   `.env.local` に対応するAPIキー (`OPENAI_API_KEY`, `GROK_API_KEY`) を設定します。
+    *   必要に応じて `MCP_SERVERS_JSON` を設定し、外部ツールを利用可能にします。
+    *   AIチャットペインでAIと対話します。
+        *   `@editor` でエディタ内容を参照させられます。
+        *   設定したMCPツールやローカルメモリツール (`memory_get`, `memory_set`) をAIが利用できます。
 
 ## 👨‍💻 開発
 
