@@ -83,10 +83,11 @@
    - エディタの内容についてAIと対話できます（別途API設定が必要）。
    - `@editor` と入力することで、エディタの現在の内容をコンテキストとしてAIに送信できます。
    - 会話履歴をクリアする機能があります。
-  - **Model Context Protocol (MCP) 連携:**
-    - `.env.local` の `MCP_SERVERS_JSON` で設定した外部ツールサーバーに接続し、そのツールをAIが利用できるようになります。
+   - **Model Context Protocol (MCP) 連携:**
+    - `.env.local` の `MCP_SERVERS_JSON` で設定した外部ツールサーバーを STDIO 経由で起動・接続し、そのツールをAIが利用できるようになります。
+    - **注意:** STDIO 連携はローカルコマンドを実行するため、信頼できるサーバーのみを設定してください。
     - 各サーバーのツールは `サーバーキー_ツール名` 形式に自動でリネームされ、OpenAIのツール名制約（英数字アンダースコア64文字以内）に対応します。
-  - **ローカルメモリツール:**
+   - **ローカルメモリツール:**
     - `memory_get` / `memory_set` ツールにより、会話中に一時的な情報を記憶・参照できます（サーバー再起動でリセットされます）。
 
 ## 🛠️ 技術スタック
@@ -166,12 +167,20 @@ OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 GROK_API_KEY="YOUR_GROK_API_KEY" 
 
 # Model Context Protocol (MCP) Servers (オプション)
-# 外部ツールサーバーをJSON形式で指定します。
+# 外部ツールサーバーを STDIO で起動するための設定をJSON形式で指定します。
+# StdioMCPTransport に渡される形式です。
 # キー名は英数字アンダースコアのみを推奨 (OpenAIツール名制約のため)。
 # 例:
 # MCP_SERVERS_JSON='{
-#   "tavily":  { "url": "http://localhost:5001/sse" },
-#   "web_search": { "url": "http://localhost:5002/sse", "headers": { "Authorization": "Bearer YOUR_TOKEN" } }
+#   "my_python_tool": {
+#     "command": "python",                 # 必須: 実行ファイルパス (string)
+#     "args": ["path/to/your/script.py"],  # オプション: コマンド引数 (string[])
+#     "cwd": "/path/to/your/project"
+#   },
+#   "another_node_tool": {
+#     "command": "node",
+#     "args": ["dist/server.js"]
+#   }
 # }'
 MCP_SERVERS_JSON=''
 
@@ -247,7 +256,7 @@ pnpm install
 9.  **AIチャット (オプション):**
     *   `app/api/chat/route.ts` で使用するAIモデル (OpenAI/Grok) を選択します。
     *   `.env.local` に対応するAPIキー (`OPENAI_API_KEY`, `GROK_API_KEY`) を設定します。
-    *   必要に応じて `MCP_SERVERS_JSON` を設定し、外部ツールを利用可能にします。
+    *   必要に応じて `MCP_SERVERS_JSON` を設定し、外部ツール (STDIO 経由) を利用可能にします。
     *   AIチャットペインでAIと対話します。
         *   `@editor` でエディタ内容を参照させられます。
         *   設定したMCPツールやローカルメモリツール (`memory_get`, `memory_set`) をAIが利用できます。

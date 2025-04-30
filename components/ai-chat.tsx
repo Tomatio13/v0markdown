@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from 'react'
 import { Send, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import TextareaAutosize from 'react-textarea-autosize'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent } from '@/components/ui/card'
 import type { Message, UseChatHelpers } from 'ai/react'
@@ -123,6 +123,23 @@ export const AIChat = ({
     }
   }, [input, handleSubmit, handleInputChange, getEditorContent, setInput, append]);
 
+  // Enterで送信、Shift+Enterで改行するハンドラ
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // デフォルトの改行動作をキャンセル
+      if (!isLoading && input.trim()) {
+        // submitWithEditorContent を引数なしで呼び出せるように調整が必要
+        // React.FormEvent<HTMLFormElement> の代わりに undefined を渡すか、
+        // submitWithEditorContent の型定義を変更する
+        const fakeEvent = {
+          preventDefault: () => {}
+        } as React.FormEvent<HTMLFormElement>;
+        submitWithEditorContent(fakeEvent);
+      }
+    }
+    // Shift + Enter の場合は通常の改行が行われる
+  };
+
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? 'bg-[#2c2c2c] text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
       <div className={`flex justify-between items-center px-4 py-2 ${isDarkMode ? 'border-b border-gray-700' : 'border-b border-gray-200'}`}>
@@ -184,13 +201,16 @@ export const AIChat = ({
       </ScrollArea>
       
       <form onSubmit={submitWithEditorContent} className={`p-4 border-t ${isDarkMode ? 'border-gray-700 bg-[#2c2c2c]' : 'border-gray-200 bg-gray-100'}`}>
-        <div className="flex items-center gap-2">
-          <Input
+        <div className="flex items-start gap-2">
+          <TextareaAutosize
             value={input}
             onChange={handleInputChange}
-            placeholder="AIに質問する... (@editorでエディタ内容を取得)"
-            className={`flex-1 rounded-md text-sm ${isDarkMode ? 'bg-[#3a3d41] border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+            onKeyDown={handleKeyDown}
+            placeholder="AIに質問する... (Shift+Enterで改行, @editorでエディタ内容を取得)"
+            className={`flex-1 rounded-md text-sm resize-none border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${isDarkMode ? 'bg-[#3a3d41] border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
             disabled={isLoading}
+            minRows={1}
+            maxRows={6}
           />
           <Button
             type="submit"

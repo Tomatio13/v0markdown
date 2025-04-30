@@ -50,6 +50,8 @@ pdf-engine: lualatex
 documentclass: ltjsarticle 
 editor: visual
 jupter: python3
+execute:
+  echo: false
 ---
 ```
 PowerPoint変換時に日本語含めて表示する際には以下を指定してください。
