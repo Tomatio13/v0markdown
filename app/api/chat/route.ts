@@ -1,36 +1,177 @@
 // Next.js AI Chatbot APIルート
-import { createOpenAI } from '@ai-sdk/openai';
-import { createXai } from '@ai-sdk/xai';
-import { streamText } from 'ai';
+import { createOpenAI, OpenAIProvider } from '@ai-sdk/openai';
+import { createXai, XaiProvider } from '@ai-sdk/xai';
+import { createGoogleGenerativeAI, GoogleGenerativeAIProvider } from '@ai-sdk/google';
+import { createAnthropic, AnthropicProvider } from '@ai-sdk/anthropic';
+import { streamText, CoreMessage, LanguageModel } from 'ai';
 import { getMcpTools } from '@/lib/mcp-tools';
 import { memoryTools } from '@/lib/local-tools';
 
-// Vercel AI SDK OpenAIプロバイダーを初期化
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  // compatibility: 'strict', // 必要に応じてコメント解除
-});
+// --- モデル設定の型定義 ---
+interface ProviderModels {
+  models: string[];
+}
+interface ModelConfig {
+  openai?: ProviderModels;
+  xai?: ProviderModels;
+  gemini?: ProviderModels;
+  anthropic?: ProviderModels;
+}
 
-const xai = createXai({
-    apiKey: process.env.GROK_API_KEY,
-  });
+// --- 環境変数とプロバイダー初期化 ---
+const openaiApiKey = process.env.OPENAI_API_KEY;
+const grokApiKey = process.env.GROK_API_KEY;
+const googleApiKey = process.env.GEMINI_API_KEY; // Gemini用の環境変数キー
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY; // Anthropic用
 
-// Node.js ランタイムを使用 (STDIO MCP のため)
+// プロバイダーの型を定義
+type AIProvider = OpenAIProvider | XaiProvider | GoogleGenerativeAIProvider | AnthropicProvider;
+
+const openai: OpenAIProvider | null = openaiApiKey ? createOpenAI({ apiKey: openaiApiKey }) : null;
+const xai: XaiProvider | null = grokApiKey ? createXai({ apiKey: grokApiKey }) : null;
+const google: GoogleGenerativeAIProvider | null = googleApiKey ? createGoogleGenerativeAI({ apiKey: googleApiKey }) : null;
+const anthropic: AnthropicProvider | null = anthropicApiKey ? createAnthropic({ apiKey: anthropicApiKey }) : null;
+
+// MODELS環境変数をパース
+const parseModelConfig = (): ModelConfig => {
+  const modelsEnv = process.env.MODELS;
+  if (!modelsEnv) {
+    console.warn('MODELS環境変数が設定されていません。');
+    return {};
+  }
+  try {
+    const cleanedJsonString = modelsEnv.replace(/"models":"(.*?)"/g, (match, p1) => {
+        const modelsArray = p1.split(',').map((m: string) => m.trim()).filter((m: string) => m);
+        return `"models":${JSON.stringify(modelsArray)}`;
+    });
+    return JSON.parse(cleanedJsonString) as ModelConfig;
+  } catch (error) {
+    console.error('MODELS環境変数のJSONパースに失敗しました:', error);
+    return {};
+  }
+};
+
+const modelConfig = parseModelConfig();
+
+// 利用可能なモデルリストを動的に生成
+const getAvailableModels = (): { id: string; name: string }[] => {
+  const availableModels: { id: string; name: string }[] = [];
+
+  // OpenAI
+  if (openai && modelConfig.openai?.models) {
+    modelConfig.openai.models.forEach(modelId => {
+      availableModels.push({ id: modelId, name: `OpenAI ${modelId}` });
+    });
+  }
+  // xAI
+  if (xai && modelConfig.xai?.models) {
+    modelConfig.xai.models.forEach(modelId => {
+      availableModels.push({ id: modelId, name: `xAI ${modelId}` });
+    });
+  }
+  // Gemini
+  if (google && modelConfig.gemini?.models) {
+    modelConfig.gemini.models.forEach(modelId => {
+      availableModels.push({ id: modelId, name: `Google ${modelId}` });
+    });
+  }
+  // Anthropic
+  if (anthropic && modelConfig.anthropic?.models) {
+    modelConfig.anthropic.models.forEach(modelId => {
+      availableModels.push({ id: modelId, name: `Anthropic ${modelId}` });
+    });
+  }
+
+  if (availableModels.length === 0) {
+    console.warn("警告: 利用可能なAIモデルが見つかりませんでした。MODELS環境変数とAPIキーを確認してください。");
+  }
+  return availableModels;
+};
+
+// モデルIDからプロバイダーインスタンスとモデルIDを返すヘルパー関数
+const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId: string } | null => {
+  if (modelConfig.openai?.models.includes(modelId)) {
+    if (!openai) throw new Error(`OpenAI APIキーが設定されていませんが、モデル ${modelId} が要求されました。`);
+    return { provider: openai, modelId: modelId };
+  }
+  if (modelConfig.xai?.models.includes(modelId)) {
+    if (!xai) throw new Error(`Grok APIキーが設定されていませんが、モデル ${modelId} が要求されました。`);
+    return { provider: xai, modelId: modelId };
+  }
+  if (modelConfig.gemini?.models.includes(modelId)) {
+    if (!google) throw new Error(`Google APIキーが設定されていませんが、モデル ${modelId} が要求されました。`);
+    return { provider: google, modelId: modelId };
+  }
+  if (modelConfig.anthropic?.models.includes(modelId)) {
+    if (!anthropic) throw new Error(`Anthropic APIキーが設定されていませんが、モデル ${modelId} が要求されました。`);
+    return { provider: anthropic, modelId: modelId };
+  }
+  console.warn(`設定に存在しない、またはAPIキーが設定されていないモデルIDが指定されました: ${modelId}`);
+  return null; // 見つからない場合はnullを返す
+};
+
+// Node.js ランタイムを使用
 // export const runtime = 'edge';
 
+// GETリクエストハンドラ（利用可能モデルリスト取得用）
+export async function GET(req: Request) {
+  try {
+    const availableModels = getAvailableModels();
+    return new Response(JSON.stringify(availableModels), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error: any) {
+    console.error('[AVAILABLE MODELS API ERROR]', error);
+    return new Response(JSON.stringify({ error: '利用可能なモデルの取得に失敗しました' }), {
+      status: 500,
+    });
+  }
+}
+
+// POSTリクエストハンドラ (チャット処理)
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    // リクエストボディから messages と model を取得 (model は string 型)
+    const { messages, model: requestedModelId }: { messages: CoreMessage[]; model?: string } = await req.json();
 
     // MCP ツールを読み込み
     const { tools: mcpTools, closeAll } = await getMcpTools();
     const tools = { ...memoryTools, ...mcpTools };
 
+    // 利用可能なモデルリストを取得（フォールバック用）
+    const availableModels = getAvailableModels();
+    if (availableModels.length === 0) {
+      throw new Error("利用可能なAIモデルが設定されていません。");
+    }
+
+    // リクエストされたモデルID、または利用可能な最初のモデルIDを使用
+    const modelIdToUse = requestedModelId && availableModels.some(m => m.id === requestedModelId)
+      ? requestedModelId
+      : availableModels[0].id; // フォールバックとして最初の利用可能モデル
+
+    console.log(`使用するモデル: ${modelIdToUse}`); // デバッグログ
+
+    // ヘルパー関数を使ってプロバイダーとモデルIDを取得 (letに変更)
+    let providerInfo = getProviderAndModelId(modelIdToUse);
+
+    // フォールバック処理
+    if (!providerInfo) {
+        console.warn(`指定されたモデル ${modelIdToUse} が見つからないため、フォールバックします。`);
+        const fallbackModelId = availableModels[0].id;
+        const fallbackProviderInfo = getProviderAndModelId(fallbackModelId);
+        if (!fallbackProviderInfo) {
+            throw new Error("致命的エラー: 利用可能なモデルが見つかりません。");
+        }
+        providerInfo = fallbackProviderInfo; // letなので再代入可能
+    }
+
+    // streamText に渡す LanguageModel インスタンスを生成
+    const modelInstance: LanguageModel = providerInfo.provider(providerInfo.modelId as any);
+
     // streamTextを使用してストリーミングレスポンスを生成
     const result = await streamText({
-      // openaiプロバイダーからチャットモデルを取得
-      // model: openai('gpt-4o-mini'), 
-      model: xai('grok-3-beta'),
+      model: modelInstance, // 生成したLanguageModelインスタンスを使用
       messages,
       tools,
       maxSteps: 10,
@@ -45,23 +186,32 @@ export async function POST(req: Request) {
 
               When the Quatro format is specified, please use the following format:
               - Code blocks for outputting graphs should be in the {python} format.
-              - Titles and other string elements within the graphs should be in English. 
+              - Titles and other string elements within the graphs should be in English.
                 However, the main body of the text should be in Japanese.
 
               Today's date is ${new Date().toISOString().split("T")[0]}.`,
-      // Node.js ランタイムでは onFinish で MCP クライアントを閉じる
       onFinish: async () => {
         await closeAll();
       },
     });
 
-    // ストリーミングレスポンスを返す (toDataStreamResponseを使用)
+    // 成功時は streamText の結果をそのまま返す
     return result.toDataStreamResponse();
+
   } catch (error: any) {
     console.error('[CHAT API ERROR]', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'AIとの対話に失敗しました' }),
-      { status: 500 }
-    );
+    const errorMessage = error.message || 'AIとの対話に失敗しました';
+    // エラー時はプレーンテキストのストリームを返す
+    const errorStream = new ReadableStream({
+        start(controller) {
+            controller.enqueue(`エラーが発生しました: ${errorMessage}`); // エラーメッセージをエンコード
+            controller.close();
+        }
+    });
+    // 標準のResponseオブジェクトを使用し、Content-Typeを指定
+    return new Response(errorStream, {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
   }
 } 
