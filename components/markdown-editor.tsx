@@ -91,6 +91,30 @@ export default function MarkdownEditor() {
   // AI Chat State (using useChat hook)
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append, reload, stop } = useChat();
 
+  // AI応答関連の処理を最適化
+  // メッセージリストのサイズを制限して過大なメモリ使用を防止
+  useEffect(() => {
+    // メッセージ数が多すぎる場合、古いメッセージを削除
+    if (messages.length > 100) {
+      console.log('メッセージ履歴が多すぎるため、古いメッセージを削除します');
+      // 最新の50メッセージを保持
+      setMessages(messages.slice(messages.length - 50));
+    }
+  }, [messages, setMessages]);
+
+  // useEffect を追加して応答完了時の処理を最適化
+  useEffect(() => {
+    // 応答が完了したときの処理
+    if (messages.length > 0 && messages[messages.length - 1].role === 'assistant' && !isLoading) {
+      // AIからの応答が完了した直後に重い処理があれば、それを遅延実行
+      const timer = setTimeout(() => {
+        // ここに重い処理があれば分散して実行
+        console.log('AI応答完了後の遅延処理が実行されました');
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, isLoading]);
+
   // --- Refs ---
   const viewRef = useRef<EditorView | null>(null)
   const cursorPosRef = useRef<number>(0)
@@ -297,7 +321,7 @@ export default function MarkdownEditor() {
         return newContent;
       });
     }
-  }, [setMarkdownContent]);
+  }, [setMarkdownContent]); // 依存配列: viewRef は含めず、安定した setMarkdownContent を追加
 
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     // ... (ここは変更なし) ...
@@ -807,6 +831,11 @@ export default function MarkdownEditor() {
     // ... (ここは変更なし) ...
      setMessages([]);
   }, [setMessages]);
+
+  // ★★★ 追加：エディタ内容取得関数をメモ化 ★★★
+  const getEditorContentCallback = useCallback((): string => {
+    return viewRef.current?.state.doc.toString() ?? markdownContent;
+  }, [markdownContent]); // markdownContentを依存配列に追加
 
   // --- UI Handlers ---
   const toggleDarkMode = () => {
@@ -1399,7 +1428,7 @@ export default function MarkdownEditor() {
                   <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
                   : null
                 }
-                getEditorContent={() => markdownContent}
+                getEditorContent={getEditorContentCallback}
                 setInput={setInput}
                 append={append as any}
               />

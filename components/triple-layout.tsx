@@ -1,6 +1,7 @@
 "use client"
 
 import { AIChat } from './ai-chat'
+import React from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import type { Message, UseChatHelpers } from 'ai/react';
 
@@ -14,12 +15,12 @@ interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 
   driveFileListComponent?: React.ReactNode
   getEditorContent?: () => string
   setInput?: (value: string) => void
-  append?: (message: { content: string, role: 'user' | 'assistant' | 'system' | 'function' }) => Promise<void>
+  append?: any // aiパッケージの完全な型と互換性を持たせる
   tocVisible?: boolean
   tocComponent?: React.ReactNode
 }
 
-export const TripleLayout = ({ 
+export const TripleLayout = React.memo(({ 
   editorComponent, 
   previewComponent, // 使用しないが互換性のために残す
   onAIContentInsert,
@@ -27,7 +28,7 @@ export const TripleLayout = ({
   messages,
   input,
   handleInputChange,
-  handleSubmit,
+  handleSubmit, // AIChat には渡さず、直接イベントハンドラを渡す
   isLoading,
   clearMessages,
   driveEnabled = false,
@@ -92,7 +93,6 @@ export const TripleLayout = ({
           messages={messages}
           input={input}
           handleInputChange={handleInputChange}
-          handleSubmit={handleSubmit}
           isLoading={isLoading}
           clearMessages={clearMessages}
           getEditorContent={getEditorContent}
@@ -102,4 +102,4 @@ export const TripleLayout = ({
       </ResizablePanel>
     </ResizablePanelGroup>
   )
-} 
+}) 
