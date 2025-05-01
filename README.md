@@ -24,6 +24,7 @@
     - [2. 環境変数の設定](#2-環境変数の設定)
   - [🚀 インストール](#-インストール)
   - [📖 使い方](#-使い方)
+    - [対応LLMプロバイダーとモデル設定](#対応llmプロバイダーとモデル設定)
   - [👨‍💻 開発](#-開発)
   - [Jupyterのインストール方法](#jupyterのインストール方法)
   - [Quatroのインストール方法](#quatroのインストール方法)
@@ -81,6 +82,7 @@
 - **印刷機能:** プレビュー内容を印刷またはPDFとして保存できます。
 - **AIチャット機能 (オプション):**
    - エディタの内容についてAIと対話できます（別途API設定が必要）。
+   - 複数のプロバイダーに対応（OpenAI, xAI/Grok, Gemini, Anthropic, Ollama）。
    - `@editor` と入力することで、エディタの現在の内容をコンテキストとしてAIに送信できます。
    - 会話履歴をクリアする機能があります。
    - **Model Context Protocol (MCP) 連携:**
@@ -109,6 +111,7 @@
 - [@marp-team/marpit](https://github.com/marp-team/marpit) - Marpの基盤となるフレームワーク
 - [Quarto](https://quarto.org/) - 科学技術計算向けパブリッシングシステム (PPTX変換で使用)
 - [Vercel AI SDK](https://sdk.vercel.ai/) - AIチャット機能 (オプション)
+- [Ollama AI Provider](https://sdk.vercel.ai/providers/community-providers/ollama) - ローカルまたはリモートのLLMを実行するOllamaサーバーへの接続
 
 ## ⚙️ Google Drive連携のための設定
 
@@ -162,9 +165,38 @@ NEXT_PUBLIC_GOOGLE_API_KEY="your_google_api_key"
 NEXT_PUBLIC_REDIRECT_URI="http://localhost:3000"
 NEXT_PUBLIC_GOOGLE_FLAG=ON
 
-# AI Provider API Keys (いずれか、または両方が必要)
+# AI Provider API Keys (いずれか、または複数を設定)
 OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 GROK_API_KEY="YOUR_GROK_API_KEY" 
+GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+ANTHROPIC_API_KEY="YOUR_ANTHROPIC_API_KEY"
+
+# OpenAI互換サービス設定（オプション）
+# LiteLLM等のOpenAI互換APIサービスを使用する場合に設定
+# OPENAI_BASE_URL="http://localhost:8000/v1"
+
+# Ollama設定（ローカルまたはリモートサーバー）
+OLLAMA_BASE_URL="http://localhost:11434/api"
+
+# 使用可能なモデルの設定（JSON形式）
+# 各プロバイダーで使用可能なモデルをここで指定
+MODELS='{
+  "openai":{
+    "models":["gpt-4o","gpt-4o-mini","o1"]
+  },
+  "xai":{
+    "models":["grok-3-mini-beta","grok-3-beta"]
+  },
+  "gemini":{
+    "models":["gemini-1.5-pro","gemini-2.0-flash"]
+  },
+  "anthropic":{
+    "models":["claude-3-7-sonnet-20250219"]
+  },
+  "ollama":{
+    "models":["llama3","phi3","qwen3:4b","llava"]
+  }
+}'
 
 # Model Context Protocol (MCP) Servers (オプション)
 # 外部ツールサーバーを STDIO で起動するための設定をJSON形式で指定します。
@@ -254,12 +286,55 @@ pnpm install
     *   出力されたPPTXファイルはMicrosoft PowerPointやLibreOfficeなどで編集可能です。
     *   Quarto記法で記述されたマークダウンも同様に「Export Quarto to PPTX」ボタンで変換できます。
 9.  **AIチャット (オプション):**
-    *   `app/api/chat/route.ts` で使用するAIモデル (OpenAI/Grok) を選択します。
-    *   `.env.local` に対応するAPIキー (`OPENAI_API_KEY`, `GROK_API_KEY`) を設定します。
-    *   必要に応じて `MCP_SERVERS_JSON` を設定し、外部ツール (STDIO 経由) を利用可能にします。
-    *   AIチャットペインでAIと対話します。
-        *   `@editor` でエディタ内容を参照させられます。
-        *   設定したMCPツールやローカルメモリツール (`memory_get`, `memory_set`) をAIが利用できます。
+    *   複数のAIプロバイダーに対応:
+        * OpenAI (GPT-4o, GPT-4o-mini等)
+        * xAI/Grok (Grok-3-beta等)
+        * Google Gemini (Gemini-1.5-pro等)
+        * Anthropic (Claude-3-7等)
+        * Ollama (ローカルLLM - Llama3, Phi3等)
+    *   `.env.local` に対応するAPIキーとMODELS設定を追加します
+    *   必要に応じて `MCP_SERVERS_JSON` を設定し、外部ツール (STDIO 経由) を利用可能にします
+    *   AIチャットペインでAIと対話します
+        *   `@editor` でエディタ内容を参照させられます
+        *   設定したMCPツールやローカルメモリツール (`memory_get`, `memory_set`) をAIが利用できます
+
+### 対応LLMプロバイダーとモデル設定
+
+AIチャット機能で使用できるLLMプロバイダーと設定方法について説明します。
+
+- **対応プロバイダー:**
+  - **OpenAI:** GPT-4o、GPT-4o-mini等のモデルが利用可能
+  - **xAI (Grok):** Grok-3-beta、Grok-3-mini-beta等
+  - **Google Gemini:** Gemini-1.5-pro、Gemini-2.0-flash等
+  - **Anthropic:** Claude-3-7-sonnet等
+  - **Ollama:** ローカルまたはリモートのOllamaサーバーで実行される各種モデル
+
+- **環境変数の設定:**
+  - 各プロバイダーのAPIキーを `.env.local` ファイルに設定します
+  - `MODELS` 環境変数でJSON形式で利用可能なモデルを指定します
+  - 例:
+    ```
+    MODELS='{
+      "openai":{
+        "models":["gpt-4o","gpt-4o-mini"]
+      },
+      "xai":{
+        "models":["grok-3-mini-beta","grok-3-beta"]
+      },
+      "ollama":{
+        "models":["llama3","phi3","qwen3:4b"]
+      }
+    }'
+
+- **OpenAI互換サービス:** LiteLLM等のOpenAI互換APIに対応
+  - `OPENAI_BASE_URL` 環境変数を設定することで、OpenAI API互換のサービスを利用可能
+  - 例: `OPENAI_BASE_URL=http://localhost:8000/v1`
+
+- **Ollama設定:**
+  - ローカルまたはリモートのOllamaサーバーに接続可能
+  - `OLLAMA_BASE_URL` でサーバーのURLを指定（デフォルト: `http://localhost:11434/api`）
+  - MODELSにインストール済みのOllamaモデル名を指定（例: `llama3`, `phi3`, `qwen3:4b`）
+  - 利用可能なモデルは `curl http://localhost:11434/api/tags` で確認可能
 
 ## 👨‍💻 開発
 

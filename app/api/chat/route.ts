@@ -6,6 +6,7 @@ import { createAnthropic, AnthropicProvider } from '@ai-sdk/anthropic';
 import { streamText, CoreMessage, LanguageModel } from 'ai';
 import { getMcpTools } from '@/lib/mcp-tools';
 import { memoryTools } from '@/lib/local-tools';
+import { createOllama, OllamaProvider } from 'ollama-ai-provider';
 
 // --- モデル設定の型定義 ---
 interface ProviderModels {
@@ -16,21 +17,30 @@ interface ModelConfig {
   xai?: ProviderModels;
   gemini?: ProviderModels;
   anthropic?: ProviderModels;
+  ollama?: ProviderModels;
 }
 
 // --- 環境変数とプロバイダー初期化 ---
 const openaiApiKey = process.env.OPENAI_API_KEY;
+const openaiBaseURL = process.env.OPENAI_BASE_URL; // OpenAI互換サービス用のベースURL
 const grokApiKey = process.env.GROK_API_KEY;
 const googleApiKey = process.env.GEMINI_API_KEY; // Gemini用の環境変数キー
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY; // Anthropic用
+const ollamaBaseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/api'; // Ollama用のベースURL
 
 // プロバイダーの型を定義
-type AIProvider = OpenAIProvider | XaiProvider | GoogleGenerativeAIProvider | AnthropicProvider;
+type AIProvider = OpenAIProvider | XaiProvider | GoogleGenerativeAIProvider | AnthropicProvider | OllamaProvider;
 
-const openai: OpenAIProvider | null = openaiApiKey ? createOpenAI({ apiKey: openaiApiKey }) : null;
+// OpenAIプロバイダーの初期化 - baseURLがあれば設定
+const openai: OpenAIProvider | null = openaiApiKey 
+  ? (openaiBaseURL 
+    ? createOpenAI({ apiKey: openaiApiKey, baseURL: openaiBaseURL })
+    : createOpenAI({ apiKey: openaiApiKey }))
+  : null;
 const xai: XaiProvider | null = grokApiKey ? createXai({ apiKey: grokApiKey }) : null;
 const google: GoogleGenerativeAIProvider | null = googleApiKey ? createGoogleGenerativeAI({ apiKey: googleApiKey }) : null;
 const anthropic: AnthropicProvider | null = anthropicApiKey ? createAnthropic({ apiKey: anthropicApiKey }) : null;
+const ollama: OllamaProvider | null = createOllama({ baseURL: ollamaBaseURL });
 
 // MODELS環境変数をパース
 const parseModelConfig = (): ModelConfig => {
@@ -81,6 +91,12 @@ const getAvailableModels = (): { id: string; name: string }[] => {
       availableModels.push({ id: modelId, name: `Anthropic ${modelId}` });
     });
   }
+  // Ollama
+  if (modelConfig.ollama?.models) {
+    modelConfig.ollama.models.forEach(modelId => {
+      availableModels.push({ id: modelId, name: `Ollama ${modelId}` });
+    });
+  }
 
   if (availableModels.length === 0) {
     console.warn("警告: 利用可能なAIモデルが見つかりませんでした。MODELS環境変数とAPIキーを確認してください。");
@@ -89,7 +105,7 @@ const getAvailableModels = (): { id: string; name: string }[] => {
 };
 
 // モデルIDからプロバイダーインスタンスとモデルIDを返すヘルパー関数
-const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId: string } | null => {
+const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId: string; modelSettings?: any } | null => {
   if (modelConfig.openai?.models.includes(modelId)) {
     if (!openai) throw new Error(`OpenAI APIキーが設定されていませんが、モデル ${modelId} が要求されました。`);
     return { provider: openai, modelId: modelId };
@@ -105,6 +121,13 @@ const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId
   if (modelConfig.anthropic?.models.includes(modelId)) {
     if (!anthropic) throw new Error(`Anthropic APIキーが設定されていませんが、モデル ${modelId} が要求されました。`);
     return { provider: anthropic, modelId: modelId };
+  }
+  if (modelConfig.ollama?.models.includes(modelId)) {
+    return { 
+      provider: ollama, 
+      modelId: modelId,
+      modelSettings: { simulateStreaming: true } // ツールとストリーミングを正常に動作させるために必要
+    };
   }
   console.warn(`設定に存在しない、またはAPIキーが設定されていないモデルIDが指定されました: ${modelId}`);
   return null; // 見つからない場合はnullを返す
@@ -167,7 +190,9 @@ export async function POST(req: Request) {
     }
 
     // streamText に渡す LanguageModel インスタンスを生成
-    const modelInstance: LanguageModel = providerInfo.provider(providerInfo.modelId as any);
+    const modelInstance: LanguageModel = providerInfo.modelSettings 
+      ? providerInfo.provider(providerInfo.modelId as any, providerInfo.modelSettings)
+      : providerInfo.provider(providerInfo.modelId as any);
 
     // streamTextを使用してストリーミングレスポンスを生成
     const result = await streamText({

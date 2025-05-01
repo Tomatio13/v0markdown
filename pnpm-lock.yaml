@@ -242,6 +242,9 @@ importers:
       path-browserify:
         specifier: ^1.0.1
         version: 1.0.1
+      pnpm:
+        specifier: ^10.10.0
+        version: 10.10.0
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -3559,6 +3562,11 @@ packages:
 
   pkg-types@2.1.0:
     resolution: {integrity: sha512-wmJwA+8ihJixSoHKxZJRBQG1oY8Yr9pGLzRmSsNms0iNWyHHAlZCa7mmKiFR10YPZuz/2k169JiS/inOjBCZ2A==}
+
+  pnpm@10.10.0:
+    resolution: {integrity: sha512-1hXbJG/nDyXc/qbY1z3ueCziPiJF48T2+Igkn7VoFJMYY33Kc8LFyO8qTKDVZX+5VnGIv6tH9WbR7mzph4FcOQ==}
+    engines: {node: '>=18.12'}
+    hasBin: true
 
   points-on-curve@0.2.0:
     resolution: {integrity: sha512-0mYKnYYe9ZcqMCWhUjItv/oHjvgEsfKvnUTg8sAtnHr3GVy7rGkXCb6d5cSyqrWqL4k81b9CPg3urd+T7aop3A==}
@@ -8392,6 +8400,8 @@ snapshots:
       confbox: 0.2.2
       exsolve: 1.0.4
       pathe: 2.0.3
+
+  pnpm@10.10.0: {}
 
   points-on-curve@0.2.0: {}
 
