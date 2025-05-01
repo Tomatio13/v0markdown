@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useCallback, useState, useRef } from 'react'
-import { Send, Trash2, BrainCircuit } from 'lucide-react'
+import { Send, Trash2, BrainCircuit, Mic, MicOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import TextareaAutosize from 'react-textarea-autosize'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -30,11 +30,59 @@ interface AIChatProps {
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement> | React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
   clearMessages: () => void;
-  setInput?: (value: string) => void;
+  setInput?: (value: string | ((prevInput: string) => string)) => void;
   append?: (message: CreateMessage, options?: { body?: Record<string, any> }) => Promise<string | null | undefined>;
   onInsertToEditor?: (text: string) => void;
   getEditorContent?: () => string;
   isDarkMode?: boolean;
+}
+
+// SpeechRecognition用のインターフェース定義
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (event: Event) => void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: (event: Event) => void;
+  start: () => void;
+  stop: () => void;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+// Window インターフェースを拡張
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
 }
 
 // MessageItem コンポーネントを修正して Markdown パーサーを使用
@@ -219,6 +267,11 @@ export const AIChat = React.memo(({
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const virtuosoRef = useRef<VirtuosoHandle>(null); // Virtuoso の Ref を作成
+  
+  // 音声認識関連の状態
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [recognizedText, setRecognizedText] = useState<string>('');
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
     const fetchAvailableModels = async () => {
@@ -352,6 +405,130 @@ export const AIChat = React.memo(({
     }
   }, [isLoading, messages]);
 
+  // 音声認識開始
+  const startSpeechRecognition = useCallback(() => {
+    // ブラウザに音声認識APIがあるか確認
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("お使いのブラウザは音声認識をサポートしていません。");
+      return;
+    }
+
+    // すでに認識中なら何もしない
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
+    // 音声認識の初期化
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'ja-JP';
+
+      // イベントハンドラー
+      recognition.onstart = () => {
+        setIsListening(true);
+        setRecognizedText("");
+        console.log('音声認識開始');
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          // スペースをトリムして取得
+          const transcript = event.results[i][0].transcript.trim();
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // 認識された文字列を表示
+        setRecognizedText(interimTranscript || finalTranscript);
+
+        // 確定した文字列を入力欄に追加
+        if (finalTranscript) {
+          if (setInput) {
+            // 現在の入力と結合
+            setInput((currentInput: string) => {
+              const trimmedFinal = finalTranscript.trim();
+              return currentInput + (currentInput.length > 0 && !currentInput.endsWith(' ') ? ' ' : '') + trimmedFinal;
+            });
+          }
+          setRecognizedText("");
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('音声認識エラー:', event.error);
+        setIsListening(false);
+        setRecognizedText("");
+        recognitionRef.current = null;
+      };
+
+      recognition.onend = () => {
+        console.log('音声認識終了');
+        setIsListening(false);
+        setRecognizedText("");
+        // 重要: 参照をクリアして次回の起動に備える
+        recognitionRef.current = null;
+      };
+
+      // 認識開始
+      recognition.start();
+    } catch (error) {
+      console.error('音声認識の初期化エラー:', error);
+      setIsListening(false);
+      recognitionRef.current = null;
+    }
+  }, [setInput]);
+
+  // 音声認識停止
+  const stopSpeechRecognition = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.error('音声認識停止エラー:', error);
+      } finally {
+        recognitionRef.current = null;
+        setIsListening(false);
+        setRecognizedText("");
+      }
+    }
+  }, []);
+
+  // 音声認識切り替え
+  const toggleSpeechRecognition = useCallback(() => {
+    console.log('音声認識切り替え, 現在の状態:', isListening, '参照:', !!recognitionRef.current);
+    if (isListening) {
+      stopSpeechRecognition();
+    } else {
+      startSpeechRecognition();
+    }
+  }, [isListening, startSpeechRecognition, stopSpeechRecognition]);
+
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (error) {
+          console.error('クリーンアップ中の音声認識停止エラー:', error);
+        } finally {
+          recognitionRef.current = null;
+        }
+      }
+    };
+  }, []);
+
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? 'bg-[#2c2c2c] text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
       <div className={`flex justify-between items-center px-4 py-2 ${isDarkMode ? 'border-b border-gray-700' : 'border-b border-gray-200'}`}>
@@ -406,7 +583,7 @@ export const AIChat = React.memo(({
       <form onSubmit={handleFormSubmitCallback} className={`p-4 border-t ${isDarkMode ? 'border-gray-700 bg-[#2c2c2c]' : 'border-gray-200 bg-gray-100'}`}>
         <div className="flex items-start gap-2">
           <TextareaAutosize
-            value={input}
+            value={recognizedText ? `${input}${input && !input.endsWith(' ') ? ' ' : ''}${recognizedText}` : input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDownCallback}
             placeholder="AIに質問する... (Shift+Enterで改行, @editorでエディタ内容を取得)"
@@ -415,6 +592,18 @@ export const AIChat = React.memo(({
             minRows={1}
             maxRows={6}
           />
+          <Button
+            type="button"
+            size="icon"
+            onClick={toggleSpeechRecognition}
+            className={`rounded-md ${
+              isDarkMode
+                ? isListening ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'
+                : isListening ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-300 hover:bg-gray-400'
+            } text-white`}
+          >
+            {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+          </Button>
           <Button
             type="submit"
             size="icon"

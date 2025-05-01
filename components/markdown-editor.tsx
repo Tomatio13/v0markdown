@@ -1,12 +1,52 @@
 "use client"
 
+// SpeechRecognition 関連の型定義
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (event: Event) => void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: (event: Event) => void;
+  start: () => void;
+  stop: () => void;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon // File を FileIcon としてインポート
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic // Micアイコンを追加
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -44,6 +84,8 @@ import { loadDraft, deleteDraft } from "@/lib/draft-storage";
 // --- グローバル型定義 ---
 declare global {
   interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
     showSaveFilePicker?: (options?: {
       suggestedName?: string;
       types?: Array<{
@@ -91,29 +133,10 @@ export default function MarkdownEditor() {
   // AI Chat State (using useChat hook)
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append, reload, stop } = useChat();
 
-  // AI応答関連の処理を最適化
-  // メッセージリストのサイズを制限して過大なメモリ使用を防止
-  useEffect(() => {
-    // メッセージ数が多すぎる場合、古いメッセージを削除
-    if (messages.length > 100) {
-      console.log('メッセージ履歴が多すぎるため、古いメッセージを削除します');
-      // 最新の50メッセージを保持
-      setMessages(messages.slice(messages.length - 50));
-    }
-  }, [messages, setMessages]);
-
-  // useEffect を追加して応答完了時の処理を最適化
-  useEffect(() => {
-    // 応答が完了したときの処理
-    if (messages.length > 0 && messages[messages.length - 1].role === 'assistant' && !isLoading) {
-      // AIからの応答が完了した直後に重い処理があれば、それを遅延実行
-      const timer = setTimeout(() => {
-        // ここに重い処理があれば分散して実行
-        console.log('AI応答完了後の遅延処理が実行されました');
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [messages, isLoading]);
+  // 音声入力関連のステート
+  const [isListening, setIsListening] = useState(false)
+  const [recognizedText, setRecognizedText] = useState("")
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   // --- Refs ---
   const viewRef = useRef<EditorView | null>(null)
@@ -935,6 +958,129 @@ export default function MarkdownEditor() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // --- 音声入力の関数 ---
+  const startSpeechRecognition = useCallback(() => {
+    // Web Speech APIのサポートチェック
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.error('このブラウザは音声認識をサポートしていません');
+      alert('このブラウザは音声認識をサポートしていません。Chrome、Edge、Safariの最新版をお試しください。');
+      return;
+    }
+
+    // SpeechRecognitionの初期化
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognitionAPI();
+    recognitionRef.current = recognition;
+
+    // 設定
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'ja-JP'; // 日本語に設定（変更可能）
+
+    // イベントハンドラー
+    recognition.onstart = () => {
+      setIsListening(true);
+      setRecognizedText("");
+      console.log('音声認識開始');
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        // スペースを削除またはトリムして取得
+        const transcript = event.results[i][0].transcript.trim();
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      // 認識された文字列を表示
+      setRecognizedText(interimTranscript || finalTranscript);
+
+      // 確定した文字列をエディタに挿入
+      if (finalTranscript) {
+        // 最終テキストは空白をトリムして挿入
+        insertTextAtCursor(finalTranscript.trim());
+        // 行末に移動して改行を追加
+        insertNewlineAtLineEnd();
+        setRecognizedText("");
+      }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('音声認識エラー:', event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      console.log('音声認識終了');
+      setIsListening(false);
+      setRecognizedText("");
+    };
+
+    // 認識開始
+    recognition.start();
+  }, []);
+
+  const stopSpeechRecognition = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setRecognizedText("");
+  }, []);
+
+  const toggleSpeechRecognition = useCallback(() => {
+    if (isListening) {
+      stopSpeechRecognition();
+    } else {
+      startSpeechRecognition();
+    }
+  }, [isListening, startSpeechRecognition, stopSpeechRecognition]);
+
+  // カーソル位置にテキストを挿入する関数
+  const insertTextAtCursor = useCallback((text: string) => {
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const pos = view.state.selection.main.head;
+      const transaction = view.state.update({
+        changes: { from: pos, insert: text }
+      });
+      view.dispatch(transaction);
+    }
+  }, []);
+
+  // 行末に改行を追加する関数
+  const insertNewlineAtLineEnd = useCallback(() => {
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const pos = view.state.selection.main.head;
+      const line = view.state.doc.lineAt(pos);
+      const lineEndPos = line.to;
+      
+      // 行末に改行を挿入し、その後のカーソル位置を改行後に設定
+      const transaction = view.state.update({
+        changes: { from: lineEndPos, insert: '\n' },
+        selection: { anchor: lineEndPos + 1, head: lineEndPos + 1 }
+      });
+      view.dispatch(transaction);
+    }
+  }, []);
+
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
   // --- Component Definitions ---
   const EditorComponent = useMemo(() => (
     // ... (変更なし) ...
@@ -1067,6 +1213,11 @@ export default function MarkdownEditor() {
   // --- ▼ ADDED ▼ ---
   // ツールバーボタンの表示/非表示を決定するヘルパー
   const showToolbarButton = (buttonName: string): boolean => {
+    // 常に表示するボタン
+    if (buttonName === 'VoiceInput') {
+      return true;
+    }
+    
     switch (outputMode) {
       case 'markdown':
         // MarkdownモードではMarp/Quarto関連ヘッダとマニュアルボタンを非表示
@@ -1273,6 +1424,23 @@ export default function MarkdownEditor() {
               {/* --- ▼ MODIFIED ▼ --- */}
               {/* マニュアルボタンの条件分岐を修正 */}
               <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+                {/* 音声入力ボタン */}
+                {showToolbarButton('VoiceInput') && 
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={toggleSpeechRecognition}
+                        className={`h-8 w-8 ${isListening ? "text-red-500" : ""}`}
+                      >
+                        <Mic className={isListening ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{isListening ? "音声入力停止" : "音声入力開始"}</TooltipContent>
+                  </Tooltip>
+                }
+                
                 {showToolbarButton('VIM ON/OFF') && <Tooltip>
                   <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={toggleVimMode} className="h-8 w-8"><Terminal className="h-4 w-4" /></Button></TooltipTrigger>
                   <TooltipContent>{isVimMode ? "Disable Vim Mode" : "Enable Vim Mode"}</TooltipContent>
@@ -1335,6 +1503,17 @@ export default function MarkdownEditor() {
             </div>
           </TooltipProvider>
         </div>
+
+        {/* 音声認識中の表示 */}
+        {isListening && (
+          <div className="mb-2 p-2 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-md flex items-center">
+            <Mic className="h-4 w-4 mr-2 animate-pulse" />
+            <div>
+              <span className="font-bold mr-2">音声入力中:</span>
+              <span>{recognizedText || "..."}</span>
+            </div>
+          </div>
+        )}
 
         {/* --- Main Content Area (Editor/Preview) --- */}
         {/* --- ▼ MODIFIED ▼ --- */}
