@@ -80,6 +80,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { type Heading } from "./table-of-contents"; // 'type' を使ったインポートに修正
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { loadDraft, deleteDraft } from "@/lib/draft-storage";
+import { load } from "js-yaml";      // ★ 追加：YAML パーサ
+import { type LoadOptions } from 'js-yaml'; // YamlLoadOptions -> LoadOptions に修正
 
 // --- グローバル型定義 ---
 declare global {
@@ -1103,23 +1105,25 @@ export default function MarkdownEditor() {
   ), [markdownContent, editorExtensions, handleContentChange, isDarkMode, insertEmoji, handleCursorUpdate]);
 
   const PreviewComponent = useMemo(() => (
-    // ... (変更なし) ...
-     <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+    // ... (PreviewComponent の定義を useMemo の外に出すことを検討したが、依存関係が多いため、現状維持)
+    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
           components={{
+            // code レンダラーをここに配置
             code({ node, className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '');
+              const language = match?.[1]; 
               const isInline = node?.position && node.position.start.line === node.position.end.line;
+              const codeContent = String(children).replace(/\n$/, '');
 
-              if (match?.[1] === 'mermaid') {
-                // Mermaid は markdown モードでのみ有効にする (ツールバーの表示に合わせる)
+              // 既存の Mermaid 処理
+              if (language === 'mermaid') {
                 if (outputMode === 'markdown') {
-                    return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
+                    return <MermaidDiagram chart={codeContent} />;
                 } else {
-                    // Marp/Quarto ではコードブロックとして表示
                     return (
                       <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
                         <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
@@ -1128,41 +1132,106 @@ export default function MarkdownEditor() {
                         <SyntaxHighlighter
                           language={'mermaid'}
                           PreTag="div"
-                          style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
-                          customStyle={isDarkMode ? { backgroundColor: '#000000', border: 'none', borderRadius: '6px', padding: '1em', margin: '1em 0'} : {}}
+                          style={isDarkMode ? vscDarkPlus as any : oneLight as any} 
+                          customStyle={{ /* 既存のスタイル */ }}
                         >
-                          {String(children).replace(/\n$/, '')}
+                          {codeContent}
                         </SyntaxHighlighter>
                       </div>
                     );
                 }
               }
+
+              // YAML Preview Logic
+              if (language === "yaml" && !isInline) {
+                const renderYamlValue = (value: any): React.ReactNode => {
+                  if ( value === null || ["string", "number", "boolean"].includes(typeof value)) {
+                    return <span>{String(value)}</span>;
+                  }
+                  if (Array.isArray(value)) {
+                    if (value.length && value.every( (v) => v && typeof v === "object" && !Array.isArray(v) )) {
+                      const headers = Array.from( new Set(value.flatMap((v) => Object.keys(v))) );
+                      return (
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className={isDarkMode ? "bg-gray-700" : "bg-gray-100"}>
+                            <tr>
+                              {headers.map((h) => ( <th key={h} className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "text-gray-300" : "text-gray-500" }`} > {h} </th> ))}
+                            </tr>
+                          </thead>
+                          <tbody className={`divide-y ${ isDarkMode ? "bg-gray-800 divide-gray-700" : "bg-white divide-gray-200" }`} >
+                            {value.map((row, rIdx) => (
+                              <tr key={rIdx}>
+                                {headers.map((h) => ( <td key={h} className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue((row as any)?.[h] ?? '')} </td> ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    }
+                    return ( <ul className="list-disc pl-4"> {value.map((v, i) => ( <li key={i}>{renderYamlValue(v)}</li> ))} </ul> );
+                  }
+                  if (typeof value === 'object' && value !== null) {
+                      return (
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <tbody className={`divide-y ${ isDarkMode ? "bg-gray-800 divide-gray-700" : "bg-white divide-gray-200" }`} >
+                            {Object.entries(value).map(([k, v]) => (
+                              <tr key={k}>
+                                <th className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-500" }`} scope="row" > {k} </th>
+                                <td className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue(v)} </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                  }
+                  return <span>{String(value)}</span>;
+                };
+                try {
+                  const yamlData = load(codeContent, { json: true } as LoadOptions);
+                  if (yamlData === undefined || yamlData === null) {
+                      return <span className="text-gray-500 italic">(empty YAML)</span>;
+                  }
+                  return ( <div className={`yaml-preview my-4 overflow-x-auto border rounded ${ isDarkMode ? "border-gray-600" : "border-gray-300" }`} > {renderYamlValue(yamlData)} </div> );
+                } catch (err: any) {
+                  console.error("YAML Parse Error:", err);
+                  return (
+                    <>
+                      <div className="yaml-parse-error my-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 rounded">
+                        <strong>YAML Parse Error:</strong>{" "}
+                        {err.message || "Invalid YAML"}
+                      </div>
+                      <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
+                        <div className={`code-language px-4 py-1 text-xs ${ isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700" }`} > yaml </div>
+                        <SyntaxHighlighter language="yaml" PreTag="div" style={isDarkMode ? vscDarkPlus as any : oneLight as any} customStyle={{ /* 既存のスタイル */ }} > {codeContent} </SyntaxHighlighter>
+                      </div>
+                    </>
+                  );
+                }
+              }
+
+              // インラインコード
               if (isInline) {
                 return <code className={className} {...props}>{children}</code>;
               }
+
+              // 通常のコードブロックハイライト (YAML/Mermaid以外)
               return (
                 <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
                   <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
-                    {match ? match[1] : 'code'}
+                    {language || 'code'} 
                   </div>
                   <SyntaxHighlighter
-                    language={match?.[1]}
+                    language={language} // 修正: language 変数を渡す
                     PreTag="div"
-                    style={isDarkMode ? vscDarkPlus as any : vscDarkPlus as any}
-                    customStyle={isDarkMode ? {
-                      backgroundColor: '#000000',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '1em',
-                      margin: '1em 0'
-                    } : {}}
+                    style={isDarkMode ? vscDarkPlus as any : oneLight as any} 
+                    customStyle={{ /* 既存のスタイル */ }}
                   >
-                    {String(children).replace(/\n$/, '')}
+                    {codeContent}
                   </SyntaxHighlighter>
                 </div>
               );
             },
-            // テーブルのスタイル調整
+            // 他のコンポーネント (table, th, td, blockquote) は変更なし
             table({ children }) {
               return <div className="overflow-x-auto"><table className="my-4 w-full">{children}</table></div>;
             },
@@ -1172,7 +1241,6 @@ export default function MarkdownEditor() {
             td({ children }) {
               return <td className={`p-2 border ${isDarkMode ? 'border-gray-700' : 'border-gray-600'}`}>{children}</td>;
             },
-            // 他の要素も必要に応じて調整
             blockquote({ children }) {
               return <blockquote className={`border-l-4 pl-4 italic my-4 ${isDarkMode ? 'border-gray-600 text-gray-400' : 'border-gray-300 text-gray-600'}`}>{children}</blockquote>
             }
@@ -1182,9 +1250,7 @@ export default function MarkdownEditor() {
         </ReactMarkdown>
       </div>
     </div>
-  // --- ▼ MODIFIED ▼ ---
-  ), [markdownContent, isDarkMode, outputMode]); // outputMode を依存配列に追加
-  // --- ▲ MODIFIED ▲ ---
+  ), [markdownContent, isDarkMode, outputMode]); // 依存配列を修正
 
   const MarpPreviewComponent = useMemo(() => (
     // ... (変更なし) ...
@@ -1200,8 +1266,8 @@ export default function MarkdownEditor() {
 
   const QuartoPreviewComponent = useMemo(() => (
     // ... (変更なし) ...
-      <div className="quarto-preview-wrapper h-full overflow-auto"> {/* h-[calc(100vh-8rem)] は削除 */}
-      <div ref={tabPreviewRef} className="markdown-preview h-full"> {/* ref は印刷用 */}
+      <div className="quarto-preview-wrapper h-full overflow-auto"> 
+      <div ref={tabPreviewRef} className="markdown-preview h-full"> 
         <QuartoPreview
           markdown={markdownContent}
           isDarkMode={isDarkMode}
@@ -1587,6 +1653,7 @@ export default function MarkdownEditor() {
              <TripleLayout
                 editorComponent={<div className="h-full overflow-auto">{EditorComponent}</div>}
                 previewComponent={
+                    // ここの参照を修正
                     outputMode === 'marp' ? MarpPreviewComponent :
                     outputMode === 'quarto' ? QuartoPreviewComponent :
                     PreviewComponent
