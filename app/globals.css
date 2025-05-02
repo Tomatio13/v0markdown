@@ -210,3 +210,40 @@
   border-bottom: none;
 }
 
+/* ---------- Fix: selection highlight in light mode ---------- */
+/* CodeMirror 行 (.cm-line) の背景を透過にし、選択ハイライト (#bbddff 等) が表示されるようにする */
+.cm-activeLine,
+.cm-line ::selection{
+  background-color: #bbddff !important;
+}
+/* 必要に応じてエディタ全体の背景は scroller/content で指定する */
+/* ライトモード用エディタ背景 */
+.cm-editor,
+.cm-scroller,
+.cm-content {
+  background-color: #ffffff !important; /* 白背景を維持 */
+}
+/* ----------------------------------------------------------- */
+
+/* ライトモードの選択範囲ハイライト */
+.cm-selectionBackground,
+.cm-content ::selection {
+  background-color: #bbddff !important; /* 薄い青系 */
+}
+
+/* --- 修正版: CodeMirror ライトモード選択範囲 --- */
+.cm-editor .cm-line::selection,
+.cm-editor .cm-content::selection,
+.cm-editor ::selection {
+  background-color: #bbddff !important;
+}
+
+/* --- Dark mode override: keep grey selection */
+.dark .cm-editor .cm-line::selection,
+.dark .cm-editor .cm-content::selection,
+.dark .cm-editor ::selection {
+  background-color: rgba(55, 55, 55, 0.5) !important;
+}
+
+
+
