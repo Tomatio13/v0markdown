@@ -567,18 +567,19 @@ export default function MarkdownEditor() {
   }, [driveEnabled, isAuthenticated, accessToken, handleDriveSave, handleLocalSave]);
 
   const handlePrint = () => {
-    // ... (ここは変更なし、ただし後で handleExport に統合) ...
+     // コメントアウトされていた部分を元に戻す
      const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    // 表示中のプレビュー要素を取得
-    // MermaidがレンダリングしたSVGを含む可能性のある要素を優先的に試す
     const activePreviewElement =
       document.querySelector('.tabs-content[data-state="active"] .prose') ||
-      splitPreviewRef.current || // Split view のプレビュー
-      tabPreviewRef.current;     // Tab view のプレビュー
+      document.querySelector('.markdown-preview .prose') || // Improve selector
+      splitPreviewRef.current ||
+      tabPreviewRef.current;
 
     const currentPreviewContent = activePreviewElement?.innerHTML || "プレビューコンテンツが見つかりません。";
+
+    // HTMLコンテンツの生成 (CSS修正済み)
     const htmlContent = `
     <!DOCTYPE html><html><head><title>Markdown Preview</title><style>
     body{font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;}
@@ -588,7 +589,8 @@ export default function MarkdownEditor() {
     .token.comment{color:#6A9955;}.token.string{color:#CE9178;}.token.keyword{color:#569CD6;}.token.function{color:#DCDCAA;}.token.number{color:#B5CEA8;}.token.operator{color:#D4D4D4;}.token.class-name{color:#4EC9B0;}
     table{border-collapse:collapse;width:100%;margin-bottom:16px;border-spacing:0;}
     table th, table td{border:1px solid #ddd;padding:8px 12px;text-align:left;}
-    table tr:nth-child(even){background-color:#f6f8fa;}
+    /* Remove the background color for even rows */
+    /* table tr:nth-child(even){background-color:#f6f8fa;} */
     blockquote{border-left:4px solid #dfe2e5;padding:0 1em;margin-left:0;color:#6a737d;}
     img{max-width:100%;height:auto;display:block;}
     h1,h2,h3,h4,h5,h6{margin-top:24px;margin-bottom:16px;font-weight:600;line-height:1.25;}
@@ -603,17 +605,22 @@ export default function MarkdownEditor() {
     .task-list-item input[type=checkbox]{margin:0 0.2em 0.25em -1.6em;vertical-align:middle;}
     .mermaid{text-align:center;margin-bottom:16px;}
     .mermaid svg{max-width:100%;height:auto !important;display:block;margin:0 auto;}
-    /* Marp/Quarto 用のスタイルを追加 */
-    /* (必要に応じて Marp/Quarto のデフォルトスタイルシートをリンクするか、主要なスタイルをここにコピー) */
-    .marp-preview-slide, .quarto-slide { /* スライドの基本スタイル */
+    /* Marp/Quarto 用のスタイル */
+    .marp-preview-slide, .quarto-slide {
        border: 1px solid #ccc;
        margin-bottom: 1em;
-       /* 他、Marp/Quarto が生成する HTML 構造に合わせたスタイル */
     }
+    /* YAML preview table specific styles for print */
+    .yaml-preview table { border: 1px solid #ddd !important; }
+    .yaml-preview th, .yaml-preview td { background-color: transparent !important; border: 1px solid #ddd !important; }
+    .yaml-preview th { background-color: #f8f9fa !important; color: #333 !important; }
+    .yaml-preview ul { list-style: disc !important; padding-left: 20px !important; margin-left: 0 !important; }
+    .yaml-preview li { margin-bottom: 4px; }
     </style></head><body><div id="content">${currentPreviewContent}</div>
     <script>window.onload=function(){console.log('Content loaded, triggering print...');window.print();/* setTimeout(() => { window.close(); }, 500); */}</script>
     </body></html>`;
 
+    // 印刷ウィンドウに書き込み
     printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
