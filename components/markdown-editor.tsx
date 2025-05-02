@@ -46,7 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic // Micアイコンを追加
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut // Micアイコンを追加, ZoomIn, ZoomOut を追加
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -111,6 +111,9 @@ export default function MarkdownEditor() {
   const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\n## Section 1\nSome text\n\n## Section 2\nMore text")
   const [isVimMode, setIsVimMode] = useState(false)
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
+  // --- ▼ ADDED ▼ ---
+  const [previewFontSize, setPreviewFontSize] = useState(16); // ★ 追加: プレビューフォントサイズ (初期値 16px)
+  // --- ▲ ADDED ▲ ---
 
   // UI State
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -1090,6 +1093,15 @@ export default function MarkdownEditor() {
     };
   }, []);
 
+  // --- フォントサイズ変更ハンドラ ---
+  const handleZoomIn = useCallback(() => {
+    setPreviewFontSize(prevSize => Math.min(prevSize + 2, 40)); // 上限 40px
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setPreviewFontSize(prevSize => Math.max(prevSize - 2, 8)); // 下限 8px
+  }, []);
+
   // --- Component Definitions ---
   const EditorComponent = useMemo(() => (
     // ... (変更なし) ...
@@ -1113,11 +1125,43 @@ export default function MarkdownEditor() {
 
   const PreviewComponent = useMemo(() => (
     // ... (PreviewComponent の定義を useMemo の外に出すことを検討したが、依存関係が多いため、現状維持)
-    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-      <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
+    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'} relative group`}>
+      {/* 拡大・縮小ボタンコンテナ */}
+     <div className={`absolute top-2 right-2 z-10 flex items-center space-x-1 p-1 rounded bg-gray-200 dark:bg-gray-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
+       <TooltipProvider>
+         <Tooltip>
+           <TooltipTrigger asChild>
+             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomOut}>
+               <ZoomOut className="h-4 w-4" />
+             </Button>
+           </TooltipTrigger>
+           <TooltipContent>
+             <p>縮小</p>
+           </TooltipContent>
+         </Tooltip>
+         <Tooltip>
+           <TooltipTrigger asChild>
+             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomIn}>
+               <ZoomIn className="h-4 w-4" />
+             </Button>
+           </TooltipTrigger>
+           <TooltipContent>
+             <p>拡大</p>
+           </TooltipContent>
+         </Tooltip>
+       </TooltipProvider>
+     </div>
+
+      {/* ★★★ 修正箇所 ★★★ */}
+      {/* prose クラスをこの div に移動し、style もここに適用 */}
+      <div
+        ref={tabPreviewRef}
+        className={`markdown-preview p-4 prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`} // prose をここに追加
+        style={{ fontSize: `${previewFontSize}px` }} // インラインスタイルをここに適用
+      >
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          className={`prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`}
+          // className から prose を削除
           components={{
             // code レンダラーをここに配置
             code({ node, className, children, ...props }) {
@@ -1256,8 +1300,9 @@ export default function MarkdownEditor() {
           {markdownContent}
         </ReactMarkdown>
       </div>
-    </div>
-  ), [markdownContent, isDarkMode, outputMode]); // 依存配列を修正
+    {/* ★★★ 修正箇所ここまで ★★★ */}
+  </div>
+), [markdownContent, isDarkMode, outputMode, previewFontSize, handleZoomIn, handleZoomOut]); // 依存配列は変更なし
 
   const MarpPreviewComponent = useMemo(() => (
     // ... (変更なし) ...
@@ -1287,14 +1332,18 @@ export default function MarkdownEditor() {
   // ツールバーボタンの表示/非表示を決定するヘルパー
   const showToolbarButton = (buttonName: string): boolean => {
     // 常に表示するボタン
-    if (buttonName === 'VoiceInput') {
+    if (buttonName === 'VoiceInput' || buttonName === 'VIM ON/OFF' || buttonName === 'Toc ON/OFF' || buttonName === 'Google Drivew ON/OFF' || buttonName === 'Clear Editor' || buttonName === 'AI Chat View') {
+        return true;
+    }
+    // 基本的なフォーマットボタンも常に表示
+    if (['H1', 'H2', 'H3', 'Bold', 'Italic', 'Emoji', 'Bullet List', 'Numberd List', 'Task List', 'Quato', 'Code Block', 'Table', 'Link', 'Image'].includes(buttonName)) {
       return true;
     }
-    
+
     switch (outputMode) {
       case 'markdown':
         // MarkdownモードではMarp/Quarto関連ヘッダとマニュアルボタンを非表示
-        return !['Marp Header', 'Quatro Header', '💡Marp', '💡Quatro'].includes(buttonName);
+        return !['Marp Header', 'Quatro Header', '💡Marp', '💡Quatro', 'Mermaid'].includes(buttonName);
       case 'marp':
         // MarpモードではMermaid、Quartoヘッダ、Quartoマニュアルを非表示
         return !['Mermaid', 'Quatro Header', '💡Quatro'].includes(buttonName);
@@ -1302,7 +1351,7 @@ export default function MarkdownEditor() {
         // QuartoモードではMermaid、Marpヘッダ、Marpマニュアルを非表示
         return !['Mermaid', 'Marp Header', '💡Marp'].includes(buttonName); // 💡Quatro を表示許可
       default:
-        return false;
+        return true; // デフォルトは表示
     }
   };
   // --- ▲ ADDED ▲ ---
