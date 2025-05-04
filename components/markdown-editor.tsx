@@ -1119,9 +1119,9 @@ export default function MarkdownEditor() {
 
   const PreviewComponent = useMemo(() => (
     // ... (PreviewComponent の定義を useMemo の外に出すことを検討したが、依存関係が多いため、現状維持)
-    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-gray-900' : 'bg-white'} relative group`}>
+    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'} relative group`}>
       {/* 拡大・縮小ボタンコンテナ */}
-     <div className={`absolute top-2 right-2 z-10 flex items-center space-x-1 p-1 rounded bg-gray-200 dark:bg-gray-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
+     <div className={`absolute top-2 right-2 z-10 flex items-center space-x-1 p-1 rounded bg-gray-200 dark:bg-[#171717] opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
        <TooltipProvider>
          <Tooltip>
            <TooltipTrigger asChild>
@@ -1300,7 +1300,7 @@ export default function MarkdownEditor() {
 
   const MarpPreviewComponent = useMemo(() => (
     // ... (変更なし) ...
-     <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+     <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
         <MarpPreview
           markdown={markdownContent}
@@ -1354,7 +1354,10 @@ export default function MarkdownEditor() {
   // scrollbarStyle の定義を return 文の直前に戻す
   const scrollbarStyle = useMemo(() => `
     .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      /* ▼ MODIFIED: ダークモードのトラック色を #171717 に */
+      background: ${isDarkMode ? '#171717' : 'transparent'}; /* ダークモードのトラック色を変更 */
+    }
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'};
       border-radius: 20px;
@@ -1366,12 +1369,16 @@ export default function MarkdownEditor() {
     }
     .custom-scrollbar {
       scrollbar-width: thin;
-      scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) transparent' : 'rgba(0, 0, 0, 0.2) transparent'};
+      /* ▼ MODIFIED: ダークモードのトラック色を #171717 に */
+      scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) #171717' : 'rgba(0, 0, 0, 0.2) transparent'}; /* ダークモードのトラック色を変更 */
     }
 
     /* CodeMirror 用 (.cm-scroller を直接ターゲット) */
     .cm-editor .cm-scroller::-webkit-scrollbar { width: 8px; }
-    .cm-editor .cm-scroller::-webkit-scrollbar-track { background: transparent; }
+    .cm-editor .cm-scroller::-webkit-scrollbar-track {
+      /* ▼ MODIFIED: ダークモードのトラック色を #171717 に */
+      background: ${isDarkMode ? '#171717' : 'transparent'}; /* ダークモードのトラック色を変更 */
+    }
     .cm-editor .cm-scroller::-webkit-scrollbar-thumb {
       background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'};
       border-radius: 20px;
@@ -1383,7 +1390,8 @@ export default function MarkdownEditor() {
     }
     .cm-editor .cm-scroller {
       scrollbar-width: thin;
-      scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) transparent' : 'rgba(0, 0, 0, 0.2) transparent'};
+      /* ▼ MODIFIED: ダークモードのトラック色を #171717 に */
+      scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) #171717' : 'rgba(0, 0, 0, 0.2) transparent'}; /* ダークモードのトラック色を変更 */
     }
   `, [isDarkMode]);
   // --- ▲ ADDED BACK ▲ ---
@@ -1394,13 +1402,16 @@ export default function MarkdownEditor() {
       {/* --- ▼ ADDED ▼ --- */}
       <style>{scrollbarStyle}</style>
       {/* --- ▲ ADDED ▲ --- */}
-      {/* --- Sidebar --- */}
-      <div className={`w-16 flex flex-col items-center py-4 space-y-4 border-r ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'}`}>
+      {/* --- Sidebar (Left) --- */}
+      {/* ▼ MODIFIED: w-14 を w-12 に変更 */}
+      {/* ▼ MODIFIED: ダークモードの背景色を #171717 に変更 */}
+      <div className={`w-9 flex flex-col items-center py-4 space-y-4 border-r ${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : 'bg-gray-100 border-gray-300'}`}>
         <TooltipProvider>
           {/* Mode Buttons */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant={outputMode === 'markdown' ? 'secondary' : 'ghost'} size="icon" className="h-10 w-10" onClick={() => handleModeChange('markdown')}>
+              {/* ▼ MODIFIED: 選択時の背景色を dark:bg-[#2F2F2F] に */}
+              <Button variant={outputMode === 'markdown' ? 'secondary' : 'ghost'} size="icon" className={`h-10 w-10 ${outputMode === 'markdown' && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} onClick={() => handleModeChange('markdown')}>
                 <FileText className="h-6 w-6" />
               </Button>
             </TooltipTrigger>
@@ -1408,7 +1419,8 @@ export default function MarkdownEditor() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant={outputMode === 'marp' ? 'secondary' : 'ghost'} size="icon" className="h-10 w-10" onClick={() => handleModeChange('marp')}>
+              {/* ▼ MODIFIED: 選択時の背景色を dark:bg-[#2F2F2F] に */}
+              <Button variant={outputMode === 'marp' ? 'secondary' : 'ghost'} size="icon" className={`h-10 w-10 ${outputMode === 'marp' && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} onClick={() => handleModeChange('marp')}>
                 <Presentation className="h-6 w-6" />
               </Button>
             </TooltipTrigger>
@@ -1416,7 +1428,8 @@ export default function MarkdownEditor() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant={outputMode === 'quarto' ? 'secondary' : 'ghost'} size="icon" className="h-10 w-10" onClick={() => handleModeChange('quarto')}>
+              {/* ▼ MODIFIED: 選択時の背景色を dark:bg-[#2F2F2F] に */}
+              <Button variant={outputMode === 'quarto' ? 'secondary' : 'ghost'} size="icon" className={`h-10 w-10 ${outputMode === 'quarto' && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} onClick={() => handleModeChange('quarto')}>
                 <FileChartColumn className="h-6 w-6" />
               </Button>
             </TooltipTrigger>
@@ -1425,162 +1438,121 @@ export default function MarkdownEditor() {
 
           <div className="w-full border-t my-2"></div>
 
-          {/* Google Login/Status */}
-          {process.env.NEXT_PUBLIC_GOOGLE_FLAG !== 'OFF' && (
-            // --- ▼ MODIFIED ▼ ---
-            // GoogleAuth を TooltipTrigger の子として直接配置し、
-            // isAuthenticated 状態に応じたアイコンを GoogleAuth の子要素として渡す試み -> GoogleAuth内部でアイコンを出すように変更したので、元の呼び出し方に戻す
-            <Tooltip>
-              <TooltipTrigger asChild>
-                 {/* GoogleAuth を直接配置。アイコン表示は GoogleAuth 内部で行う */}
-                 <GoogleAuth onAuthChange={handleAuthChange} />
-              </TooltipTrigger>
-              {/* ツールチップの内容も認証状態に応じて変更 */} 
-              <TooltipContent side="right">{isAuthenticated ? "Googleからログアウト" : "Googleにログイン"}</TooltipContent>
-            </Tooltip>
-            // --- ▲ MODIFIED ▲ ---
-          )}
 
-          {/* Dark Mode Toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="h-10 w-10">
-                {isDarkMode ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{isDarkMode ? "ライトモードに切替" : "ダークモードに切替"}</TooltipContent>
-          </Tooltip>
+          {/* ▲ ADDED ▲ */}
         </TooltipProvider>
       </div>
 
       {/* --- Main Content Area --- */}
+      {/* ▼ MODIFIED: flex-grow を追加してメインエリアを伸縮可能にする */}
       <div className="flex flex-col flex-grow overflow-hidden">
         {/* --- Menu Bar (Top) --- */}
+        {/* ▼ REMOVED: トップメニューバー全体を削除 ▼ */}
+        {/*
         <div className={`flex justify-between items-center px-4 py-2 border-b shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-300'}`}>
           <h1 className="text-lg font-semibold">Markdown Editor</h1>
           <div className="flex items-center space-x-2">
-            <TooltipProvider>
-              {/* Save Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={handleSave} className="h-8 gap-1" disabled={isSaving || (driveEnabled && !isAuthenticated)}>
-                    {isSaving ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">保存中...</span></> : <><Save className="h-4 w-4" /><span className="hidden sm:inline">Save</span></>}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{driveEnabled && isAuthenticated ? `Google Driveに保存 (${selectedFile?.name || '新規'})` : "ローカルに保存"}</TooltipContent>
-              </Tooltip>
-
-              {/* --- ▼ ADDED ▼ --- */}
-              {/* Quarto PDF Export Button (Conditional) */}
-              {outputMode === 'quarto' && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={handleExportToQuartoPdf} className="h-8 gap-1" disabled={isQuartoPdfGenerating}>
-                      {/* --- ▼ MODIFIED ▼ --- */}
-                      {/* File を FileIcon に変更 */}
-                      {isQuartoPdfGenerating ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">生成中...</span></> : <><FileIcon className="h-4 w-4" /><span className="hidden sm:inline">PDF</span></>}
-                      {/* --- ▲ MODIFIED ▲ --- */}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>PDFとして出力 (Quarto)</TooltipContent>
-                </Tooltip>
-              )}
-              {/* --- ▲ ADDED ▲ --- */}
-
-              {/* Export Button (Dynamic: PPTX/Print) */}
-              {/* Markdownモードでは印刷、Marp/QuartoモードではPPTX出力 */}
-              {(outputMode === 'markdown' || outputMode === 'marp' || outputMode === 'quarto') && ( // 表示条件を確認
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={handleExport} className="h-8 gap-1" disabled={isExporting}>
-                        {isExporting ? <><span className="animate-spin mr-1">⌛</span><span className="hidden sm:inline">処理中...</span></> : <>{getExportButtonProps().icon}<span className="hidden sm:inline">{getExportButtonProps().label}</span></>}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{getExportButtonProps().tooltip}</TooltipContent>
-                  </Tooltip>
-              )}
-            </TooltipProvider>
+            // ... (削除されるボタンたち) ...
           </div>
         </div>
+        */}
+        {/* ▲ REMOVED: トップメニューバー全体を削除 ▲ */}
 
         {/* --- Toolbar --- */}
-        <div className={`bg-muted pl-1 pr-2 py-1 flex justify-start items-center border-b shrink-0 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} overflow-x-auto whitespace-nowrap`}>
+        {/* ▼ MODIFIED: py-1 を py-0.5 に変更 */}
+        {/* ▼ MODIFIED: ダークモードの背景色を black に、ボーダー色を gray-800 に変更 */}
+        <div className={`bg-muted dark:bg-[#171717]  pl-1 pr-2 py-0.5 flex justify-start items-center border-b shrink-0 ${isDarkMode ? 'dark:border-[#171717]' : 'border-gray-300'} overflow-x-auto whitespace-nowrap`}>
           <TooltipProvider>
             <div className="flex space-x-0 items-center">
               {/* Headings */}
-              {showToolbarButton('H1') && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("# ", "\n")}><Heading1 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 1</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("## ", "\n")}><Heading2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 2</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("### ", "\n")}><Heading3 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 3</TooltipContent></Tooltip>
+              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
+              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
+              {showToolbarButton('H1') && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("# ", "\n")}><Heading1 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 1</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("## ", "\n")}><Heading2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 2</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("### ", "\n")}><Heading3 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 3</TooltipContent></Tooltip>
               </div>}
               {/* Text Formatting */}
-              {(showToolbarButton('Bold') || showToolbarButton('Italic') || showToolbarButton('Emoji')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Bold') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("**", "**")}><Bold className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bold</TooltipContent></Tooltip>}
-                {showToolbarButton('Italic') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("*", "*")}><Italic className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Italic</TooltipContent></Tooltip>}
+              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
+              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
+              {(showToolbarButton('Bold') || showToolbarButton('Italic') || showToolbarButton('Emoji')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Bold') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("**", "**")}><Bold className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bold</TooltipContent></Tooltip>}
+                {showToolbarButton('Italic') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("*", "*")}><Italic className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Italic</TooltipContent></Tooltip>}
                 {showToolbarButton('Emoji') && <Popover>
-                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
+                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
                   <PopoverContent className="w-80 p-0"><EmojiPicker onEmojiSelect={insertEmoji} /></PopoverContent>
                 </Popover>}
               </div>}
               {/* Lists */}
-              {(showToolbarButton('Bullet List') || showToolbarButton('Numberd List') || showToolbarButton('Task List')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Bullet List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- ", "\n")}><List className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bullet List</TooltipContent></Tooltip>}
-                {showToolbarButton('Numberd List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("1. ", "\n")}><ListOrdered className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Numbered List</TooltipContent></Tooltip>}
-                {showToolbarButton('Task List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("- [ ] ", "\n")}><CheckSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Task List</TooltipContent></Tooltip>}
+              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
+              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
+              {(showToolbarButton('Bullet List') || showToolbarButton('Numberd List') || showToolbarButton('Task List')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Bullet List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("- ", "\n")}><List className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bullet List</TooltipContent></Tooltip>}
+                {showToolbarButton('Numberd List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("1. ", "\n")}><ListOrdered className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Numbered List</TooltipContent></Tooltip>}
+                {showToolbarButton('Task List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("- [ ] ", "\n")}><CheckSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Task List</TooltipContent></Tooltip>}
               </div>}
               {/* Block Elements */}
-              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid') || showToolbarButton('Marp Header') || showToolbarButton('Quatro Header')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Quato') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>}
-                {showToolbarButton('Code Block') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>}
-                {showToolbarButton('Table') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>}
-                {showToolbarButton('Mermaid') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>}
+              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
+              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
+              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid') || showToolbarButton('Marp Header') || showToolbarButton('Quatro Header')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Quato') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>}
+                {showToolbarButton('Code Block') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>}
+                {showToolbarButton('Table') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>}
+                {showToolbarButton('Mermaid') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>}
                 {showToolbarButton('Marp Header') && <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---\nmarp: true\ntheme: default\n${isDarkMode ? 'class: invert' : '# class: invert'}\npaginate: true\nheader: "Header"\nfooter: "Footer"\n---\n\n`, "")}><Presentation className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText(`---\nmarp: true\ntheme: default\n${isDarkMode ? 'class: invert' : '# class: invert'}\npaginate: true\nheader: "Header"\nfooter: "Footer"\n---\n\n`, "")}><Presentation className="h-4 w-4" /></Button>
                   </TooltipTrigger><TooltipContent>Marp Header</TooltipContent>
                 </Tooltip>}
                 {showToolbarButton('Quatro Header') && <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n html:\n  code-fold: true\njupter: python3\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n html:\n  code-fold: true\njupter: python3\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
                   </TooltipTrigger><TooltipContent>Quarto Header</TooltipContent>
                 </Tooltip>}
               </div>}
               {/* Links & Images & Clear */}
-              {(showToolbarButton('Link') || showToolbarButton('Image') || showToolbarButton('Clear Editor')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Link') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => insertText("[", "](url)")}><Link className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Link</TooltipContent></Tooltip>}
+              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
+              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
+              {(showToolbarButton('Link') || showToolbarButton('Image') || showToolbarButton('Clear Editor')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+                {showToolbarButton('Link') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("[", "](url)")}><Link className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Link</TooltipContent></Tooltip>}
                 {showToolbarButton('Image') && <Tooltip>
-                  <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>{isUploadingImage ? <span className="animate-spin h-4 w-4">⌛</span> : <Image className="h-4 w-4" />}</Button></TooltipTrigger>
+                  <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>{isUploadingImage ? <span className="animate-spin h-4 w-4">⌛</span> : <Image className="h-4 w-4" />}</Button></TooltipTrigger>
                   <TooltipContent>Image</TooltipContent>
                 </Tooltip>}
-                {showToolbarButton('Clear Editor') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClearContent}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent>Clear Editor</TooltipContent></Tooltip>}
+                {showToolbarButton('Clear Editor') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClearContent}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent>Clear Editor</TooltipContent></Tooltip>}
               </div>}
               {/* View Mode Buttons */}
-              <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
-                <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'editor' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('editor')} className="h-8 w-8"><Code size={18} /></Button></TooltipTrigger><TooltipContent>Editor Only</TooltipContent></Tooltip>
+              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
+              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
+              {/* ▼ MODIFIED: 選択中ボタンの背景色を dark:bg-[#212121] に */}
+              <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+                <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'editor' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('editor')} className={`h-7 w-7 ${viewMode === 'editor' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><Code size={18} /></Button></TooltipTrigger><TooltipContent>Editor Only</TooltipContent></Tooltip>
                 {outputMode === 'markdown' && (
                   <>
-                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('preview')} className="h-8 w-8"><Box size={18} /></Button></TooltipTrigger><TooltipContent>Preview Only</TooltipContent></Tooltip>
-                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('split')} className="h-8 w-8"><SplitSquareVertical size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Markdown)</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('preview')} className={`h-7 w-7 ${viewMode === 'preview' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><Box size={18} /></Button></TooltipTrigger><TooltipContent>Preview Only</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('split')} className={`h-7 w-7 ${viewMode === 'split' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><SplitSquareVertical size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Markdown)</TooltipContent></Tooltip>
                   </>
                 )}
                 {outputMode === 'marp' && (
                   <>
-                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-preview')} className="h-8 w-8"><Presentation size={18} /></Button></TooltipTrigger><TooltipContent>Marp Preview</TooltipContent></Tooltip>
-                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-split')} className="h-8 w-8"><Columns size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Marp)</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-preview')} className={`h-7 w-7 ${viewMode === 'marp-preview' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><Presentation size={18} /></Button></TooltipTrigger><TooltipContent>Marp Preview</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'marp-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('marp-split')} className={`h-7 w-7 ${viewMode === 'marp-split' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><Columns size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Marp)</TooltipContent></Tooltip>
                   </>
                 )}
                 {outputMode === 'quarto' && (
                   <>
-                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-preview')} className="h-8 w-8"><FileChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Quarto Preview</TooltipContent></Tooltip>
-                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-split')} className="h-8 w-8"><ChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Quarto)</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-preview')} className={`h-7 w-7 ${viewMode === 'quarto-preview' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><FileChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Quarto Preview</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-split')} className={`h-7 w-7 ${viewMode === 'quarto-split' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><ChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Quarto)</TooltipContent></Tooltip>
                   </>
                 )}
-                {showToolbarButton('AI Chat View') && <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'triple' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('triple')} className="h-8 w-8"><BotMessageSquare size={18} /></Button></TooltipTrigger><TooltipContent>AI Chat View</TooltipContent></Tooltip>}
+                {showToolbarButton('AI Chat View') && <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'triple' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('triple')} className={`h-7 w-7 ${viewMode === 'triple' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><BotMessageSquare size={18} /></Button></TooltipTrigger><TooltipContent>AI Chat View</TooltipContent></Tooltip>}
               </div>
               {/* Settings & Drive & Manuals */}
               {/* --- ▼ MODIFIED ▼ --- */}
               {/* マニュアルボタンの条件分岐を修正 */}
-              <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-gray-800 p-1 rounded-md mr-1 flex-shrink-0">
+              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
+              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
+              <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
                 {/* 音声入力ボタン */}
                 {showToolbarButton('VoiceInput') && 
                   <Tooltip>
@@ -1589,7 +1561,7 @@ export default function MarkdownEditor() {
                         variant="ghost"
                         size="icon"
                         onClick={toggleSpeechRecognition}
-                        className={`h-8 w-8 ${isListening ? "text-red-500" : ""}`}
+                        className={`h-7 w-7 ${isListening ? "text-red-500" : ""}`}
                       >
                         <Mic className={isListening ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
                       </Button>
@@ -1599,7 +1571,7 @@ export default function MarkdownEditor() {
                 }
                 
                 {showToolbarButton('VIM ON/OFF') && <Tooltip>
-                  <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={toggleVimMode} className="h-8 w-8"><Terminal className="h-4 w-4" /></Button></TooltipTrigger>
+                  <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={toggleVimMode} className="h-7 w-7 dark:bg-[#171717]"><Terminal className="h-4 w-4" /></Button></TooltipTrigger>
                   <TooltipContent>{isVimMode ? "Disable Vim Mode" : "Enable Vim Mode"}</TooltipContent>
                 </Tooltip>}
                 {showToolbarButton('Toc ON/OFF') && <Tooltip>
@@ -1608,7 +1580,7 @@ export default function MarkdownEditor() {
                       variant={isTocVisible ? 'secondary' : 'ghost'}
                       size="icon"
                       onClick={toggleToc}
-                      className="h-8 w-8"
+                      className="h-7 w-7"
                       disabled={driveEnabled}
                     >
                       <List className="h-4 w-4" />
@@ -1624,7 +1596,7 @@ export default function MarkdownEditor() {
                         size="icon"
                         onClick={() => handleDriveToggle(!driveEnabled)}
                         disabled={!isAuthenticated}
-                        className={`h-8 w-8 ${driveEnabled ? 'text-blue-500' : ''}`}
+                        className={`h-7 w-7 ${driveEnabled ? 'text-blue-500' : ''}`}
                         aria-label="Toggle Google Drive integration"
                       >
                        {driveEnabled ? <UploadCloud className="h-4 w-4" /> : <UploadCloud className="h-4 w-4 opacity-50" />}
@@ -1637,7 +1609,7 @@ export default function MarkdownEditor() {
                 {showToolbarButton('💡Marp') &&
                  <Tooltip>
                    <TooltipTrigger asChild>
-                     <Button variant="ghost" size="icon" onClick={() => window.open(`/api/preview-markdown?path=${encodeURIComponent('/manual/marp_manual.md')}`, '_blank')} className="h-8 w-8">
+                     <Button variant="ghost" size="icon" onClick={() => window.open(`/api/preview-markdown?path=${encodeURIComponent('/manual/marp_manual.md')}`, '_blank')} className="h-7 w-7">
                        <CircleHelp className="h-4 w-4" />
                      </Button>
                    </TooltipTrigger>
@@ -1648,7 +1620,7 @@ export default function MarkdownEditor() {
                 {showToolbarButton('💡Quatro') && // 条件を '💡Quatro' に修正
                  <Tooltip>
                    <TooltipTrigger asChild>
-                     <Button variant="ghost" size="icon" onClick={() => window.open(`/api/preview-markdown?path=${encodeURIComponent('/manual/quatro_manual.md')}`, '_blank')} className="h-8 w-8"> {/* quatro -> quarto */}
+                     <Button variant="ghost" size="icon" onClick={() => window.open(`/api/preview-markdown?path=${encodeURIComponent('/manual/quatro_manual.md')}`, '_blank')} className="h-7 w-7"> {/* quatro -> quarto */}
                        <CircleHelp className="h-4 w-4" />
                      </Button>
                    </TooltipTrigger>
@@ -1660,6 +1632,7 @@ export default function MarkdownEditor() {
             </div>
           </TooltipProvider>
         </div>
+        {/* --- ▲ MODIFIED ▲ --- */}
 
         {/* 音声認識中の表示 */}
         {isListening && (
@@ -1692,7 +1665,8 @@ export default function MarkdownEditor() {
                       )}
                     </ScrollArea>
                   </ResizablePanel>
-                  <ResizableHandle withHandle />
+                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
@@ -1716,7 +1690,8 @@ export default function MarkdownEditor() {
                       )}
                     </ScrollArea>
                   </ResizablePanel>
-                  <ResizableHandle withHandle />
+                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
@@ -1738,13 +1713,15 @@ export default function MarkdownEditor() {
                       )}
                     </ScrollArea>
                   </ResizablePanel>
-                  <ResizableHandle withHandle />
+                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                 <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
               </ResizablePanel>
-              <ResizableHandle withHandle />
+              {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                 {PreviewComponent}
               </ResizablePanel>
@@ -1798,7 +1775,8 @@ export default function MarkdownEditor() {
                       )}
                     </ScrollArea>
                   </ResizablePanel>
-                  <ResizableHandle withHandle />
+                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
@@ -1820,13 +1798,15 @@ export default function MarkdownEditor() {
                       )}
                     </ScrollArea>
                   </ResizablePanel>
-                  <ResizableHandle withHandle />
+                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                 <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
               </ResizablePanel>
-              <ResizableHandle withHandle />
+              {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                 {MarpPreviewComponent}
               </ResizablePanel>
@@ -1846,7 +1826,8 @@ export default function MarkdownEditor() {
                       )}
                     </ScrollArea>
                   </ResizablePanel>
-                  <ResizableHandle withHandle />
+                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
@@ -1869,14 +1850,16 @@ export default function MarkdownEditor() {
                       )}
                     </ScrollArea>
                   </ResizablePanel>
-                  <ResizableHandle withHandle />
+                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                  {/* EditorComponent を含む div に custom-scrollbar を追加 */}
                 <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
               </ResizablePanel>
-              <ResizableHandle withHandle />
+              {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                  {/* QuartoPreviewComponent は自身のルートに custom-scrollbar がある */}
                 {QuartoPreviewComponent}
@@ -1887,7 +1870,8 @@ export default function MarkdownEditor() {
         {/* --- ▲ MODIFIED ▲ --- */}
 
         {/* --- Status Bar --- */}
-        <div className={`sticky bottom-0 left-0 right-0 p-1 border-t text-xs flex justify-between items-center shrink-0 z-10 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
+        {/* ▼ MODIFIED: ダークモードの背景色を black に、ボーダー色を gray-800 に変更 */}
+        <div className={`sticky bottom-0 left-0 right-0 p-1 border-t text-xs flex justify-between items-center shrink-0 z-10 ${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717] text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
           <div>Ln {cursorPosition.line}, Col {cursorPosition.col}</div>
           <div>
             <span>Mode: {outputMode.charAt(0).toUpperCase() + outputMode.slice(1)}</span>
@@ -1899,6 +1883,78 @@ export default function MarkdownEditor() {
         {/* Hidden file input for image upload */}
         <input type="file" ref={imageInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
       </div> {/* End Main Content Area Flex Col */}
+
+      {/* --- ▼ ADDED: Sidebar (Right) --- */}
+      {/* ▼ MODIFIED: w-14 を w-12 に変更 */}
+      {/* ▼ MODIFIED: ダークモードの背景色を #171717 に変更 */}
+      <div className={`w-9 flex flex-col items-center py-4 space-y-4 border-l ${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : 'bg-gray-100 border-gray-300'}`}>
+        <TooltipProvider>
+          {/* Save Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {/* ▼ MODIFIED: variant を ghost に変更 */}
+              <Button variant="ghost" size="icon" onClick={handleSave} className="h-10 w-10" disabled={isSaving || (driveEnabled && !isAuthenticated)}>
+                {isSaving ? <span className="animate-spin">⌛</span> : <Save className="h-5 w-5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">{driveEnabled && isAuthenticated ? `Google Driveに保存 (${selectedFile?.name || '新規'})` : "ローカルに保存"}</TooltipContent>
+          </Tooltip>
+
+          {/* Quarto PDF Export Button (Conditional) */}
+          {outputMode === 'quarto' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* ▼ MODIFIED: variant を ghost に変更 */}
+                <Button variant="ghost" size="icon" onClick={handleExportToQuartoPdf} className="h-10 w-10" disabled={isQuartoPdfGenerating}>
+                  {isQuartoPdfGenerating ? <span className="animate-spin">⌛</span> : <FileIcon className="h-5 w-5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">PDFとして出力 (Quarto)</TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Export Button (Dynamic: PPTX/Print) */}
+          {(outputMode === 'markdown' || outputMode === 'marp' || outputMode === 'quarto') && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* ▼ MODIFIED: variant を ghost に変更 */}
+                  <Button variant="ghost" size="icon" onClick={handleExport} className="h-10 w-10" disabled={isExporting}>
+                    {isExporting ? <span className="animate-spin">⌛</span> : getExportButtonProps().icon}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">{getExportButtonProps().tooltip}</TooltipContent>
+              </Tooltip>
+          )}
+
+          {/* ▼ ADDED: スペーサーと移動したボタン ▼ */}
+          <div className="flex-grow" /> {/* このスペーサーがボタンを下部に押しやる */}
+
+          {/* Google Login/Status (Moved) */}
+          {process.env.NEXT_PUBLIC_GOOGLE_FLAG !== 'OFF' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                 <GoogleAuth onAuthChange={handleAuthChange} />
+              </TooltipTrigger>
+              {/* side を left に変更 */}
+              <TooltipContent side="left">{isAuthenticated ? "Googleからログアウト" : "Googleにログイン"}</TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Dark Mode Toggle (Moved) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="h-10 w-10">
+                {isDarkMode ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
+              </Button>
+            </TooltipTrigger>
+            {/* side を left に変更 */}
+            <TooltipContent side="left">{isDarkMode ? "ライトモードに切替" : "ダークモードに切替"}</TooltipContent>
+          </Tooltip>
+          {/* ▲ ADDED ▲ */}
+        </TooltipProvider>
+      </div>
+      {/* --- ▲ ADDED: Sidebar (Right) --- */}
+
     </div> /* End Top Level Flex Container */
   )
 }
