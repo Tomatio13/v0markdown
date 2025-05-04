@@ -82,6 +82,7 @@ import { useAutoSave } from "@/hooks/use-auto-save";
 import { loadDraft, deleteDraft } from "@/lib/draft-storage";
 import { load } from "js-yaml";      // ★ 追加：YAML パーサ
 import { type LoadOptions } from 'js-yaml'; // YamlLoadOptions -> LoadOptions に修正
+import React from 'react'; // React をインポート
 
 // --- グローバル型定義 ---
 declare global {
@@ -111,22 +112,15 @@ export default function MarkdownEditor() {
   const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\n## Section 1\nSome text\n\n## Section 2\nMore text")
   const [isVimMode, setIsVimMode] = useState(false)
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
-  // --- ▼ ADDED ▼ ---
-  const [previewFontSize, setPreviewFontSize] = useState(16); // ★ 追加: プレビューフォントサイズ (初期値 16px)
-  // --- ▲ ADDED ▲ ---
-
-  // UI State
+  const [previewFontSize, setPreviewFontSize] = useState(16);
   const [isDarkMode, setIsDarkMode] = useState(false)
-  // --- ▼ ADDED ▼ ---
-  // 出力モードの状態を追加 (markdown, marp, quarto)
   const [outputMode, setOutputMode] = useState<'markdown' | 'marp' | 'quarto'>('markdown')
-  // --- ▲ ADDED ▲ ---
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split'>('split')
   const [isSaving, setIsSaving] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isPptxGenerating, setIsPptxGenerating] = useState(false)
-  const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false)
-  const [isQuartoPdfGenerating, setIsQuartoPdfGenerating] = useState(false); // PDF生成用のローディング状態を追加
+  const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false);
+  const [isQuartoPdfGenerating, setIsQuartoPdfGenerating] = useState(false);
   const [isTocVisible, setIsTocVisible] = useState(false);
 
   // Google Drive State
@@ -1125,7 +1119,7 @@ export default function MarkdownEditor() {
 
   const PreviewComponent = useMemo(() => (
     // ... (PreviewComponent の定義を useMemo の外に出すことを検討したが、依存関係が多いため、現状維持)
-    <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'} relative group`}>
+    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-gray-900' : 'bg-white'} relative group`}>
       {/* 拡大・縮小ボタンコンテナ */}
      <div className={`absolute top-2 right-2 z-10 flex items-center space-x-1 p-1 rounded bg-gray-200 dark:bg-gray-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
        <TooltipProvider>
@@ -1306,7 +1300,7 @@ export default function MarkdownEditor() {
 
   const MarpPreviewComponent = useMemo(() => (
     // ... (変更なし) ...
-     <div className={`h-full overflow-auto ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+     <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
         <MarpPreview
           markdown={markdownContent}
@@ -1318,8 +1312,8 @@ export default function MarkdownEditor() {
 
   const QuartoPreviewComponent = useMemo(() => (
     // ... (変更なし) ...
-      <div className="quarto-preview-wrapper h-full overflow-auto"> 
-      <div ref={tabPreviewRef} className="markdown-preview h-full"> 
+      <div className="quarto-preview-wrapper h-full overflow-auto custom-scrollbar">
+      <div ref={tabPreviewRef} className="markdown-preview h-full">
         <QuartoPreview
           markdown={markdownContent}
           isDarkMode={isDarkMode}
@@ -1356,9 +1350,50 @@ export default function MarkdownEditor() {
   };
   // --- ▲ ADDED ▲ ---
 
+  // --- ▼ ADDED BACK ▼ ---
+  // scrollbarStyle の定義を return 文の直前に戻す
+  const scrollbarStyle = useMemo(() => `
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'};
+      border-radius: 20px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)'};
+    }
+    .custom-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) transparent' : 'rgba(0, 0, 0, 0.2) transparent'};
+    }
+
+    /* CodeMirror 用 (.cm-scroller を直接ターゲット) */
+    .cm-editor .cm-scroller::-webkit-scrollbar { width: 8px; }
+    .cm-editor .cm-scroller::-webkit-scrollbar-track { background: transparent; }
+    .cm-editor .cm-scroller::-webkit-scrollbar-thumb {
+      background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'};
+      border-radius: 20px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+    .cm-editor .cm-scroller::-webkit-scrollbar-thumb:hover {
+      background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)'};
+    }
+    .cm-editor .cm-scroller {
+      scrollbar-width: thin;
+      scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) transparent' : 'rgba(0, 0, 0, 0.2) transparent'};
+    }
+  `, [isDarkMode]);
+  // --- ▲ ADDED BACK ▲ ---
+
   // --- Render ---
   return (
     <div className={`fixed inset-0 flex ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
+      {/* --- ▼ ADDED ▼ --- */}
+      <style>{scrollbarStyle}</style>
+      {/* --- ▲ ADDED ▲ --- */}
       {/* --- Sidebar --- */}
       <div className={`w-16 flex flex-col items-center py-4 space-y-4 border-r ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'}`}>
         <TooltipProvider>
@@ -1640,7 +1675,7 @@ export default function MarkdownEditor() {
         {/* --- Main Content Area (Editor/Preview) --- */}
         {/* --- ▼ MODIFIED ▼ --- */}
         {/* flex-grow を適用し、残りの高さを埋めるようにする */}
-        <div className="flex-grow overflow-auto">
+        <div className="flex-grow overflow-hidden"> {/* overflow-auto から overflow-hidden に変更 */}
           {/* ResizablePanelGroup and view modes */}
           {/* (ここの内部構造は変更なし、ただし親要素の高さ管理が変わった) */}
           {viewMode === 'editor' && (
@@ -1648,17 +1683,21 @@ export default function MarkdownEditor() {
               {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {driveEnabled && isAuthenticated && accessToken ? (
-                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                    ) : (
-                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                    )}
+                    {/* ScrollArea に custom-scrollbar を追加 */}
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                <div className="h-full overflow-auto">{EditorComponent}</div>
+                 {/* EditorComponent を含む div に custom-scrollbar を追加 */}
+                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
               </ResizablePanel>
             </ResizablePanelGroup>
           )}
@@ -1668,11 +1707,14 @@ export default function MarkdownEditor() {
               {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {driveEnabled && isAuthenticated && accessToken ? (
-                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                    ) : (
-                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                    )}
+                    {/* ScrollArea に custom-scrollbar を追加 */}
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
@@ -1687,17 +1729,20 @@ export default function MarkdownEditor() {
               {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {driveEnabled && isAuthenticated && accessToken ? (
-                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                    ) : (
-                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                    )}
+                    {/* ScrollArea に custom-scrollbar を追加 */}
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                <div className="h-full overflow-auto">{EditorComponent}</div>
+                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
@@ -1707,9 +1752,10 @@ export default function MarkdownEditor() {
           )}
            {viewMode === 'triple' && (
              <TripleLayout
-                editorComponent={<div className="h-full overflow-auto">{EditorComponent}</div>}
+                // EditorComponent を含む div に custom-scrollbar を追加
+                editorComponent={<div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>}
                 previewComponent={
-                    // ここの参照を修正
+                    // 各プレビューコンポーネントは自身のルートに custom-scrollbar がある
                     outputMode === 'marp' ? MarpPreviewComponent :
                     outputMode === 'quarto' ? QuartoPreviewComponent :
                     PreviewComponent
@@ -1725,9 +1771,12 @@ export default function MarkdownEditor() {
                 driveEnabled={driveEnabled && isAuthenticated}
                 driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
                 tocVisible={!driveEnabled && isTocVisible}
+                // TOCコンポーネントを ScrollArea でラップし custom-scrollbar を追加
                 tocComponent={
                   (!driveEnabled && isTocVisible) ?
-                  <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                   <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                     <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                   </ScrollArea>
                   : null
                 }
                 getEditorContent={getEditorContentCallback}
@@ -1740,11 +1789,14 @@ export default function MarkdownEditor() {
               {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {driveEnabled && isAuthenticated && accessToken ? (
-                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                    ) : (
-                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                    )}
+                    {/* ScrollArea に custom-scrollbar を追加 */}
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
@@ -1759,17 +1811,20 @@ export default function MarkdownEditor() {
               {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {driveEnabled && isAuthenticated && accessToken ? (
-                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                    ) : (
-                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                    )}
+                    {/* ScrollArea に custom-scrollbar を追加 */}
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                <div className="h-full overflow-auto">{EditorComponent}</div>
+                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
@@ -1782,16 +1837,20 @@ export default function MarkdownEditor() {
               {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {driveEnabled && isAuthenticated && accessToken ? (
-                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                    ) : (
-                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                    )}
+                     {/* ScrollArea に custom-scrollbar を追加 */}
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                 {/* QuartoPreviewComponent は自身のルートに custom-scrollbar がある */}
                 {QuartoPreviewComponent}
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -1801,20 +1860,25 @@ export default function MarkdownEditor() {
               {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
                 <>
                   <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {driveEnabled && isAuthenticated && accessToken ? (
-                      <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                    ) : (
-                      <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                    )}
+                    {/* ScrollArea に custom-scrollbar を追加 */}
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
                 </>
               ) : null}
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                <div className="h-full overflow-auto">{EditorComponent}</div>
+                 {/* EditorComponent を含む div に custom-scrollbar を追加 */}
+                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                 {/* QuartoPreviewComponent は自身のルートに custom-scrollbar がある */}
                 {QuartoPreviewComponent}
               </ResizablePanel>
             </ResizablePanelGroup>

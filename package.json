@@ -105,6 +105,7 @@
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
+    "remove-markdown": "^0.6.2",
     "sonner": "^1.7.1",
     "stream-browserify": "^3.0.0",
     "tailwind-merge": "^2.5.5",
