@@ -1262,14 +1262,14 @@ export default function MarkdownEditor() {
               // 通常のコードブロックハイライト (YAML/Mermaid以外)
               return (
                 <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
-                  <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                  <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-black text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
                     {language || 'code'} 
                   </div>
                   <SyntaxHighlighter
                     language={language} // 修正: language 変数を渡す
                     PreTag="div"
                     style={isDarkMode ? vscDarkPlus as any : oneLight as any} 
-                    customStyle={{ /* 既存のスタイル */ }}
+                    customStyle={isDarkMode ? { background: '#000000' } : {}} // ダークモードの背景を #000000 に上書き
                   >
                     {codeContent}
                   </SyntaxHighlighter>

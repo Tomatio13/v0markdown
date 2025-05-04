@@ -597,11 +597,11 @@ export const AIChat = React.memo(({
 
   return (
     <div 
-      className={`flex flex-col h-full ${isDarkMode ? 'bg-[#0d1117] text-[#e6edf3]' : 'bg-gray-100 text-gray-900'}`}
+      className={`flex flex-col h-full ${isDarkMode ? 'dark:bg-[#1E1E1EFF] text-[#e6edf3]' : 'bg-gray-100 text-gray-900'}`}
       suppressHydrationWarning
     >
       <div 
-        className={`flex justify-between items-center px-4 py-2 ${isDarkMode ? 'border-b border-[#30363d]' : 'border-b border-gray-200'}`}
+        className={`flex justify-between items-center px-4 py-0.5 ${isDarkMode ? 'border-b border-[#30363d]' : 'border-b border-gray-200'}`}
         suppressHydrationWarning
       >
         <h3 className="text-base font-semibold flex items-center">
@@ -633,11 +633,11 @@ export const AIChat = React.memo(({
 
       <form 
         onSubmit={handleFormSubmitCallback} 
-        className={`px-4 py-2 ${isDarkMode ? 'bg-[#0d1117]' : 'bg-gray-100'}`}
+        className={`px-4 py-2 ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-gray-100'}`}
         suppressHydrationWarning
       >
         <div className="flex items-center gap-2 relative">
-          <div className={`flex-1 relative flex items-center rounded-md border ${isDarkMode ? 'bg-[#0d1117] border-[#30363d]' : 'bg-white border-gray-300'}`}>
+          <div className={`flex-1 relative flex items-center rounded-md border ${isDarkMode ? 'bg-[#1E1E1EFF] border-[#30363d]' : 'bg-white border-gray-300'}`}>
             {availableModels.length > 0 && (
               <div className="pl-2">
                 <Select
@@ -669,7 +669,7 @@ export const AIChat = React.memo(({
               onChange={handleInputChange}
               onKeyDown={handleKeyDownCallback}
               placeholder="AIに質問する... (Shift+Enterで改行)"
-              className={`flex-1 text-sm resize-none px-2 py-1.5 rounded-md ${isDarkMode ? 'bg-[#0d1117] text-[#e6edf3] placeholder-[#8b949e]' : 'bg-white text-gray-900 placeholder-gray-500'} focus:outline-none overflow-hidden`}
+              className={`flex-1 text-sm resize-none px-2 py-1.5 rounded-md ${isDarkMode ? 'bg-[#1E1E1EFF] text-[#e6edf3] placeholder-[#8b949e]' : 'bg-white text-gray-900 placeholder-gray-500'} focus:outline-none overflow-hidden`}
               disabled={isLoading || availableModels.length === 0}
               minRows={1}
               maxRows={12}
