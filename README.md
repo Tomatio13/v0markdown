@@ -19,15 +19,16 @@
   - [🎨 画面イメージ](#-画面イメージ)
   - [✨ 機能](#-機能)
   - [🛠️ 技術スタック](#️-技術スタック)
-  - [⚙️ Google Drive連携のための設定](#️-google-drive連携のための設定)
-    - [1. Google Cloud Consoleでの設定](#1-google-cloud-consoleでの設定)
-    - [2. 環境変数の設定](#2-環境変数の設定)
   - [🚀 インストール](#-インストール)
+  - [🛠️ 外部ツールのセットアップ](#️-外部ツールのセットアップ)
+    - [Jupyterのインストール方法](#jupyterのインストール方法)
+    - [Quartoのインストール方法](#quartoのインストール方法)
+  - [⚙️ 初期設定](#️-初期設定)
+    - [1. Google Drive連携設定 (任意)](#1-google-drive連携設定-任意)
+      - [Google Cloud Consoleでの設定](#google-cloud-consoleでの設定)
+    - [2. 環境変数設定](#2-環境変数設定)
+    - [3. 外部ツール設定 (任意)](#3-外部ツール設定-任意)
   - [📖 使い方](#-使い方)
-    - [対応LLMプロバイダーとモデル設定](#対応llmプロバイダーとモデル設定)
-  - [👨‍💻 開発](#-開発)
-  - [Jupyterのインストール方法](#jupyterのインストール方法)
-  - [Quatroのインストール方法](#quatroのインストール方法)
   - [📄 ライセンス](#-ライセンス)
 
 
@@ -36,67 +37,58 @@
 
 ## ✨ 機能
 
-- **リアルタイムマークダウンプレビュー:** 入力と同時にプレビューが更新されます。
-- **シンタックスハイライト:** コードブロックを読みやすく表示します。
-- **多様な表示モード:** エディタのみ、プレビューのみ、分割（左右）、AIチャット付き（3ペイン）など、好みに合わせて表示を切り替えられます。
-- **ペイン幅調整:** 分割表示やGoogle Drive連携表示時に、各ペインの幅をドラッグで自由に調整できます。
-- **ダークモード/ライトモード:** 好みに合わせてテーマを切り替えられます。
-- **Vimキーバインディング:** Vimライクな操作が可能です（オン/オフ切り替え可）。ステータスバーでモードを確認できます。
-- **拡張ツールバー:**
-    - **書式設定:** 見出し、太字、リストなどをボタン一つで挿入できます。
-    - **ファイル操作:** ローカル保存、Google Drive保存（連携時）、印刷、PPTXエクスポート（Marp/Quarto）、Quartoエクスポート。
-    - **表示切替:** エディタ/プレビュー/分割/AIチャット表示の切り替え。
-    - **モード切替:** ダーク/ライトモード、Vimモードの切り替え。
-- **目次機能:** ドキュメント内のH1およびH2見出しから自動生成された目次を表示します（Google Drive連携が無効な場合）。
-- **ステータスバー:** 現在のカーソル位置（行、列）、選択文字数、プレビューモードなどを表示します。
-- **絵文字ピッカー:** 絵文字アイコンまたはコンテキストメニューから簡単に絵文字を検索・挿入できます。
-- **画像アップロード:** エディタに画像をドラッグ&ドロップまたはファイル選択でアップロードできます。アップロード中のインジケーターが表示され、日本語ファイル名もサポートします。
-- **音声入力機能:** 
-    - ツールバーのマイクアイコンをクリックして音声入力モードをオン/オフできます。
-    - 音声入力中は画面上部に認識中の文字列がリアルタイムで表示されます。
-    - 文章が確定すると自動的にカーソル位置に挿入されます。
-    - 日本語に最適化されていますが、ブラウザの設定によって他の言語にも対応します。
-    - Chrome、Edge、Safariなど、Web Speech APIをサポートするブラウザで動作します。
-- **Mermaid ダイアグラムサポート:** ` ```mermaid ` でMermaid記法による図表を作成・表示できます。レンダリング処理が改善されています。
+**I. コア編集とフォーマット**
+*   **Markdownサポート:**
+    *   **基本的な書式:** 見出し、リスト、太字、斜体、リンク、引用、コードブロック、表などをサポートします。
+    *   **シンタックスハイライト:** コードブロック内のコードを言語に応じて色付けし、読みやすく表示します。
+    *   **Mermaidダイアグラム:** ` ```mermaid ` 記法を使って、フローチャートやシーケンス図などの図を簡単に作成・表示できます。
+*   **リアルタイムプレビュー:** Markdownを入力すると同時に、整形されたプレビューがリアルタイムで更新されます。
+*   **書式設定支援:** ツールバーのボタンを使って、見出し、太字、リストなどの一般的なMarkdown書式を簡単に挿入できます。
+*   **画像アップロード:** ドラッグ＆ドロップまたはファイル選択で画像をエディタに簡単に追加できます。アップロード状況が表示され、日本語のファイル名にも対応しています。
+*   **音声入力:** ツールバーのマイクアイコンから音声でテキストを入力できます。認識中のテキストが画面上部に表示され、確定するとカーソル位置に挿入されます（Web Speech API対応ブラウザが必要）。
+*   **プレゼンテーション作成 (Marp):**
+    *   [Marp](https://marp.app/) 形式のMarkdownでプレゼンテーションスライドを作成できます (`---`でスライド区切り)。
+    *   テーマ設定、ページ番号、背景画像、画像のサイズ調整など、Marpのディレクティブをサポートします。
+    *   エディタ内でリアルタイムにスライドプレビューを確認できます。
+    *   作成したスライドはPowerPoint (PPTX) 形式でエクスポートできます (別途Marp CLIとJupyterのセットアップが必要な場合があります)。
+*   **プレゼンテーション作成 (Quarto):**
+    *   [Quarto](https://quarto.org/) 形式のMarkdownドキュメントをPowerPoint (PPTX) 形式、PDF形式でエクスポートできます (別途Quartoのセットアップが必要です)。
+    *   エディタ内でQuartoドキュメントのプレビューが可能です。
 
-- **Marpプレゼンテーションサポート:**
-    - [Marp](https://marp.app/)（Markdown Presentation Ecosystem）完全対応。
-    - **Marpプレビュー機能:** エディタ内でプレゼンテーションのリアルタイムプレビューが可能です。
-    - Marpディレクティブを使用したスライド設定（テーマ、ページ番号、背景色など）。
-    - 画像サイズの調整や配置のカスタマイズ（`width`、`height`、`position`など）。
-    - グローバルディレクティブとローカルディレクティブの両方をサポート。
-    - カスタムCSSによるスライドデザインのオーバーライド。
-    - ヘッダ挿入ボタンで簡単にMarpディレクティブを挿入できます。
-- **PowerPoint(PPTX)変換機能:**
-    - マークダウンをプレゼンテーション用のPPTXファイルに変換できます。
-    - Marpの記法を使用してスライドを作成できます（`---`でスライド区切り）。
-    - 変換プロセスの進行状況が表示されます。
-    - オフライン環境でも利用できる堅牢な変換機能です。
-- **Quarto変換機能:**
-    - [Quarto](https://quarto.org/)形式のマークダウンをPPTXファイルに変換できます。
-    - 変換プロセスの進行状況が表示されます。
-    - Quartoプレビューコンポーネントにより、エディタ内でプレビュー可能です。
-- **Google Drive連携:**
-    - Googleアカウントで認証します。
-    - Google Drive内のMarkdownファイル（`.md`）を一覧表示・検索できます。
-    - Google Driveからファイルを開き、エディタに読み込めます。
-    - エディタの内容をGoogle Driveに保存できます。
-        - 新規保存時は、Markdownの最初の見出し行から自動でファイル名を生成します（例: `# My Document` → `MyDocument.md`）。
-        - 既存ファイルを開いている場合は、そのファイルに上書き保存します。
-    - 連携機能のオン/オフを切り替えられます。
-- **ローカルファイル保存:** Google Drive連携が無効な場合、ファイルをローカルにダウンロードできます。
-- **印刷機能:** プレビュー内容を印刷またはPDFとして保存できます。
-- **AIチャット機能 (オプション):**
-   - エディタの内容についてAIと対話できます（別途API設定が必要）。
-   - 複数のプロバイダーに対応（OpenAI, xAI/Grok, Gemini, Anthropic, Ollama）。
-   - `@editor` と入力することで、エディタの現在の内容をコンテキストとしてAIに送信できます。
-   - 会話履歴をクリアする機能があります。
-   - **Model Context Protocol (MCP) 連携:**
-    - `.env.local` の `MCP_SERVERS_JSON` で設定した外部ツールサーバーを STDIO 経由で起動・接続し、そのツールをAIが利用できるようになります。
-    - **注意:** STDIO 連携はローカルコマンドを実行するため、信頼できるサーバーのみを設定してください。
-    - 各サーバーのツールは `サーバーキー_ツール名` 形式に自動でリネームされ、OpenAIのツール名制約（英数字アンダースコア64文字以内）に対応します。
-   - **ローカルメモリツール:**
-    - `memory_get` / `memory_set` ツールにより、会話中に一時的な情報を記憶・参照できます（サーバー再起動でリセットされます）。
+**II. 整理とナビゲーション**
+
+*   **目次表示:** ドキュメント内の見出し (H1, H2) から自動的に目次を生成し、サイドバーに表示します（Google Drive連携が無効な場合）。
+*   **Google Drive連携 (オプション):**
+    *   Googleアカウントでログインし、Google Drive内のMarkdownファイル (.md) を操作できます。
+    *   ファイルの一覧表示、検索、内容の読み込みが可能です。
+    *   編集内容をGoogle Driveに保存できます（新規保存時は最初の見出しからファイル名を自動生成、既存ファイルは上書き保存）。
+    *   連携機能はオン/オフを切り替えられます。
+
+**III. AI アシスタンス**
+
+*   **AIチャット:**
+    *   エディタの右側にチャットパネルを開き、AIと対話しながら文章作成の補助を受けられます（別途APIキー設定が必要）。
+    *   複数のAIプロバイダー (OpenAI, Grok, Gemini, Anthropic, Ollama) に対応。
+    *   `@editor` と入力すると、現在エディタに書かれている内容をAIにコンテキストとして渡せます。
+    *   会話履歴のクリア機能があります。
+*   **外部ツール連携 (MCP):** 設定した外部ツール (コマンドラインツールなど) をAIが利用できるようになります (STDIO経由、要設定)。
+
+**V. ユーザビリティとインターフェース**
+
+*   **柔軟なレイアウト:**
+    *   **表示モード切替:** エディタのみ、プレビューのみ、左右分割、AIチャット付き（3ペイン）など、好みに合わせて表示を切り替えられます。
+    *   **ペイン幅調整:** 分割表示時に、各エリアの幅をドラッグで自由に調整できます。
+*   **カスタマイズ:**
+    *   **テーマ:** ダークモードとライトモードを切り替えられます。
+    *   **Vimキーバインディング:** Vimライクなキーボード操作を有効/無効にできます。
+*   **便利なUI要素:**
+    *   **拡張ツールバー:** ファイル操作（ローカル保存、Drive保存、印刷、PPTX/Quartoエクスポート）、表示モード切替、テーマ切替、Vimモード切替などの機能に素早くアクセスできます。
+    *   **ステータスバー:** カーソルの現在位置（行、列）、選択中の文字数、現在のプレビューモードなどを表示します。
+    *   **絵文字ピッカー:** 絵文字アイコンや右クリックメニューから、簡単に絵文字を検索して挿入できます。
+*   **ファイル操作:**
+    *   **ローカル保存:** Google Drive連携が無効な場合、編集内容をMarkdownファイルとしてローカルにダウンロードできます。
+    *   **印刷:** プレビュー内容をブラウザの印刷機能を使って印刷したり、PDFとして保存したりできます。
+
 
 ## 🛠️ 技術スタック
 
@@ -119,11 +111,90 @@
 - [Vercel AI SDK](https://sdk.vercel.ai/) - AIチャット機能 (オプション)
 - [Ollama AI Provider](https://sdk.vercel.ai/providers/community-providers/ollama) - ローカルまたはリモートのLLMを実行するOllamaサーバーへの接続
 
-## ⚙️ Google Drive連携のための設定
+## 🚀 インストール
 
-Google Drive連携機能を利用するには、以下の設定が必要です。
+プロジェクトをローカル環境にセットアップする手順です。
 
-### 1. Google Cloud Consoleでの設定
+```bash
+# リポジトリをクローン
+git clone https://github.com/Tomatio13/v0markdown.git
+cd v0markdown # ディレクトリ名がリポジトリ名と異なる場合注意
+
+# 依存関係をインストール (npm, yarn, pnpm いずれかを使用)
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+インストール完了後、[初期設定](#️-初期設定)に進んでください。
+
+## 🛠️ 外部ツールのセットアップ
+
+MarpやQuartoからのPPTXエクスポート機能を利用するために必要な外部ツールのインストール手順です。
+
+### Jupyterのインストール方法
+
+(MarpのPPTX変換で内部的に必要になる場合があります)
+
+最低限以下のコマンドを実行してJupyter環境を構築してください。
+
+```bash
+# 作業ディレクトリを作成 (任意)
+mkdir jupyter_env && cd jupyter_env
+# Python仮想環境を作成
+python3 -m venv venv # python3 を使用
+# Python仮想環境を有効化 (OSによってコマンドが異なります)
+# Linux/macOS:
+source venv/bin/activate
+# Windows (Command Prompt):
+# venv\Scripts\activate.bat
+# Windows (PowerShell):
+# venv\Scripts\Activate.ps1
+
+# pipをアップグレード
+pip install --upgrade pip
+# 必要なパッケージをインストール
+pip install jupyter numpy pandas matplotlib seaborn plotly # 必要に応じて追加
+# インストールされたjupyterのパスを確認 (このパスを .env.local の JUPYTER_PATH に設定)
+which jupyter
+# 仮想環境を無効化 (任意)
+deactivate
+```
+**注意:** `JUPYTER_PATH` には `which jupyter` で表示された**絶対パス**を設定してください。
+
+### Quartoのインストール方法
+
+[Quarto公式ドキュメントのGet Started](https://quarto.org/docs/get-started/)を参照してください。
+
+以下はUbuntu/Debian系の例です。
+
+```bash
+# 最新版の .deb ファイルをダウンロード (バージョンは適宜確認)
+wget # debファイルの取得
+wget https://github.com/quarto-dev/quarto-cli/releases/download/v1.7.23/quarto-1.7.23-linux-amd64.deb# 例: v1.7.23
+
+# ダウンロードした .deb ファイルをインストール
+sudo dpkg -i quarto-*.deb
+# 依存関係の問題があれば修正
+sudo apt --fix-broken install
+
+# quartoのインストール先を確認 (通常は /opt/quarto/bin/quarto)
+which quarto
+# このパスのディレクトリ (例: /opt/quarto/bin) を .env.local の QUARTO_PATH に設定
+```
+**注意:** `QUARTO_PATH` には `quarto` 実行ファイルが存在する**ディレクトリのパス**を設定してください（例: `/opt/quarto/bin`）。
+
+## ⚙️ 初期設定
+
+アプリケーションを実行する前に必要な設定を行います。
+
+### 1. Google Drive連携設定 (任意)
+
+Google Drive連携機能を利用する場合のみ、以下の設定が必要です。不要な場合はこのセクションをスキップし、環境変数 `NEXT_PUBLIC_GOOGLE_FLAG` を `OFF` に設定してください (後述)。
+
+#### Google Cloud Consoleでの設定
 
 (Google Cloud Platformにアカウントがない場合は作成してください)
 
@@ -155,25 +226,27 @@ Google Drive連携機能を利用するには、以下の設定が必要です�
         *   ローカル開発環境で実行するURLを入力します。通常は `http://localhost:3000` です。（異なるポートを使用している場合は、そのポート番号に合わせてください。例: `http://localhost:3001`）
     *   **承認済みのリダイレクト URI:** (今回は使用しませんが、将来的に必要になる場合があります)
     *   「**作成**」をクリック。
-7.  **クライアントIDの確認:** 作成されたクライアントIDが表示されます。これを次のステップで使用します。
-    *   **あなたのクライアント ID:** この値をコピーします。
+7.  **クライアントIDとシークレットの確認:** 作成されたクライアントIDとクライアントシークレットが表示されます。これらを次の環境変数設定で使用します。
 
-### 2. 環境変数の設定
+### 2. 環境変数設定
 
-プロジェクトのルートディレクトリにある `.env.local` ファイル（なければ作成）に、Google Cloud Consoleで取得したクライアントIDを設定します。
-GoogleDriveを利用しない場合は、NEXT_PUBLIC_GOOGLE_FLAG=OFFにしてください
+プロジェクトのルートディレクトリに `.env.local` ファイルを作成し、以下の内容を設定します。
 
 ```env:.env.local
-# Google API Keys
+# Google API Keys (Google Drive連携を利用する場合に設定)
+# Google Cloud Consoleで取得した値を設定
 NEXT_PUBLIC_GOOGLE_CLIENT_ID="your_google_client_id"
-NEXT_PUBLIC_GOOGLE_CLIENT_SECRET="your_google_client_secret"
-NEXT_PUBLIC_GOOGLE_API_KEY="your_google_api_key"
-NEXT_PUBLIC_REDIRECT_URI="http://localhost:3000"
+NEXT_PUBLIC_GOOGLE_CLIENT_SECRET="your_google_client_secret" # 必要に応じて
+NEXT_PUBLIC_GOOGLE_API_KEY="your_google_api_key"           # 必要に応じて
+NEXT_PUBLIC_REDIRECT_URI="http://localhost:3000"          # 開発環境のURL
+
+# Google Drive連携の有効/無効フラグ (ON / OFF)
+# OFFにするとGoogle Drive関連の機能が無効になります
 NEXT_PUBLIC_GOOGLE_FLAG=ON
 
-# AI Provider API Keys (いずれか、または複数を設定)
+# AI Provider API Keys (AIチャット機能を利用する場合にいずれか、または複数を設定)
 OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
-GROK_API_KEY="YOUR_GROK_API_KEY" 
+GROK_API_KEY="YOUR_GROK_API_KEY"
 GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 ANTHROPIC_API_KEY="YOUR_ANTHROPIC_API_KEY"
 
@@ -182,7 +255,8 @@ ANTHROPIC_API_KEY="YOUR_ANTHROPIC_API_KEY"
 # OPENAI_BASE_URL="http://localhost:8000/v1"
 
 # Ollama設定（ローカルまたはリモートサーバー）
-OLLAMA_BASE_URL="http://localhost:11434/api"
+# AIチャットでOllamaを利用する場合に設定
+OLLAMA_BASE_URL="http://localhost:11434/api" # OllamaサーバーのURL
 
 # 使用可能なモデルの設定（JSON形式）
 # 各プロバイダーで使用可能なモデルをここで指定
@@ -200,12 +274,12 @@ MODELS='{
     "models":["claude-3-7-sonnet-20250219"]
   },
   "ollama":{
-    "models":["llama3","phi3","qwen3:4b","llava"]
+    "models":["llama3","phi3","qwen3:4b","llava"] # Ollamaにインストール済みのモデル
   }
 }'
 
 # Model Context Protocol (MCP) Servers (オプション)
-# 外部ツールサーバーを STDIO で起動するための設定をJSON形式で指定します。
+# AIチャットで外部ツールサーバーを STDIO で起動する場合に設定。
 # StdioMCPTransport に渡される形式です。
 # キー名は英数字アンダースコアのみを推奨 (OpenAIツール名制約のため)。
 # 例:
@@ -213,7 +287,7 @@ MODELS='{
 #   "my_python_tool": {
 #     "command": "python",                 # 必須: 実行ファイルパス (string)
 #     "args": ["path/to/your/script.py"],  # オプション: コマンド引数 (string[])
-#     "cwd": "/path/to/your/project"
+#     "cwd": "/path/to/your/project"      # オプション: 作業ディレクトリ (string)
 #   },
 #   "another_node_tool": {
 #     "command": "node",
@@ -222,167 +296,73 @@ MODELS='{
 # }'
 MCP_SERVERS_JSON=''
 
-# Paths for External Tools (オプション)
-JUPYTER_PATH=/path/to/jupyter
-QUARTO_PATH=/path/to/quarto/bin
+# Paths for External Tools (オプション、PPTX/Quarto変換に必要)
+# 外部ツールの実行ファイルパスを設定します。
+# 設定しない場合、関連するエクスポート機能は利用できません。
+# パスは環境に合わせて調整してください。
+JUPYTER_PATH="/path/to/jupyter" # 例: /home/user/venv/bin/jupyter
+QUARTO_PATH="/path/to/quarto/bin" # 例: /opt/quarto/bin
 ```
 
-**重要:** `.env.local` ファイルを変更した後は、Next.jsの開発サーバーを**再起動**する必要があります。
+**重要:**
+- 必要なAPIキーやクライアントID/シークレットは、各サービスのコンソール等から取得してください。
+- `.env.local` ファイルは機密情報を含むため、Gitリポジトリにはコミットしないでください (`.gitignore` に追加されていることを確認してください)。
+- ファイルを変更した後は、Next.jsの開発サーバーを**再起動**する必要があります。
 
-## 🚀 インストール
+### 3. 外部ツール設定 (任意)
 
-```bash
-# リポジトリをクローン
-git https://github.com/Tomatio13/v0markdown.git
-cd markdown-editor
+特定の機能（Marp/QuartoからのPPTXエクスポートなど）を利用するには、対応する外部ツールのインストールと環境変数 (`JUPYTER_PATH`, `QUARTO_PATH`) の設定が必要です。
 
-# 依存関係をインストール (npm, yarn, pnpm いずれかを使用)
-npm install
-# or
-yarn install
-# or
-pnpm install
-```
+- **Jupyter:** MarpからのPPTXエクスポートに内部で使用されることがあります。
+- **Quarto:** QuartoドキュメントからのPPTXエクスポートに必要です。
+
+インストール手順の詳細は、[外部ツールのセットアップ](#️-外部ツールのセットアップ)セクションを参照してください。
+
+インストール後、`.env.local` ファイルに `JUPYTER_PATH` と `QUARTO_PATH` を設定し、開発サーバーを再起動してください。
 
 ## 📖 使い方
+
+[初期設定](#️-初期設定)が完了したら、アプリケーションを起動して利用できます。
 
 1.  **開発サーバーを起動:**
     ```bash
     npm run dev
+    # or
+    yarn dev
+    # or
+    pnpm dev
     ```
-2.  ブラウザで `http://localhost:3000` (または指定されたポート) を開きます。
-3.  **Google Drive連携:**
+2.  ブラウザで `http://localhost:3000` (または `.env.local` で指定したポート) を開きます。
+3.  **エディタ:** マークダウンテキストを入力・編集します。
+4.  **プレビュー:** 分割ビューまたはプレビュータブでレンダリング結果を確認します。
+5.  **ツールバー:** 書式設定、表示モード切り替え、ファイル操作などを行います。
+6.  **Google Drive連携 (有効な場合):**
     *   ツールバーの「Google Drive連携」スイッチをオンにします。
-    *   「Googleでログイン」ボタンが表示されるのでクリックし、Google Cloud Consoleでテストユーザーとして登録したアカウントでログインします。
+    *   「Googleでログイン」ボタンをクリックし、[Google Drive連携設定](#1-google-drive連携設定-任意)でテストユーザーとして登録したアカウントでログインします。
     *   認証が成功すると、左側にGoogle DriveのMarkdownファイル一覧が表示されます。
     *   ファイルをクリックすると、内容がエディタに読み込まれます。
     *   エディタで内容を編集し、「Save (Drive)」ボタンをクリックするとGoogle Driveに保存されます。
-4.  **エディタ:** マークダウンテキストを入力・編集します。
-5.  **プレビュー:** 分割ビューまたはプレビュータブでレンダリング結果を確認します。
-6.  **ツールバー:** 書式設定やモード切り替えなどを行います。
 7.  **ローカル保存:** Google Drive連携をオフにすると、「Save」ボタンでファイルをローカルにダウンロードできます。
 8.  **Marpプレゼンテーション:**
-    *   マークダウンで簡単にプレゼンテーションスライドを作成できます。
-    *   スライドの区切りは `---` で行います。
-    *   Marp記法例:
+    *   マークダウンでスライドを作成します (`---` で区切り)。
+    *   Marpディレクティブでテーマなどを設定できます。
         ```markdown
         ---
         marp: true
         theme: default
-        paginate: true
         ---
 
         # スライド1
-        これは最初のスライドです
-
-        ---
-
-        # スライド2
-        これは2枚目のスライドです
-        
-        ---
-
-        ## コード例
-        ```js
-        console.log('Hello World');
         ```
-        ```
-    *   Marpディレクティブ（`theme`、`paginate`など）を使用してスライドの見た目をカスタマイズできます。
-    *   「Export to PPTX」ボタンをクリックすると、PowerPointファイルとして出力されます。
-    *   出力されたPPTXファイルはMicrosoft PowerPointやLibreOfficeなどで編集可能です。
-    *   Quarto記法で記述されたマークダウンも同様に「Export Quarto to PPTX」ボタンで変換できます。
-9.  **AIチャット (オプション):**
-    *   複数のAIプロバイダーに対応:
-        * OpenAI (GPT-4o, GPT-4o-mini等)
-        * xAI/Grok (Grok-3-beta等)
-        * Google Gemini (Gemini-1.5-pro等)
-        * Anthropic (Claude-3-7等)
-        * Ollama (ローカルLLM - Llama3, Phi3等)
-    *   `.env.local` に対応するAPIキーとMODELS設定を追加します
-    *   必要に応じて `MCP_SERVERS_JSON` を設定し、外部ツール (STDIO 経由) を利用可能にします
-    *   AIチャットペインでAIと対話します
-        *   `@editor` でエディタ内容を参照させられます
-        *   設定したMCPツールやローカルメモリツール (`memory_get`, `memory_set`) をAIが利用できます
+    *   ツールバーの「Export to PPTX」ボタンでPowerPointファイルを出力します（[外部ツール設定](#3-外部ツール設定-任意)が必要です）。
+9.  **Quartoプレゼンテーション:**
+    *   Quarto記法でスライドを作成します。
+    *   ツールバーの「Export Quarto to PPTX」ボタンでPowerPointファイルを出力します（[外部ツール設定](#3-外部ツール設定-任意)が必要です）。
+10. **AIチャット (有効な場合):**
+    *   AIチャットペインを開き、AIと対話します。
+    *   `@editor` でエディタ内容を参照させられます。
+    *   設定したMCPツールやローカルメモリツール (`memory_get`, `memory_set`) をAIが利用できます。
 
-### 対応LLMプロバイダーとモデル設定
-
-AIチャット機能で使用できるLLMプロバイダーと設定方法について説明します。
-
-- **対応プロバイダー:**
-  - **OpenAI:** GPT-4o、GPT-4o-mini等のモデルが利用可能
-  - **xAI (Grok):** Grok-3-beta、Grok-3-mini-beta等
-  - **Google Gemini:** Gemini-1.5-pro、Gemini-2.0-flash等
-  - **Anthropic:** Claude-3-7-sonnet等
-  - **Ollama:** ローカルまたはリモートのOllamaサーバーで実行される各種モデル
-
-- **環境変数の設定:**
-  - 各プロバイダーのAPIキーを `.env.local` ファイルに設定します
-  - `MODELS` 環境変数でJSON形式で利用可能なモデルを指定します
-  - 例:
-    ```
-    MODELS='{
-      "openai":{
-        "models":["gpt-4o","gpt-4o-mini"]
-      },
-      "xai":{
-        "models":["grok-3-mini-beta","grok-3-beta"]
-      },
-      "ollama":{
-        "models":["llama3","phi3","qwen3:4b"]
-      }
-    }'
-
-- **OpenAI互換サービス:** LiteLLM等のOpenAI互換APIに対応
-  - `OPENAI_BASE_URL` 環境変数を設定することで、OpenAI API互換のサービスを利用可能
-  - 例: `OPENAI_BASE_URL=http://localhost:8000/v1`
-
-- **Ollama設定:**
-  - ローカルまたはリモートのOllamaサーバーに接続可能
-  - `OLLAMA_BASE_URL` でサーバーのURLを指定（デフォルト: `http://localhost:11434/api`）
-  - MODELSにインストール済みのOllamaモデル名を指定（例: `llama3`, `phi3`, `qwen3:4b`）
-  - 利用可能なモデルは `curl http://localhost:11434/api/tags` で確認可能
-
-## 👨‍💻 開発
-
-```bash
-# 開発サーバーを起動
-npm run dev
-
-# 本番用ビルドを作成
-npm run build
-
-# 本番環境としてアプリを起動
-npm start
-```
-
-## Jupyterのインストール方法
-最低限以下のコマンドを実行してJupyter環境を構築してください。
-```bash
-mkdir jupytor
-# Python仮想化環境の作成
-python -m venv venv
-# Python仮想化環境の有効化
-source venv/bin/activate
-# 必要なパッケージのインストール
-pip install --upgrade pip
-pip install jupyter numpy plotly matplotlib
-# Python仮想化環境の無効化
-deactivate
-```
-
-## Quatroのインストール方法
-[Quatroのインストール](https://quarto.org/docs/get-started/)を参照してください。
-以下、Ubuntuの場合です。他のOSは試していません。
-```bash
-# debファイルの取得
-wget https://github.com/quarto-dev/quarto-cli/releases/download/v1.7.23/quarto-1.7.23-linux-amd64.deb 
-
-# rootユーザでインストール
-sudo apt install ./quarto-1.7.23-linux-amd64.deb
-# quatroのインストール先の確認
-$ ls -t /opt/quarto/bin   
- tools   vendor   quarto   quarto.js
-```
 
 ## 📄 ライセンス
 
