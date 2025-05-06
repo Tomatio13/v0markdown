@@ -46,8 +46,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize // MaximizeとMinimizeアイコンを追加
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
@@ -122,6 +128,11 @@ export default function MarkdownEditor() {
   const [isQuartoPptxGenerating, setIsQuartoPptxGenerating] = useState(false);
   const [isQuartoPdfGenerating, setIsQuartoPdfGenerating] = useState(false);
   const [isTocVisible, setIsTocVisible] = useState(false);
+  // Marpテーマ関連
+  const [selectedMarpTheme, setSelectedMarpTheme] = useState("default");
+  const [marpThemes, setMarpThemes] = useState<string[]>(["default"]);
+  const [isLoadingThemes, setIsLoadingThemes] = useState(false);
+
 
   // Google Drive State
   const [driveEnabled, setDriveEnabled] = useState(false)
@@ -1432,6 +1443,37 @@ export default function MarkdownEditor() {
     };
   }, []);
 
+  // Marpヘッダーを挿入する関数
+  const insertMarpHeader = useCallback((themeName: string) => {
+    setSelectedMarpTheme(themeName);
+    insertText(`---\nmarp: true\ntheme: ${themeName}\n${isDarkMode ? '# class: invert' : '# class: invert'}\npaginate: true\nheader: "Header"\nfooter: "Footer"\n---\n\n`, "");
+  }, [isDarkMode, insertText]);
+
+  // Marpテーマを取得するEffect
+  useEffect(() => {
+    const fetchMarpThemes = async () => {
+      setIsLoadingThemes(true);
+      try {
+        const response = await fetch('/api/marp-themes');
+        if (!response.ok) {
+          console.error('テーマ取得エラー:', response.statusText);
+          return;
+        }
+        const data = await response.json();
+        if (data.themes && Array.isArray(data.themes)) {
+          setMarpThemes(data.themes);
+          console.log('Marpテーマを取得しました:', data.themes);
+        }
+      } catch (error) {
+        console.error('テーマ取得中に例外が発生しました:', error);
+      } finally {
+        setIsLoadingThemes(false);
+      }
+    };
+
+    fetchMarpThemes();
+  }, []);
+
   // --- Render ---
   return (
     <div className={`fixed inset-0 flex ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
@@ -1530,21 +1572,11 @@ export default function MarkdownEditor() {
               {/* Block Elements */}
               {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
               {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
-              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid') || showToolbarButton('Marp Header') || showToolbarButton('Quatro Header')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
                 {showToolbarButton('Quato') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>}
                 {showToolbarButton('Code Block') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>}
                 {showToolbarButton('Table') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>}
                 {showToolbarButton('Mermaid') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>}
-                {showToolbarButton('Marp Header') && <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText(`---\nmarp: true\ntheme: default\n${isDarkMode ? 'class: invert' : '# class: invert'}\npaginate: true\nheader: "Header"\nfooter: "Footer"\n---\n\n`, "")}><Presentation className="h-4 w-4" /></Button>
-                  </TooltipTrigger><TooltipContent>Marp Header</TooltipContent>
-                </Tooltip>}
-                {showToolbarButton('Quatro Header') && <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n html:\n  code-fold: true\njupter: python3\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
-                  </TooltipTrigger><TooltipContent>Quarto Header</TooltipContent>
-                </Tooltip>}
               </div>}
               {/* Links & Images & Clear */}
               {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
@@ -1557,6 +1589,50 @@ export default function MarkdownEditor() {
                 </Tooltip>}
                 {showToolbarButton('Clear Editor') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClearContent}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent>Clear Editor</TooltipContent></Tooltip>}
               </div>}
+              {(showToolbarButton('Marp Header') || showToolbarButton('Quatro Header')) && (
+                <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+                  {showToolbarButton('Marp Header') && (
+                    <DropdownMenu>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <Palette className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Marpテーマ選択</TooltipContent>
+                      </Tooltip>
+                      <DropdownMenuContent align="start">
+                        {isLoadingThemes ? (
+                          <div className="flex items-center justify-center py-2 px-4 text-sm text-muted-foreground">
+                            <span className="animate-spin mr-2">⌛</span>テーマ読み込み中...
+                          </div>
+                        ) : marpThemes.length > 0 ? (
+                          marpThemes.map((theme) => (
+                            <DropdownMenuItem 
+                              key={theme} 
+                              onClick={() => insertMarpHeader(theme)}
+                              className={selectedMarpTheme === theme ? "font-bold bg-muted" : ""}
+                            >
+                              {theme}
+                            </DropdownMenuItem>
+                          ))
+                        ) : (
+                          <div className="py-2 px-4 text-sm text-muted-foreground">
+                            テーマが見つかりませんでした
+                          </div>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  {showToolbarButton('Quatro Header') && <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n html:\n  code-fold: true\njupter: python3\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
+                    </TooltipTrigger><TooltipContent>Quarto Header</TooltipContent>
+                  </Tooltip>}
+                </div>
+              )}
               {/* View Mode Buttons */}
               {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
               {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
