@@ -29,6 +29,9 @@
     - [2. 環境変数設定](#2-環境変数設定)
     - [3. 外部ツール設定 (任意)](#3-外部ツール設定-任意)
   - [📖 使い方](#-使い方)
+    - [共通的な使い方](#共通的な使い方)
+    - [Marpプレゼンテーション](#marpプレゼンテーション)
+    - [Quartoプレゼンテーション](#quartoプレゼンテーション)
   - [📄 ライセンス](#-ライセンス)
 
 
@@ -324,6 +327,8 @@ QUARTO_PATH="/path/to/quarto/bin" # 例: /opt/quarto/bin
 
 [初期設定](#️-初期設定)が完了したら、アプリケーションを起動して利用できます。
 
+### 共通的な使い方
+
 1.  **開発サーバーを起動:**
     ```bash
     npm run dev
@@ -343,26 +348,59 @@ QUARTO_PATH="/path/to/quarto/bin" # 例: /opt/quarto/bin
     *   ファイルをクリックすると、内容がエディタに読み込まれます。
     *   エディタで内容を編集し、「Save (Drive)」ボタンをクリックするとGoogle Driveに保存されます。
 7.  **ローカル保存:** Google Drive連携をオフにすると、「Save」ボタンでファイルをローカルにダウンロードできます。
-8.  **Marpプレゼンテーション:**
-    *   マークダウンでスライドを作成します (`---` で区切り)。
-    *   Marpディレクティブでテーマなどを設定できます。
-        ```markdown
-        ---
-        marp: true
-        theme: default
-        ---
-
-        # スライド1
-        ```
-    *   ツールバーの「Export to PPTX」ボタンでPowerPointファイルを出力します（[外部ツール設定](#3-外部ツール設定-任意)が必要です）。
-9.  **Quartoプレゼンテーション:**
-    *   Quarto記法でスライドを作成します。
-    *   ツールバーの「Export Quarto to PPTX」ボタンでPowerPointファイルを出力します（[外部ツール設定](#3-外部ツール設定-任意)が必要です）。
-10. **AIチャット (有効な場合):**
+8.  **AIチャット (有効な場合):**
     *   AIチャットペインを開き、AIと対話します。
     *   `@editor` でエディタ内容を参照させられます。
     *   設定したMCPツールやローカルメモリツール (`memory_get`, `memory_set`) をAIが利用できます。
 
+### Marpプレゼンテーション
+
+1.  **スライド作成:** マークダウンでスライドを作成します (`---` で区切り)。
+2.  **ディレクティブ:** Marpディレクティブでテーマなどを設定できます。
+    ```markdown
+    ---
+    marp: true
+    theme: default # または gaia, uncover
+    size: 16:9
+    paginate: true
+    header: 'My Header'
+    footer: 'My Footer'
+    ---
+
+    # スライド1
+    コンテンツ...
+
+    ---
+
+    <!-- _class: invert -->
+    # スライド2 (反転テーマ)
+    コンテンツ...
+    ```
+3.  **カスタムテーマの利用:**
+    *   独自のCSSテーマファイル (例: `my-custom-theme.css`) をプロジェクト内の `public/marp_themes/` ディレクトリに配置します。
+    *   配置したCSSファイルのファイル名 (拡張子を除く) を、Markdownフロントマターの `theme` ディレクティブに指定します。
+      ```markdown
+      ---
+      marp: true
+      theme: my-custom-theme # public/marp_themes/my-custom-theme.css を参照
+      ---
+
+      # カスタムテーマを使ったスライド
+      ```
+    *   プレビューとPPTXエクスポートの両方でカスタムテーマが適用されます。
+4.  **PPTXエクスポート:** ツールバーの「Export to PPTX」ボタンでPowerPointファイルを出力します（[外部ツール設定](#3-外部ツール設定-任意)で `JUPYTER_PATH` の設定が必要な場合があります）。
+   
+> #### カスタムテーマについて
+> `public/marp_themes/`には[Marp Community Themes](https://rnd195.github.io/marp-community-themes/) で公開されているテーマ`academic`、`Beam`、`Border`、`Gradient`、`Graph Paper`、`Rose Pine`、`Rose Pine Dawn`、`Rose Pine Monn`を配置してあります。
+> このテーマは、デフォルトのテーマとして使用することも、カスタマイズして使用することも可能です。
+> カスタマイズしたい場合は、`public/marp_themes/`に配置したテーマファイルを編集してください。
+> また、[Marpのテーマ屋さん](https://marp-themes.nekast.com/)では、カスタマイズしたテーマを公開しています。
+> そちらを参考に、自分でカスタマイズしたテーマを作成することも可能です。
+
+### Quartoプレゼンテーション
+
+1.  **ドキュメント作成:** Quarto記法でドキュメントやスライドを作成します。
+2.  **PPTX/PDFエクスポート:** ツールバーの「Export Quarto to PPTX」または「Export Quarto to PDF」ボタンで対応する形式のファイルを出力します（[外部ツール設定](#3-外部ツール設定-任意)で `QUARTO_PATH` の設定が必要です）。
 
 ## 📄 ライセンス
 

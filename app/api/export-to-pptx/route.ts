@@ -9,13 +9,56 @@ import util from 'util'; // util.promisifyを使用
 const execPromise = util.promisify(exec); // execをPromise化
 
 // デバッグログフラグ（本番環境では false に設定）
-const DEBUG = false // ★★★ falseに戻す ★★★
+const DEBUG = true // ★★★ デバッグ用にtrueにする場合がある ★★★
+
+// --- プレビューから移植: フロントマターからテーマ名を抽出 ---
+const extractThemeFromFrontmatter = (md: string): string | null => {
+  // 確実に文字列化して改行で分割
+  const lines = String(md).split('\n');
+  
+  // 先頭の --- を探す
+  let frontmatterStartIndex = -1;
+  for (let i = 0; i < Math.min(10, lines.length); i++) { // 先頭10行のみチェック
+    if (lines[i].trim() === '---') {
+      frontmatterStartIndex = i;
+      break;
+    }
+  }
+  if (frontmatterStartIndex === -1) return null; // 開始が見つからない
+
+  // 終了の --- を探す
+  let frontmatterEndIndex = -1;
+  for (let i = frontmatterStartIndex + 1; i < lines.length; i++) {
+    if (lines[i].trim() === '---') {
+      frontmatterEndIndex = i;
+      break;
+    }
+  }
+  if (frontmatterEndIndex === -1) return null; // 終了が見つからない
+
+  // フロントマターの内容を抽出
+  const frontmatterLines = lines.slice(frontmatterStartIndex + 1, frontmatterEndIndex);
+  
+  // theme: の行を探す
+  for (const line of frontmatterLines) {
+    const trimmedLine = line.trim();
+    if (trimmedLine.startsWith('theme:')) {
+      const themeValue = trimmedLine.substring('theme:'.length).trim();
+      return themeValue || null; // 空の場合はnullを返す
+    }
+  }
+  
+  return null; // theme指定が見つからない
+};
+// --- 移植ここまで ---
+
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   const sessionId = uuidv4().substring(0, 8)
   const tmpDir = path.join(os.tmpdir(), `marp-${sessionId}`)
   let processedMdFilePath = ''; // スコープ外でも参照できるように
+  let customThemeCssPath = ''; // カスタムテーマCSSの一時ファイルパス
 
   // ログヘルパー関数
   const log = (message: string) => {
@@ -99,7 +142,7 @@ export async function POST(request: NextRequest) {
                 // Markdown内のコードブロックを <p><img></p> タグに置換し、前後に改行を追加
                 const imgTag = `<p><img src="${svgRelativePath}" alt="Mermaid diagram ${i}"></p>`;
                 // 前後の改行を保証するために、置換文字列に \n を追加
-                markdownContent = markdownContent.replace(block.fullMatch, `\n\n${imgTag}\n\n`); 
+                markdownContent = markdownContent.replace(block.fullMatch, `\n\n${imgTag}\n\n`);
 
             } catch (error) {
                 log(`[Mermaid ${i}] mmdc実行エラー: ${error instanceof Error ? error.message : String(error)}`);
@@ -114,8 +157,41 @@ export async function POST(request: NextRequest) {
     }
     // --- Mermaid処理 終了 ---
 
+    // --- カスタムテーマ処理 ---
+    log('カスタムテーマの抽出と読み込み開始...');
+    const themeName = extractThemeFromFrontmatter(markdownContent);
+    let themeSetOption = ''; // Marp CLI に渡すオプション文字列
+
+    if (themeName) {
+        log(`フロントマターからテーマ名 "${themeName}" を抽出しました`);
+        const projectRoot = process.cwd();
+        const themeFilePath = path.join(projectRoot, 'public', 'marp_themes', `${themeName}.css`);
+        log(`カスタムテーマCSSファイルパス: ${themeFilePath}`);
+
+        try {
+            const themeCssContent = await fs.readFile(themeFilePath, 'utf-8');
+            customThemeCssPath = path.join(tmpDir, 'custom-theme.css'); // 一時ファイルのパス
+            log(`カスタムテーマCSSを一時ファイルに書き込み: ${customThemeCssPath}`);
+            await fs.writeFile(customThemeCssPath, themeCssContent);
+            // シェルスクリプト内で使えるようにファイル名だけを渡す
+            themeSetOption = `--theme-set "${path.basename(customThemeCssPath)}"`;
+            log(`カスタムテーマ読み込み成功。Marp CLIオプション: ${themeSetOption}`);
+        } catch (readError) {
+            if (readError instanceof Error && 'code' in readError && readError.code === 'ENOENT') {
+                log(`警告: カスタムテーマCSSファイルが見つかりません: ${themeFilePath}。デフォルトテーマを使用します。`);
+            } else {
+                log(`警告: カスタムテーマCSSファイルの読み込みに失敗しました: ${readError instanceof Error ? readError.message : String(readError)}。デフォルトテーマを使用します。`);
+            }
+            // エラーが発生しても処理は続行し、themeSetOptionは空のまま
+        }
+    } else {
+        log('フロントマターにテーマ指定が見つかりませんでした。デフォルトテーマを使用します。');
+    }
+    // --- カスタムテーマ処理 終了 ---
+
+
     // ★★★ デバッグログ追加 ★★★
-    log(`処理済みマークダウン内容:\n----\n${markdownContent}\n----`); 
+    log(`処理済みマークダウン内容:\n----\n${markdownContent}\n----`);
     // ★★★ デバッグログ追加 終了 ★★★
 
     // 処理済みマークダウンを一時ファイルに保存
@@ -132,12 +208,13 @@ export async function POST(request: NextRequest) {
       // タイムアウトを設定
       const TIMEOUT_MS = 60000; // 60秒に延長
       log(`タイムアウト設定: ${TIMEOUT_MS}ms`);
-      
+
       // プロジェクトルートディレクトリを取得
       const projectRoot = process.cwd();
 
       // シェルスクリプトファイルを作成 (入力ファイルを processedMdFilePath に変更)
       const scriptPath = path.join(tmpDir, 'convert.sh');
+      // ★★★ themeSetOption をコマンドに追加 ★★★
       const scriptContent = `#!/bin/bash
 # tmpDirに移動してmarpを実行 (SVGの相対パス解決のため)
 cd "${tmpDir}"
@@ -150,7 +227,8 @@ mkdir -p "$PUPPETEER_CACHE_DIR"
 
 # 編集可能なPPTXを生成 (入力は processed_document.md)
 # --html と --allow-local-files はSVG読み込みに必要
-npx @marp-team/marp-cli --html "${path.basename(processedMdFilePath)}" --pptx-editable -o "${path.basename(pptxFilePath)}" --no-stdin --allow-local-files
+# ★★★ カスタムテーマオプションを追加 ★★★
+npx @marp-team/marp-cli --html "${path.basename(processedMdFilePath)}" ${themeSetOption} --pptx-editable -o "${path.basename(pptxFilePath)}" --no-stdin --allow-local-files
 
 EXIT_CODE=$?
 echo "変換終了: $(date), 終了コード: $EXIT_CODE"
