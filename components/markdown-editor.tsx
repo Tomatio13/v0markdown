@@ -79,6 +79,7 @@ import GoogleAuth from "./google-auth"
 import GoogleDriveFileList from "./google-drive-file-list"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import MarpPreview from "./marp-preview"
+import MarpPreviewContainer from "./marp-preview-container"
 import QuartoPreview from "./quarto-preview"
 import TableOfContents from "./table-of-contents" // Heading をここからインポート
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -1309,17 +1310,18 @@ export default function MarkdownEditor() {
   </div>
 ), [markdownContent, isDarkMode, outputMode, previewFontSize, handleZoomIn, handleZoomOut]); // 依存配列は変更なし
 
+  // MarpPreviewComponentの定義を修正
   const MarpPreviewComponent = useMemo(() => (
-    // ... (変更なし) ...
-     <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'}`}>
-      <div ref={tabPreviewRef} className="markdown-preview p-4"> {/* ref は印刷用 */}
-        <MarpPreview
+    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'}`}>
+      <div ref={tabPreviewRef} className="markdown-preview h-full w-full" style={{ padding: 0 }}> {/* paddingを0に設定 */}
+        <MarpPreviewContainer
           markdown={markdownContent}
           isDarkMode={isDarkMode}
+          mode={viewMode === 'marp-preview' ? 'slide' : 'realtime'} // marp-previewはスライドビュー、それ以外はリアルタイムビュー
         />
       </div>
     </div>
-  ), [markdownContent, isDarkMode]);
+  ), [markdownContent, isDarkMode, viewMode]);
 
   const QuartoPreviewComponent = useMemo(() => (
     // ... (変更なし) ...

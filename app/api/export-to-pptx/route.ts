@@ -59,19 +59,22 @@ export async function POST(request: NextRequest) {
   const tmpDir = path.join(os.tmpdir(), `marp-${sessionId}`)
   let processedMdFilePath = ''; // スコープ外でも参照できるように
   let customThemeCssPath = ''; // カスタムテーマCSSの一時ファイルパス
+  
+  // フォーマット取得（デフォルトはpptx）
+  const formData = await request.formData()
+  const format = (formData.get('format') as string) || 'pptx'
 
   // ログヘルパー関数
   const log = (message: string) => {
     if (DEBUG) {
-      console.log(`[PPTX-${sessionId}] ${message}`)
+      console.log(`[MARP-${sessionId}] ${message}`)
     }
   }
 
-  log(`処理開始: ${new Date().toISOString()}`)
+  log(`処理開始: ${new Date().toISOString()}, フォーマット: ${format}`)
 
   try {
     log('リクエストデータの解析中...')
-    const formData = await request.formData()
     let markdownContent = formData.get('markdown')
 
     if (!markdownContent || typeof markdownContent !== 'string') {
@@ -199,9 +202,9 @@ export async function POST(request: NextRequest) {
     log(`処理済みマークダウンファイルを作成: ${processedMdFilePath}`)
     await fs.writeFile(processedMdFilePath, markdownContent)
 
-    // PPTXファイルのパス
-    const pptxFilePath = path.join(tmpDir, 'document.pptx')
-    log(`出力先PPTXファイル: ${pptxFilePath}`)
+    // 出力ファイルのパス
+    const outputFilePath = path.join(tmpDir, `document.${format}`)
+    log(`出力先ファイル: ${outputFilePath}`)
 
     // marpコマンドの実行
     try {
@@ -225,16 +228,21 @@ export PUPPETEER_CACHE_DIR="${projectRoot}/node_modules/.cache/puppeteer"
 export PUPPETEER_DOWNLOAD_PATH="${projectRoot}/node_modules/.cache/puppeteer"
 mkdir -p "$PUPPETEER_CACHE_DIR"
 
-# 編集可能なPPTXを生成 (入力は processed_document.md)
-# --html と --allow-local-files はSVG読み込みに必要
-# ★★★ カスタムテーマオプションを追加 ★★★
-npx @marp-team/marp-cli --html "${path.basename(processedMdFilePath)}" ${themeSetOption} --pptx-editable -o "${path.basename(pptxFilePath)}" --no-stdin --allow-local-files
+# 出力形式を決定
+if [ "${format}" = "html" ]; then
+  # HTML生成 (プレビュー用)
+  npx @marp-team/marp-cli --html "${path.basename(processedMdFilePath)}" ${themeSetOption} -o "${path.basename(outputFilePath)}" --no-stdin --allow-local-files
+else
+  # 編集可能なPPTXを生成 (入力は processed_document.md)
+  # --html と --allow-local-files はSVG読み込みに必要
+  npx @marp-team/marp-cli --html "${path.basename(processedMdFilePath)}" ${themeSetOption} --pptx-editable -o "${path.basename(outputFilePath)}" --no-stdin --allow-local-files
+fi
 
 EXIT_CODE=$?
 echo "変換終了: $(date), 終了コード: $EXIT_CODE"
 
-if [ -f "${path.basename(pptxFilePath)}" ] && [ -s "${path.basename(pptxFilePath)}" ]; then
-  echo "生成ファイル: $(du -h "${path.basename(pptxFilePath)}" | cut -f1)"
+if [ -f "${path.basename(outputFilePath)}" ] && [ -s "${path.basename(outputFilePath)}" ]; then
+  echo "生成ファイル: $(du -h "${path.basename(outputFilePath)}" | cut -f1)"
   exit $EXIT_CODE
 else
   echo "エラー: ファイル生成失敗"
@@ -290,27 +298,39 @@ fi
 
       // ファイルが存在するか確認
       try {
-        const fileStats = await fs.stat(pptxFilePath)
-        log(`PPTXファイル生成確認: ${fileStats.size} バイト`)
-        if (fileStats.size === 0) throw new Error('PPTXファイルが空です')
+        const fileStats = await fs.stat(outputFilePath)
+        log(`出力ファイル生成確認: ${fileStats.size} バイト`)
+        if (fileStats.size === 0) throw new Error('出力ファイルが空です')
       } catch (statErr) {
-        log(`PPTXファイル確認エラー: ${statErr instanceof Error ? statErr.message : String(statErr)}`)
-        throw new Error('PPTXファイルが生成されませんでした')
+        log(`出力ファイル確認エラー: ${statErr instanceof Error ? statErr.message : String(statErr)}`)
+        throw new Error('出力ファイルが生成されませんでした')
       }
 
-      // PPTXファイルの読み込み
-      log('PPTXファイルの読み込み開始')
-      const pptxData = await fs.readFile(pptxFilePath)
-      log(`PPTXファイル読み込み完了: ${pptxData.length} バイト`)
+      // 出力ファイルの読み込み
+      log('出力ファイルの読み込み開始')
+      const outputData = await fs.readFile(outputFilePath)
+      log(`出力ファイル読み込み完了: ${outputData.length} バイト`)
 
-      // PPTXファイルを返す
+      // 出力ファイルを返す
       const elapsedTime = Date.now() - startTime
       log(`処理完了: ${elapsedTime}ms`)
 
-      return new NextResponse(pptxData, {
+      // Content-Type の設定
+      let contentType = 'application/octet-stream'
+      let fileName = 'document'
+      
+      if (format === 'pptx') {
+        contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        fileName = 'document.pptx'
+      } else if (format === 'html') {
+        contentType = 'text/html'
+        fileName = 'document.html'
+      }
+
+      return new NextResponse(outputData, {
         headers: {
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'Content-Disposition': 'attachment; filename="document.pptx"; filename*=UTF-8\'\'document.pptx',
+          'Content-Type': contentType,
+          'Content-Disposition': `attachment; filename="${fileName}"; filename*=UTF-8\'\'${fileName}`,
           'X-Processing-Time': `${elapsedTime}ms`
         }
       })
@@ -326,7 +346,7 @@ fi
     log(`全体処理エラー: ${errorMessage}`)
     // クリーンアップはfinallyブロックで行う
     return NextResponse.json(
-      { error: `PowerPoint変換中にエラーが発生しました: ${errorMessage}` },
+      { error: `変換中にエラーが発生しました: ${errorMessage}` },
       { status: 500 }
     )
   } finally {
