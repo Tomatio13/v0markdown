@@ -7,6 +7,8 @@ import { streamText, CoreMessage, LanguageModel } from 'ai';
 import { getMcpTools } from '@/lib/mcp-tools';
 import { memoryTools } from '@/lib/local-tools';
 import { createOllama, OllamaProvider } from 'ollama-ai-provider';
+import fs from 'fs';
+import path from 'path';
 
 // --- モデル設定の型定義 ---
 interface ProviderModels {
@@ -215,6 +217,8 @@ export async function POST(req: Request) {
                 However, the main body of the text should be in Japanese.
 
               When using Weather MCP, please specify the city name in English and take the current date and time into consideration..
+              
+              ${loadCustomPrompt()}
               `,
       onFinish: async () => {
         await closeAll();
@@ -257,4 +261,35 @@ const getJapanTime = (): string => {
     hour12: false
   };
   return new Intl.DateTimeFormat('ja-JP', options).format(now);
-} 
+}
+
+// カスタムプロンプトファイルを読み込む関数
+const loadCustomPrompt = (): string => {
+  try {
+    // 環境変数からカスタムプロンプトのファイル名を取得
+    const customPromptFile = process.env.CUSTOM_PROMPT;
+    
+    // カスタムプロンプトが設定されていない場合は空文字列を返す
+    if (!customPromptFile) {
+      return '';
+    }
+    
+    // プロンプトファイルのパスを生成
+    const promptPath = path.join(process.cwd(), 'public', 'prompt', customPromptFile);
+    
+    // ファイルが存在するか確認
+    if (!fs.existsSync(promptPath)) {
+      console.warn(`カスタムプロンプトファイルが見つかりません: ${promptPath}`);
+      return '';
+    }
+    
+    // ファイルを読み込んで内容を返す
+    const promptContent = fs.readFileSync(promptPath, 'utf-8');
+    console.log(`カスタムプロンプトを読み込みました: ${customPromptFile}`);
+    
+    return promptContent;
+  } catch (error) {
+    console.error('カスタムプロンプトの読み込みに失敗しました:', error);
+    return '';
+  }
+}; 
