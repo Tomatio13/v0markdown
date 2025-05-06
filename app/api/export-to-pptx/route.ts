@@ -9,7 +9,7 @@ import util from 'util'; // util.promisifyを使用
 const execPromise = util.promisify(exec); // execをPromise化
 
 // デバッグログフラグ（本番環境では false に設定）
-const DEBUG = true // ★★★ デバッグ用にtrueにする場合がある ★★★
+const DEBUG = false // ★★★ デバッグ用にtrueにする場合がある ★★★
 
 // --- プレビューから移植: フロントマターからテーマ名を抽出 ---
 const extractThemeFromFrontmatter = (md: string): string | null => {
