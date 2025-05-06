@@ -46,7 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut // Micアイコンを追加, ZoomIn, ZoomOut を追加
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize // MaximizeとMinimizeアイコンを追加
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -1396,6 +1396,42 @@ export default function MarkdownEditor() {
   `, [isDarkMode]);
   // --- ▲ ADDED BACK ▲ ---
 
+  // 全画面表示の状態
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // 全画面表示切替ハンドラ
+  const toggleFullScreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      // 全画面表示に切り替え
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullScreen(true);
+      }).catch(err => {
+        console.error(`全画面表示エラー: ${err.message}`);
+      });
+    } else {
+      // 全画面表示終了
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => {
+          setIsFullScreen(false);
+        }).catch(err => {
+          console.error(`全画面終了エラー: ${err.message}`);
+        });
+      }
+    }
+  }, []);
+
+  // 全画面状態の監視
+  useEffect(() => {
+    const handleFullScreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullScreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullScreenChange);
+    };
+  }, []);
+
   // --- Render ---
   return (
     <div className={`fixed inset-0 flex ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
@@ -1939,6 +1975,16 @@ export default function MarkdownEditor() {
               <TooltipContent side="left">{isAuthenticated ? "Googleからログアウト" : "Googleにログイン"}</TooltipContent>
             </Tooltip>
           )}
+
+          {/* 全画面表示切替ボタン */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={toggleFullScreen} className="h-10 w-10">
+                {isFullScreen ? <Minimize className="h-6 w-6" /> : <Maximize className="h-6 w-6" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">{isFullScreen ? "全画面表示を終了" : "全画面表示に切替"}</TooltipContent>
+          </Tooltip>
 
           {/* Dark Mode Toggle (Moved) */}
           <Tooltip>
