@@ -56,6 +56,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
+import 'katex/dist/katex.min.css'
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vscDarkPlus, oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism" // スタイルをまとめてインポート
 import CodeMirror from "@uiw/react-codemirror"
@@ -1166,7 +1169,8 @@ export default function MarkdownEditor() {
         style={{ fontSize: `${previewFontSize}px` }} // インラインスタイルをここに適用
       >
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
           // className から prose を削除
           components={{
             // code レンダラーをここに配置
