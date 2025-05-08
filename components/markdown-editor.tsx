@@ -46,7 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -93,6 +93,7 @@ import { loadDraft, deleteDraft } from "@/lib/draft-storage";
 import { load } from "js-yaml";      // ★ 追加：YAML パーサ
 import { type LoadOptions } from 'js-yaml'; // YamlLoadOptions -> LoadOptions に修正
 import React from 'react'; // React をインポート
+import MarkmapDiagram from "./markmap-diagram"; // Markmapコンポーネントをインポート
 
 // --- グローバル型定義 ---
 declare global {
@@ -125,7 +126,7 @@ export default function MarkdownEditor() {
   const [previewFontSize, setPreviewFontSize] = useState(16);
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [outputMode, setOutputMode] = useState<'markdown' | 'marp' | 'quarto'>('markdown')
-  const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split'>('split')
+  const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split' | 'markmap' | 'markmap-split'>('split')
   const [isSaving, setIsSaving] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isPptxGenerating, setIsPptxGenerating] = useState(false)
@@ -914,6 +915,7 @@ export default function MarkdownEditor() {
   const getPreviewModeName = () => {
     if (viewMode.includes('marp')) return 'Marp';
     if (viewMode.includes('quarto')) return 'Quarto';
+    if (viewMode.includes('markmap')) return 'Markmap'; // 追加
     if (viewMode.includes('preview') || viewMode.includes('split')) return 'Markdown';
     return null;
   };
@@ -1343,7 +1345,7 @@ export default function MarkdownEditor() {
   // ツールバーボタンの表示/非表示を決定するヘルパー
   const showToolbarButton = (buttonName: string): boolean => {
     // 常に表示するボタン
-    if (buttonName === 'VoiceInput' || buttonName === 'VIM ON/OFF' || buttonName === 'Toc ON/OFF' || buttonName === 'Google Drivew ON/OFF' || buttonName === 'Clear Editor' || buttonName === 'AI Chat View') {
+    if (buttonName === 'VoiceInput' || buttonName === 'VIM ON/OFF' || buttonName === 'Toc ON/OFF' || buttonName === 'Google Drivew ON/OFF' || buttonName === 'Clear Editor' || buttonName === 'AI Chat View' || buttonName === '💡Markmap') {
         return true;
     }
     // 基本的なフォーマットボタンも常に表示
@@ -1479,6 +1481,20 @@ export default function MarkdownEditor() {
 
     fetchMarpThemes();
   }, []);
+
+  // --- ▼ ADDED ▼ ---
+  // マインドマップのコンポーネント
+  const MarkmapPreviewComponent = useMemo(() => (
+    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'}`}>
+      <div ref={tabPreviewRef} className="markdown-preview h-full w-full" style={{ padding: 0 }}>
+        <MarkmapDiagram 
+          markdown={markdownContent}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    </div>
+  ), [markdownContent, isDarkMode]);
+  // --- ▲ ADDED ▲ ---
 
   // --- Render ---
   return (
@@ -1649,6 +1665,8 @@ export default function MarkdownEditor() {
                   <>
                     <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'preview' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('preview')} className={`h-7 w-7 ${viewMode === 'preview' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><Box size={18} /></Button></TooltipTrigger><TooltipContent>Preview Only</TooltipContent></Tooltip>
                     <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('split')} className={`h-7 w-7 ${viewMode === 'split' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><SplitSquareVertical size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Markdown)</TooltipContent></Tooltip>
+                    {/* マインドマップ Split View ボタン */}
+                    <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'markmap-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('markmap-split')} className={`h-7 w-7 ${viewMode === 'markmap-split' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><GitBranch size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Mindmap)</TooltipContent></Tooltip>
                   </>
                 )}
                 {outputMode === 'marp' && (
@@ -1981,6 +1999,54 @@ export default function MarkdownEditor() {
               <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                  {/* QuartoPreviewComponent は自身のルートに custom-scrollbar がある */}
                 {QuartoPreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+          {/* Markmap View Only */}
+          {viewMode === 'markmap' && (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
+                  </ResizablePanel>
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                {MarkmapPreviewComponent}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )}
+          {/* Markmap Split View */}
+          {viewMode === 'markmap-split' && (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                <>
+                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                      {driveEnabled && isAuthenticated && accessToken ? (
+                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                      ) : (
+                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                      )}
+                    </ScrollArea>
+                  </ResizablePanel>
+                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                </>
+              ) : null}
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
+              </ResizablePanel>
+              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                {MarkmapPreviewComponent}
               </ResizablePanel>
             </ResizablePanelGroup>
           )}
