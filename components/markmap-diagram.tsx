@@ -63,56 +63,56 @@ export default function MarkmapDiagram({ markdown, isDarkMode = false }: Markmap
     svg.setAttribute('viewBox', `0 0 ${dimensions.width} ${dimensions.height}`);
     svg.style.background = isDarkMode ? '#1e1e1e' : 'white';
     
+    // ダークモード時にクラスを追加
+    if (isDarkMode) {
+      svg.classList.add('markmap-dark');
+    }
+    
     try {
       // マークダウンをマインドマップデータに変換
       const { root } = transformer.transform(markdown);
       
-      // 基本的なスタイルをSVGに追加
-      const styleElem = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-      styleElemRef.current = styleElem;
-      styleElem.textContent = `
-        .markmap-link {
-          stroke-width: 1.5;
-        }
-        .markmap-node > circle {
-          fill-opacity: 0.8;
-        }
-        .markmap-node > text {
-          fill: ${isDarkMode ? '#ffffff' : '#333333'} !important;
-          stroke: ${isDarkMode ? '#000000' : 'none'};
-          stroke-width: ${isDarkMode ? '0.5px' : '0'};
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          font-weight: ${isDarkMode ? 'bold' : 'normal'};
-          paint-order: stroke;
-          stroke-linecap: round;
-          stroke-linejoin: round;
-        }
-      `;
-      svg.appendChild(styleElem);
-      
-      // JSON形式のオプションも更新
+      // 既存要素をクリア
+      while (svg.firstChild) {
+        svg.removeChild(svg.firstChild);
+      }
+
+      // JSON形式のオプションを設定
       const jsonOptions = {
-        // 基本的なオプションのみ設定
         colorFreezeLevel: 9,
         initialExpandLevel: 9,
         placement: 'center'
       };
-      
+
       // オプションの変換
       const options = deriveOptions(jsonOptions);
-      
-      // クリーンアップ: SVG内の既存要素を削除
-      while (svg.firstChild) {
-        svg.removeChild(svg.firstChild);
-      }
-      
-      // 既存のマークマップが存在する場合はnullに設定
-      if (markmapRef.current) {
-        markmapRef.current = null;
-      }
-      
+
       // 新しいマークマップを作成
       markmapRef.current = Markmap.create(svg, options, root);
+
+      // マークマップ生成後にスタイルを追加（後勝ちにする）
+      const styleElem = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      styleElemRef.current = styleElem;
+      styleElem.textContent = `
+        /* 共通スタイル */
+        .markmap-link { stroke-width: 1.5; }
+        .markmap-node > circle { fill-opacity: 0.8; }
+
+        /* ライトモード */
+        .markmap:not(.markmap-dark) .markmap-node > text {
+          fill: var(--markmap-text-color, #333);
+        }
+
+        /* ダークモード：文字色を白に上書き */
+        .markmap-dark {
+          --markmap-text-color: #fff !important;
+        }
+        .markmap-dark .markmap-node > text {
+          fill: var(--markmap-text-color, #fff) !important;
+          font-weight: bold;
+        }
+      `;
+      svg.appendChild(styleElem);
       
       // ツールバーの作成と追加
       if (containerRef.current && markmapRef.current) {
@@ -209,23 +209,34 @@ export default function MarkmapDiagram({ markdown, isDarkMode = false }: Markmap
   useEffect(() => {
     if (!initializedRef.current || !styleElemRef.current) return;
     
+    // SVGにダークモードクラスを追加/削除
+    if (svgRef.current) {
+      if (isDarkMode) {
+        svgRef.current.classList.add('markmap-dark');
+      } else {
+        svgRef.current.classList.remove('markmap-dark');
+      }
+      svgRef.current.style.background = isDarkMode ? '#1e1e1e' : 'white';
+    }
+    
     // スタイル要素のテキスト内容を更新
     styleElemRef.current.textContent = `
-      .markmap-link {
-        stroke-width: 1.5;
+      /* 共通スタイル */
+      .markmap-link { stroke-width: 1.5; }
+      .markmap-node > circle { fill-opacity: 0.8; }
+
+      /* ライトモード */
+      .markmap:not(.markmap-dark) .markmap-node > text {
+        fill: var(--markmap-text-color, #333);
       }
-      .markmap-node > circle {
-        fill-opacity: 0.8;
+
+      /* ダークモード：文字色を白に上書き */
+      .markmap-dark {
+        --markmap-text-color: #fff !important;
       }
-      .markmap-node > text {
-        fill: ${isDarkMode ? '#ffffff' : '#333333'} !important;
-        stroke: ${isDarkMode ? '#000000' : 'none'};
-        stroke-width: ${isDarkMode ? '0.5px' : '0'};
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        font-weight: ${isDarkMode ? 'bold' : 'normal'};
-        paint-order: stroke;
-        stroke-linecap: round;
-        stroke-linejoin: round;
+      .markmap-dark .markmap-node > text {
+        fill: var(--markmap-text-color, #fff) !important;
+        font-weight: bold;
       }
     `;
     
