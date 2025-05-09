@@ -210,11 +210,21 @@ const processMessages = (messages: (CoreMessage | ExtendedUserMessage)[]): CoreM
         } else if (part.type === 'file' && 'file' in part && part.file) {
           // ファイルパーツをAI SDKの形式に変換
           // type: 'file'、data（ファイルデータ）、mimeType（MIMEタイプ）が必要
-          console.log(`ファイルを処理: ${part.file.name || 'unknown'}, MIMEタイプ: ${part.file.mimeType}`);
+          // AI SDK 側では data URL 形式 (data:mimeType;base64,xxx) の文字列を期待しているため，
+          // まだプレフィックスが無い場合は付与してから渡すようにする。
+          // 参考: https://github.com/vercel/ai/discussions/2563
+
+          const hasDataUrlPrefix = part.file.data.startsWith('data:');
+          const mimeType = part.file.mimeType || 'application/octet-stream';
+          const dataUrl = hasDataUrlPrefix
+            ? part.file.data
+            : `data:${mimeType};base64,${part.file.data}`;
+
+          console.log(`ファイルを処理: ${part.file.name || 'unknown'}, MIMEタイプ: ${mimeType}`);
           userContent.push({
             type: 'file',
-            data: part.file.data,
-            mimeType: part.file.mimeType
+            data: dataUrl,
+            mimeType: mimeType
           });
         }
       }
