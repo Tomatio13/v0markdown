@@ -1205,6 +1205,29 @@ export default function MarkdownEditor() {
                 }
               }
 
+              // mindmap コードブロックのサポートを追加
+              if (language === 'mindmap') {
+                if (outputMode === 'markdown') {
+                  return <MarkmapDiagram markdown={codeContent} isDarkMode={isDarkMode} />;
+                } else {
+                  return (
+                    <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
+                      <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                        mindmap
+                      </div>
+                      <SyntaxHighlighter
+                        language={'markdown'}
+                        PreTag="div"
+                        style={isDarkMode ? vscDarkPlus as any : oneLight as any}
+                        customStyle={{ /* 既存のスタイル */ }}
+                      >
+                        {codeContent}
+                      </SyntaxHighlighter>
+                    </div>
+                  );
+                }
+              }
+
               // YAML Preview Logic
               if (language === "yaml" && !isInline) {
                 const renderYamlValue = (value: any): React.ReactNode => {
@@ -1349,7 +1372,7 @@ export default function MarkdownEditor() {
         return true;
     }
     // 基本的なフォーマットボタンも常に表示
-    if (['H1', 'H2', 'H3', 'Bold', 'Italic', 'Emoji', 'Bullet List', 'Numberd List', 'Task List', 'Quato', 'Code Block', 'Table', 'Link', 'Image'].includes(buttonName)) {
+    if (['H1', 'H2', 'H3', 'Bold', 'Italic', 'Emoji', 'Bullet List', 'Numberd List', 'Task List', 'Quato', 'Code Block', 'Table', 'Link', 'Image', 'Mindmap'].includes(buttonName)) {
       return true;
     }
 
@@ -1594,11 +1617,12 @@ export default function MarkdownEditor() {
               {/* Block Elements */}
               {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
               {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
-              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
+              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid') || showToolbarButton('Mindmap')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
                 {showToolbarButton('Quato') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>}
                 {showToolbarButton('Code Block') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>}
                 {showToolbarButton('Table') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>}
                 {showToolbarButton('Mermaid') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>}
+                {showToolbarButton('Mindmap') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```mindmap\n# マインドマップ\n## トピック1\n### サブトピック\n## トピック2\n### サブトピック\n#### 詳細\n```\n")}><GitBranch className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mind Map</TooltipContent></Tooltip>}
               </div>}
               {/* Links & Images & Clear */}
               {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}

@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* マインドマップのスタイル設定 */
+.markmap {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+}
+
+.markmap > svg {
+  width: 80%;
+  height: 80%;
+  max-height: 200px;
+}
+
+/* コードブロック内のマインドマップ用コンテナ */
+.mindmap-container {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* マインドマップのノードテキスト */
+.markmap-node > text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+}
+
+/* ダークモード対応 */
+.dark .markmap-node > text {
+  fill: #ffffff;
+  stroke: none;
+}
+
+/* マインドマップのリンク線 */
+.markmap-link {
+  stroke-width: 1.5;
+}
+
+/* マインドマップのノード円 */
+.markmap-node > circle {
+  fill-opacity: 0.8;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

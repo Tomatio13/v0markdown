@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata = {
   title: "Markdown Editor",
   description: "GitHub Flavored Markdown Editor with real-time preview",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -31,7 +31,5 @@ export default function RootLayout({
     </html>
   )
 }
-
-
 
 import './globals.css'
