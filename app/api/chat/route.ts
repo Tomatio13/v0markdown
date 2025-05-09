@@ -3,7 +3,7 @@ import { createOpenAI, OpenAIProvider } from '@ai-sdk/openai';
 import { createXai, XaiProvider } from '@ai-sdk/xai';
 import { createGoogleGenerativeAI, GoogleGenerativeAIProvider } from '@ai-sdk/google';
 import { createAnthropic, AnthropicProvider } from '@ai-sdk/anthropic';
-import { streamText, CoreMessage, LanguageModel } from 'ai';
+import { streamText, CoreMessage, LanguageModel, TextPart, FilePart, ImagePart, CoreUserMessage } from 'ai';
 import { getMcpTools } from '@/lib/mcp-tools';
 import { memoryTools } from '@/lib/local-tools';
 import { createOllama, OllamaProvider } from 'ollama-ai-provider';
@@ -20,6 +20,26 @@ interface ModelConfig {
   gemini?: ProviderModels;
   anthropic?: ProviderModels;
   ollama?: ProviderModels;
+}
+
+// ファイルアップロード用の拡張型
+interface UploadedFilePart {
+  type: 'file';
+  data: string;  // Base64エンコードされたデータ
+  mimeType: string;
+  name?: string;
+}
+
+// テキストパート用の拡張型
+interface TextMessagePart {
+  type: 'text';
+  text: string;
+}
+
+// ユーザーメッセージ用の拡張型
+interface ExtendedUserMessage {
+  role: 'user';
+  content: string | Array<TextMessagePart | { type: 'file'; file: UploadedFilePart }>;
 }
 
 // --- 環境変数とプロバイダー初期化 ---
@@ -154,11 +174,66 @@ export async function GET(req: Request) {
   }
 }
 
+// メッセージを処理してファイルパーツを抽出する関数
+const processMessages = (messages: (CoreMessage | ExtendedUserMessage)[]): CoreMessage[] => {
+  // 最後のメッセージ以外からはファイルデータを削除
+  return messages.map((message, index) => {
+    const isLastMessage = index === messages.length - 1;
+    
+    // ユーザーメッセージでかつcontent内にファイルパーツが含まれている場合
+    if (message.role === 'user' && typeof message.content !== 'string' && Array.isArray(message.content)) {
+      // 最後のメッセージでない場合はファイルデータを削除
+      if (!isLastMessage) {
+        // テキスト部分だけを抽出
+        const textContent = message.content
+          .filter(part => part.type === 'text')
+          .map(part => part.type === 'text' ? part.text : '')
+          .join(' ');
+          
+        // ファイルデータなしのテキストメッセージとして返す
+        return {
+          role: 'user',
+          content: textContent || '【ファイルアップロード】'
+        } as CoreMessage;
+      }
+      
+      // 最後のメッセージは通常処理
+      const userContent: Array<TextPart | FilePart | ImagePart> = [];
+
+      // メッセージの内容をAI SDKの形式に合わせて変換
+      for (const part of message.content) {
+        if (part.type === 'text') {
+          userContent.push({
+            type: 'text',
+            text: part.text
+          });
+        } else if (part.type === 'file' && 'file' in part && part.file) {
+          // ファイルパーツをAI SDKの形式に変換
+          // type: 'file'、data（ファイルデータ）、mimeType（MIMEタイプ）が必要
+          console.log(`ファイルを処理: ${part.file.name || 'unknown'}, MIMEタイプ: ${part.file.mimeType}`);
+          userContent.push({
+            type: 'file',
+            data: part.file.data,
+            mimeType: part.file.mimeType
+          });
+        }
+      }
+      
+      // 標準のCoreUserMessageの形式に変換
+      return {
+        role: 'user',
+        content: userContent
+      } as CoreUserMessage;
+    }
+    return message as CoreMessage;
+  });
+};
+
 // POSTリクエストハンドラ (チャット処理)
 export async function POST(req: Request) {
   try {
-    // リクエストボディから messages と model を取得 (model は string 型)
-    const { messages, model: requestedModelId }: { messages: CoreMessage[]; model?: string } = await req.json();
+    // リクエストボディから messages と model を取得
+    const { messages, model: requestedModelId } = await req.json();
 
     // MCP ツールを読み込み
     const { tools: mcpTools, closeAll } = await getMcpTools();
@@ -191,6 +266,9 @@ export async function POST(req: Request) {
         providerInfo = fallbackProviderInfo; // letなので再代入可能
     }
 
+    // メッセージを処理してファイルパーツがあれば変換
+    const processedMessages = processMessages(messages);
+
     // streamText に渡す LanguageModel インスタンスを生成
     const modelInstance: LanguageModel = providerInfo.modelSettings 
       ? providerInfo.provider(providerInfo.modelId as any, providerInfo.modelSettings)
@@ -199,7 +277,7 @@ export async function POST(req: Request) {
     // streamTextを使用してストリーミングレスポンスを生成
     const result = await streamText({
       model: modelInstance, // 生成したLanguageModelインスタンスを使用
-      messages,
+      messages: processedMessages, // 処理済みのメッセージを使用
       tools,
       maxSteps: 10,
       system: `You are a helpful japanese assistant that can answer questions and help with tasks.speak in japanese.
@@ -221,10 +299,10 @@ export async function POST(req: Request) {
               ${loadCustomPrompt()}
               `,
       onFinish: async () => {
+
         await closeAll();
       },
     });
-
     // 成功時は streamText の結果をそのまま返す
     return result.toDataStreamResponse();
 

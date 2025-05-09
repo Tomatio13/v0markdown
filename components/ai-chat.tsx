@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useCallback, useState, useRef } from 'react'
-import { Send, Trash2, BrainCircuit, Mic, MicOff, Plus, ArrowUp } from 'lucide-react'
+import { Send, Trash2, BrainCircuit, Mic, MicOff, Plus, ArrowUp, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import TextareaAutosize from 'react-textarea-autosize'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -36,6 +36,14 @@ interface AIChatProps {
   onInsertToEditor?: (text: string) => void;
   getEditorContent?: () => string;
   isDarkMode?: boolean;
+}
+
+// ファイルアップロード用の型定義
+interface UploadedFile {
+  name: string;
+  type: string;
+  size: number;
+  data: string; // Base64エンコード
 }
 
 // SpeechRecognition用のインターフェース定義
@@ -237,20 +245,64 @@ const MessageItem = React.memo(({
       ),
     }), [isDarkMode]);
 
-    const RenderedContent = React.useMemo(() => (
-      <div className="whitespace-pre-wrap text-xs leading-relaxed">
-        {message.role === 'user' ? (
-          <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
-        ) : (
-          <ReactMarkdown
-            className="markdown-content leading-none"
-            components={markdownComponents}
-          >
-            {message.content}
-          </ReactMarkdown>
-        )}
-      </div>
-    ), [message.content, message.role, markdownComponents]);
+    // メッセージの内容をテキストに変換する関数
+    const getMessageContent = React.useCallback((content: any): string => {
+      // コンテンツがない場合は空文字を返す
+      if (!content) return '';
+      
+      // 文字列の場合はそのまま返す
+      if (typeof content === 'string') return content;
+      
+      // 配列の場合は各要素を処理
+      if (Array.isArray(content)) {
+        return content.map(item => {
+          // テキスト部分を抽出
+          if (item.type === 'text' && typeof item.text === 'string') {
+            return item.text;
+          }
+          // ファイル部分の場合はファイル情報を表示
+          if (item.type === 'file') {
+            // file.nameがある場合はそれを使用、ない場合はitem.nameを試す
+            let fileName = '';
+            if ('file' in item && item.file && item.file.name) {
+              fileName = item.file.name;
+            } else if (item.name) {
+              fileName = item.name;
+            } else {
+              fileName = '添付ファイル';
+            }
+            return `【ファイル: ${fileName}】`;
+          }
+          return '';
+        }).join('\n');
+      }
+      
+      // その他の場合はJSONに変換（フォールバック）
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        return '[表示できないコンテンツ]';
+      }
+    }, []);
+
+    const RenderedContent = React.useMemo(() => {
+      const messageContent = getMessageContent(message.content);
+      
+      return (
+        <div className="whitespace-pre-wrap text-xs leading-relaxed">
+          {message.role === 'user' ? (
+            <div style={{ whiteSpace: 'pre-wrap' }}>{messageContent}</div>
+          ) : (
+            <ReactMarkdown
+              className="markdown-content leading-none"
+              components={markdownComponents}
+            >
+              {messageContent}
+            </ReactMarkdown>
+          )}
+        </div>
+      );
+    }, [message.content, message.role, markdownComponents, getMessageContent]);
 
     return (
         <div className="pb-3">
@@ -276,7 +328,7 @@ const MessageItem = React.memo(({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleInsertToEditor(message.content)}
+                            onClick={() => handleInsertToEditor(typeof message.content === 'string' ? message.content : getMessageContent(message.content))}
                             className={`mt-1 text-[10px] px-1 py-0.5 h-auto leading-none ${isDarkMode ? 'text-blue-400 hover:bg-[#30363d]' : 'text-blue-600 hover:bg-gray-100'}`}
                             suppressHydrationWarning
                         >
@@ -356,11 +408,51 @@ export const AIChat = React.memo(({
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognizedText, setRecognizedText] = useState<string>('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const latestInputRef = useRef<string>(input);
+  const prevLoadingRef = useRef<boolean>(isLoading);
+  
+  // エラーメッセージ用のステート追加
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  // エラーメッセージをチャットに追加する関数
+  const addErrorMessageToChat = useCallback((errorText: string) => {
+    if (!append) return;
+    
+    // エラーメッセージをアシスタントのメッセージとして追加
+    append({
+      role: 'assistant',
+      content: `⚠️ **エラー**: ${errorText}\n\n`
+    }, {});
+    
+    // エラーメッセージをクリア
+    setErrorMessage('');
+  }, [append]);
+
+  // エラーメッセージが変更されたらチャットに追加
+  useEffect(() => {
+    if (errorMessage) {
+      addErrorMessageToChat(errorMessage);
+    }
+  }, [errorMessage, addErrorMessageToChat]);
+
+  // isLoading の変化を監視し、読み込み完了後に AI 応答がなかった場合にエラーを出す
+  useEffect(() => {
+    // ローディングが true -> false になった瞬間を検出
+    if (prevLoadingRef.current && !isLoading) {
+      const lastMsg = messages[messages.length - 1];
+      if (!lastMsg || lastMsg.role !== 'assistant') {
+        console.warn('AI応答が生成されませんでした');
+        setErrorMessage('AIからの応答がありませんでした。サーバー側でエラーが発生したか、タイムアウトした可能性があります。');
+      }
+    }
+    prevLoadingRef.current = isLoading;
+  }, [isLoading, messages]);
 
   useEffect(() => {
     latestInputRef.current = input;
@@ -369,6 +461,7 @@ export const AIChat = React.memo(({
   useEffect(() => {
     const fetchAvailableModels = async () => {
       try {
+        setErrorMessage(''); // エラーメッセージをクリア
         const response = await fetch('/api/chat');
         if (!response.ok) {
           throw new Error(`モデルリストの取得に失敗しました: ${response.statusText}`);
@@ -380,6 +473,7 @@ export const AIChat = React.memo(({
         }
       } catch (error) {
         console.error("利用可能なモデルの取得エラー:", error);
+        setErrorMessage(`モデルリストの取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
       }
     };
 
@@ -410,44 +504,166 @@ export const AIChat = React.memo(({
       }
   }, [getEditorContent]);
 
+  const handleFileClick = useCallback(() => {
+    // すでにファイルがアップロードされている場合は処理を中止
+    if (uploadedFiles.length > 0) {
+      alert("すでにファイルがアップロードされています。一度に添付できるのは1ファイルのみです。");
+      return;
+    }
+    
+    // ファイル選択ダイアログを開く
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  }, [uploadedFiles.length]);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    // すでにファイルがアップロードされている場合は処理を中止
+    if (uploadedFiles.length > 0) {
+      alert("すでにファイルがアップロードされています。一度に添付できるのは1ファイルのみです。");
+      e.target.value = '';
+      return;
+    }
+    
+    // 最初のファイルだけを処理
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target && event.target.result) {
+        // Base64形式に変換
+        const base64Data = event.target.result.toString().split(',')[1];
+        const fileInfo: UploadedFile = {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: base64Data
+        };
+        setUploadedFiles([fileInfo]);
+      }
+    };
+    reader.readAsDataURL(file);
+    
+    // 入力フィールドをリセット
+    e.target.value = '';
+  }, [uploadedFiles.length]);
+
+  const removeFile = useCallback((index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   const sendMessage = useCallback(async (content: string) => {
     if (!append) {
       console.error("append関数が提供されていません。");
+      setErrorMessage("メッセージを送信できません：チャット機能が正しく初期化されていません。");
       return;
     }
     if (!selectedModel) {
       console.error("送信するモデルが選択されていません。");
-      alert("使用するAIモデルを選択してください。");
+      setErrorMessage("使用するAIモデルを選択してください。");
       return;
     }
 
+    setErrorMessage(''); // エラーメッセージをクリア
     console.log(`モデル '${selectedModel}' を使用してメッセージを送信します。`);
 
     try {
-      await append(
-        { content, role: 'user' },
-        { body: { model: selectedModel } }
-      );
+      let result: string | null | undefined;
+      
+      // アップロードされたファイルがある場合は、複合メッセージを作成
+      if (uploadedFiles.length > 0) {
+        // 複合メッセージ（テキスト + ファイル）を作成
+        const messageParts = [];
+        
+        // テキストパートを追加
+        if (content.trim()) {
+          messageParts.push({
+            type: 'text',
+            text: content
+          });
+        }
+        
+        // ファイルパートを追加
+        uploadedFiles.forEach(file => {
+          messageParts.push({
+            type: 'file',
+            file: {
+              type: 'file',
+              data: file.data,
+              mimeType: file.type,
+              name: file.name
+            }
+          });
+        });
+        
+        // console.log(`ファイル付きメッセージを送信します...`);
+        result = await append(
+          { 
+            role: 'user',
+            content: messageParts
+          } as any,
+          { body: { model: selectedModel } }
+        );
+      } else {
+        // 通常のテキストメッセージ
+        // console.log(`テキストメッセージを送信します...`);
+        result = await append(
+          { content, role: 'user' },
+          { body: { model: selectedModel } }
+        );
+      }
+      
+      // // AIレスポンスの詳細解析
+      console.log(`AIレスポンス解析:`, {
+        型: typeof result,
+        値: result,
+        状態: result ? '成功' : '応答なし',
+        メッセージID: result || '生成されず'
+      });
+      
+      // ストリーミングレスポンスの場合、resultの値はnullでも問題ない
+      // エラーチェックを削除して、常に成功として扱う
+      /* 以下のコードを削除
+      if (result === null || result === undefined) {
+        console.warn("AIからの応答がありませんでした");
+        setErrorMessage("AIからの応答がありませんでした。サーバー側でエラーが発生したか、タイムアウトした可能性があります。");
+        return;
+      }
+      */
+      
+      // console.log(`メッセージ送信完了。レスポンスID: ${result}`);
+      
+      // 入力とファイルをリセット
       if (setInput) {
         setInput('');
         latestInputRef.current = '';
       }
       setRecognizedText('');
+      setUploadedFiles([]);
     } catch (error) {
       console.error("メッセージ送信エラー:", error);
-      alert(`メッセージの送信中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`);
+      // エラーの詳細情報をログに記録
+      console.error("エラーの詳細:", {
+        名前: error instanceof Error ? error.name : 'Unknown',
+        メッセージ: error instanceof Error ? error.message : String(error),
+        スタック: error instanceof Error ? error.stack : undefined
+      });
+      setErrorMessage(`メッセージの送信中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-  }, [append, selectedModel, setInput]);
+  }, [append, selectedModel, setInput, uploadedFiles]);
 
   const handleFormSubmitCallback = useCallback(async (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
 
     const contentToUse = latestInputRef.current || input;
     const trimmedInput = contentToUse.trim();
-    if (!trimmedInput) return;
+    // ファイルがアップロードされている場合は、テキストが空でも送信可能に
+    if (!trimmedInput && uploadedFiles.length === 0) return;
 
-    if (trimmedInput === 'クリア') {
+    if (trimmedInput === 'クリア' && uploadedFiles.length === 0) {
       console.log('入力が "クリア" のため、メッセージをクリアします。');
       clearMessages();
       if (setInput) {
@@ -468,16 +684,16 @@ export const AIChat = React.memo(({
 
     await sendMessage(contentToSend);
 
-  }, [input, getEditorContentCallback, sendMessage, clearMessages, setInput]);
+  }, [input, getEditorContentCallback, sendMessage, clearMessages, setInput, uploadedFiles.length]);
 
   const handleKeyDownCallback = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isLoading && (latestInputRef.current || input).trim()) {
+      if (!isLoading && ((latestInputRef.current || input).trim() || uploadedFiles.length > 0)) {
         handleFormSubmitCallback();
       }
     }
-  }, [isLoading, input, handleFormSubmitCallback]);
+  }, [isLoading, input, handleFormSubmitCallback, uploadedFiles.length]);
 
   const clearMessagesCallback = useCallback(() => {
     clearMessages();
@@ -631,6 +847,31 @@ export const AIChat = React.memo(({
         />
       </div>
 
+      {/* ファイルアップロード表示エリア */}
+      {uploadedFiles.length > 0 && (
+        <div className={`px-4 py-2 ${isDarkMode ? 'bg-[#21262d] border-t border-[#30363d]' : 'bg-gray-50 border-t border-gray-200'}`}>
+          <div className="flex flex-wrap gap-2">
+            {uploadedFiles.map((file, index) => (
+              <div
+                key={index}
+                className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                  isDarkMode ? 'bg-[#30363d] text-[#e6edf3]' : 'bg-blue-100 text-blue-800'
+                }`}
+              >
+                <span className="truncate max-w-[150px]">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(index)}
+                  className="ml-1 text-xs hover:text-red-500"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <form 
         onSubmit={handleFormSubmitCallback} 
         className={`px-4 py-2 ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-gray-100'}`}
@@ -677,6 +918,27 @@ export const AIChat = React.memo(({
             />
 
             <div className="flex items-center pr-2 gap-1">
+              {/* ファイルアップロードボタン */}
+              <button
+                type="button"
+                onClick={handleFileClick}
+                className={`p-1 rounded hover:bg-opacity-20 ${
+                  isDarkMode ? 'text-gray-400 hover:bg-[#21262d]' : 'text-gray-600 hover:bg-gray-200'
+                } cursor-pointer`}
+                disabled={isLoading}
+                suppressHydrationWarning
+              >
+                <Paperclip size={16} />
+              </button>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileChange}
+                className="hidden"
+                accept="image/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.csv,.json"
+              />
+
               <button
                 type="button"
                 onClick={toggleSpeechRecognition}
@@ -693,12 +955,12 @@ export const AIChat = React.memo(({
 
               <button
                 type="submit"
-                disabled={isLoading || !input.trim() || availableModels.length === 0 || !selectedModel}
+                disabled={isLoading || (!input.trim() && uploadedFiles.length === 0) || availableModels.length === 0 || !selectedModel}
                 className={`p-1 rounded-md ${
                   isDarkMode
                     ? 'text-blue-400 hover:bg-[#21262d] hover:bg-opacity-20 disabled:text-gray-600'
                     : 'text-blue-600 hover:bg-gray-200 disabled:text-gray-400'
-                } ${(isLoading || !input.trim() || availableModels.length === 0 || !selectedModel) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                } ${(isLoading || (!input.trim() && uploadedFiles.length === 0) || availableModels.length === 0 || !selectedModel) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                 suppressHydrationWarning
               >
                 <ArrowUp size={16} />

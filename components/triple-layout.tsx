@@ -14,7 +14,7 @@ interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 
   driveEnabled?: boolean
   driveFileListComponent?: React.ReactNode
   getEditorContent?: () => string
-  setInput?: (value: string) => void
+  setInput?: (value: string | ((prevInput: string) => string)) => void
   append?: any // aiパッケージの完全な型と互換性を持たせる
   tocVisible?: boolean
   tocComponent?: React.ReactNode
@@ -28,7 +28,7 @@ export const TripleLayout = React.memo(({
   messages,
   input,
   handleInputChange,
-  handleSubmit, // AIChat には渡さず、直接イベントハンドラを渡す
+  handleSubmit,
   isLoading,
   clearMessages,
   driveEnabled = false,
@@ -93,6 +93,7 @@ export const TripleLayout = React.memo(({
           messages={messages}
           input={input}
           handleInputChange={handleInputChange}
+          handleSubmit={handleSubmit}
           isLoading={isLoading}
           clearMessages={clearMessages}
           getEditorContent={getEditorContent}
