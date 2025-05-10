@@ -9,6 +9,7 @@ import { memoryTools } from '@/lib/local-tools';
 import { createOllama, OllamaProvider } from 'ollama-ai-provider';
 import fs from 'fs';
 import path from 'path';
+import { convertFileToMarkdown } from '@/lib/server-utils';
 
 // --- モデル設定の型定義 ---
 interface ProviderModels {
@@ -41,6 +42,54 @@ interface ExtendedUserMessage {
   role: 'user';
   content: string | Array<TextMessagePart | { type: 'file'; file: UploadedFilePart }>;
 }
+
+// 日本の現在時刻を表示する関数
+const getJapanTime = (): string => {
+  const now = new Date();
+  // 日本標準時 (JST: UTC+9) に変換
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  };
+  return new Intl.DateTimeFormat('ja-JP', options).format(now);
+}
+
+// カスタムプロンプトファイルを読み込む関数
+const loadCustomPrompt = (): string => {
+  try {
+    // 環境変数からカスタムプロンプトのファイル名を取得
+    const customPromptFile = process.env.CUSTOM_PROMPT;
+    
+    // カスタムプロンプトが設定されていない場合は空文字列を返す
+    if (!customPromptFile) {
+      return '';
+    }
+    
+    // プロンプトファイルのパスを生成
+    const promptPath = path.join(process.cwd(), 'public', 'prompt', customPromptFile);
+    
+    // ファイルが存在するか確認
+    if (!fs.existsSync(promptPath)) {
+      console.warn(`カスタムプロンプトファイルが見つかりません: ${promptPath}`);
+      return '';
+    }
+    
+    // ファイルを読み込んで内容を返す
+    const promptContent = fs.readFileSync(promptPath, 'utf-8');
+    console.log(`カスタムプロンプトを読み込みました: ${customPromptFile}`);
+    
+    return promptContent;
+  } catch (error) {
+    console.error('カスタムプロンプトの読み込みに失敗しました:', error);
+    return '';
+  }
+};
 
 // --- 環境変数とプロバイダー初期化 ---
 const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -175,68 +224,89 @@ export async function GET(req: Request) {
 }
 
 // メッセージを処理してファイルパーツを抽出する関数
-const processMessages = (messages: (CoreMessage | ExtendedUserMessage)[]): CoreMessage[] => {
+const processMessages = (messages: (CoreMessage | ExtendedUserMessage)[]): CoreMessage[] | Promise<CoreMessage[]> => {
   // 最後のメッセージ以外からはファイルデータを削除
-  return messages.map((message, index) => {
-    const isLastMessage = index === messages.length - 1;
-    
-    // ユーザーメッセージでかつcontent内にファイルパーツが含まれている場合
-    if (message.role === 'user' && typeof message.content !== 'string' && Array.isArray(message.content)) {
-      // 最後のメッセージでない場合はファイルデータを削除
-      if (!isLastMessage) {
-        // テキスト部分だけを抽出
-        const textContent = message.content
-          .filter(part => part.type === 'text')
-          .map(part => part.type === 'text' ? part.text : '')
-          .join(' ');
+  const process = async () => {
+    return Promise.all(messages.map(async (message, index) => {
+      const isLastMessage = index === messages.length - 1;
+      
+      // ユーザーメッセージでかつcontent内にファイルパーツが含まれている場合
+      if (message.role === 'user' && typeof message.content !== 'string' && Array.isArray(message.content)) {
+        // 最後のメッセージでない場合はファイルデータを削除
+        if (!isLastMessage) {
+          // テキスト部分だけを抽出
+          const textContent = message.content
+            .filter(part => part.type === 'text')
+            .map(part => part.type === 'text' ? part.text : '')
+            .join(' ');
           
-        // ファイルデータなしのテキストメッセージとして返す
+          // ファイルデータなしのテキストメッセージとして返す
+          return {
+            role: 'user',
+            content: textContent || '【ファイルアップロード】'
+          } as CoreMessage;
+        }
+        
+        // 最後のメッセージは通常処理
+        const userContent: Array<TextPart | FilePart | ImagePart> = [];
+
+        // メッセージの内容をAI SDKの形式に合わせて変換
+        for (const part of message.content) {
+          if (part.type === 'text') {
+            userContent.push({
+              type: 'text',
+              text: part.text
+            });
+          } else if (part.type === 'file' && 'file' in part && part.file) {
+            const { data, mimeType, name } = part.file;
+            // PDF
+            if (mimeType === 'application/pdf') {
+              const hasDataUrlPrefix = data.startsWith('data:');
+              const dataUrl = hasDataUrlPrefix ? data : `data:${mimeType};base64,${data}`;
+              userContent.push({
+                type: 'file',
+                data: dataUrl,
+                mimeType: mimeType
+              });
+            }
+            // 画像
+            else if (mimeType.startsWith('image/')) {
+              const hasDataUrlPrefix = data.startsWith('data:');
+              const dataUrl = hasDataUrlPrefix ? data : `data:${mimeType};base64,${data}`;
+              userContent.push({
+                type: 'image',
+                image: dataUrl,
+                mimeType: mimeType
+              });
+            }
+            // その他（markitdownでMarkdown化）
+            else {
+              try {
+                const text = await convertFileToMarkdown(data, mimeType, name);
+                userContent.push({
+                  type: 'text',
+                  text: text
+                });
+              } catch (err) {
+                userContent.push({
+                  type: 'text',
+                  text: `【ファイル変換エラー】このファイルはMarkdown化できませんでした: ${(err as Error).message}`
+                });
+              }
+            }
+          }
+        }
+        // 標準のCoreUserMessageの形式に変換
         return {
           role: 'user',
-          content: textContent || '【ファイルアップロード】'
-        } as CoreMessage;
+          content: userContent
+        } as CoreUserMessage;
       }
-      
-      // 最後のメッセージは通常処理
-      const userContent: Array<TextPart | FilePart | ImagePart> = [];
-
-      // メッセージの内容をAI SDKの形式に合わせて変換
-      for (const part of message.content) {
-        if (part.type === 'text') {
-          userContent.push({
-            type: 'text',
-            text: part.text
-          });
-        } else if (part.type === 'file' && 'file' in part && part.file) {
-          // ファイルパーツをAI SDKの形式に変換
-          // type: 'file'、data（ファイルデータ）、mimeType（MIMEタイプ）が必要
-          // AI SDK 側では data URL 形式 (data:mimeType;base64,xxx) の文字列を期待しているため，
-          // まだプレフィックスが無い場合は付与してから渡すようにする。
-          // 参考: https://github.com/vercel/ai/discussions/2563
-
-          const hasDataUrlPrefix = part.file.data.startsWith('data:');
-          const mimeType = part.file.mimeType || 'application/octet-stream';
-          const dataUrl = hasDataUrlPrefix
-            ? part.file.data
-            : `data:${mimeType};base64,${part.file.data}`;
-
-          console.log(`ファイルを処理: ${part.file.name || 'unknown'}, MIMEタイプ: ${mimeType}`);
-          userContent.push({
-            type: 'file',
-            data: dataUrl,
-            mimeType: mimeType
-          });
-        }
-      }
-      
-      // 標準のCoreUserMessageの形式に変換
-      return {
-        role: 'user',
-        content: userContent
-      } as CoreUserMessage;
-    }
-    return message as CoreMessage;
-  });
+      return message as CoreMessage;
+    }));
+  };
+  // Promiseを返すことでPOST側でawaitできるようにする
+  return process();
 };
 
 // POSTリクエストハンドラ (チャット処理)
@@ -277,7 +347,7 @@ export async function POST(req: Request) {
     }
 
     // メッセージを処理してファイルパーツがあれば変換
-    const processedMessages = processMessages(messages);
+    const processedMessages = await processMessages(messages);
 
     // streamText に渡す LanguageModel インスタンスを生成
     const modelInstance: LanguageModel = providerInfo.modelSettings 
@@ -309,7 +379,6 @@ export async function POST(req: Request) {
               ${loadCustomPrompt()}
               `,
       onFinish: async () => {
-
         await closeAll();
       },
     });
@@ -333,51 +402,3 @@ export async function POST(req: Request) {
     });
   }
 }
-
-// 日本の現在時刻を表示する関数
-const getJapanTime = (): string => {
-  const now = new Date();
-  // 日本標準時 (JST: UTC+9) に変換
-  const options: Intl.DateTimeFormatOptions = {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  };
-  return new Intl.DateTimeFormat('ja-JP', options).format(now);
-}
-
-// カスタムプロンプトファイルを読み込む関数
-const loadCustomPrompt = (): string => {
-  try {
-    // 環境変数からカスタムプロンプトのファイル名を取得
-    const customPromptFile = process.env.CUSTOM_PROMPT;
-    
-    // カスタムプロンプトが設定されていない場合は空文字列を返す
-    if (!customPromptFile) {
-      return '';
-    }
-    
-    // プロンプトファイルのパスを生成
-    const promptPath = path.join(process.cwd(), 'public', 'prompt', customPromptFile);
-    
-    // ファイルが存在するか確認
-    if (!fs.existsSync(promptPath)) {
-      console.warn(`カスタムプロンプトファイルが見つかりません: ${promptPath}`);
-      return '';
-    }
-    
-    // ファイルを読み込んで内容を返す
-    const promptContent = fs.readFileSync(promptPath, 'utf-8');
-    console.log(`カスタムプロンプトを読み込みました: ${customPromptFile}`);
-    
-    return promptContent;
-  } catch (error) {
-    console.error('カスタムプロンプトの読み込みに失敗しました:', error);
-    return '';
-  }
-}; 

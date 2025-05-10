@@ -531,14 +531,6 @@ export const AIChat = React.memo(({
     // 最初のファイルだけを処理
     const file = files[0];
 
-    // // PDF 以外は拒否
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    if (!isPdf) {
-      alert("アップロードできるのは PDF ファイルのみです。");
-      e.target.value = '';
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target && event.target.result) {
@@ -945,7 +937,7 @@ export const AIChat = React.memo(({
                 type="file"
                 onChange={handleFileChange}
                 className="hidden"
-                accept="application/pdf,.pdf"
+                // accept="application/pdf,.pdf"
               />
 
               <button

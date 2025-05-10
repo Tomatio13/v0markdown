@@ -23,6 +23,7 @@
   - [🛠️ 外部ツールのセットアップ](#️-外部ツールのセットアップ)
     - [Jupyterのインストール方法](#jupyterのインストール方法)
     - [Quartoのインストール方法](#quartoのインストール方法)
+    - [Markitdownのインストール方法](#markitdownのインストール方法)
   - [⚙️ 初期設定](#️-初期設定)
     - [1. Google Drive連携設定 (任意)](#1-google-drive連携設定-任意)
       - [Google Cloud Consoleでの設定](#google-cloud-consoleでの設定)
@@ -78,6 +79,10 @@
     *   複数のAIプロバイダー (OpenAI, Grok, Gemini, Anthropic, Ollama) に対応。
     *   `@editor` と入力すると、現在エディタに書かれている内容をAIにコンテキストとして渡せます。
     *   会話履歴のクリア機能があります。
+    *   **ファイル添付機能:** チャットにPDF・画像・各種オフィスファイル（Word, Excel, PowerPoint等）を添付して、AIに解析させることができます。
+        *   PDF: PDF内容をネイティブに処理
+        *   画像: 画像認識機能でコンテンツを解析
+        *   その他の文書: Markitdownを使ってマークダウンに変換し、AIに提供
 *   **外部ツール連携 (MCP):** 設定した外部ツール (コマンドラインツールなど) をAIが利用できるようになります (STDIO経由、要設定)。
 
 **V. ユーザビリティとインターフェース**
@@ -193,6 +198,32 @@ which quarto
 # このパスのディレクトリ (例: /opt/quarto/bin) を .env.local の QUARTO_PATH に設定
 ```
 **注意:** `QUARTO_PATH` には `quarto` 実行ファイルが存在する**ディレクトリのパス**を設定してください（例: `/opt/quarto/bin`）。
+
+### Markitdownのインストール方法
+
+Markitdownは多様なファイル形式をマークダウンに変換するツールです。AIチャットにファイルを添付した際の変換処理に使用されます。
+
+```bash
+# 仮想環境を作成
+mkdir markitdown_env && cd markitdown_env
+python3 -m venv venv
+
+# 仮想環境を有効化
+source venv/bin/activate
+
+# Markitdownをインストール（全機能を含む）
+pip install 'markitdown[all]'
+
+# 仮想環境のパスを確認（このパスを.env.localのMARKITDOWN_PATHに設定）
+pwd
+```
+
+.env.localに以下の設定を追加します：
+
+```
+# Markitdownのパス設定
+MARKITDOWN_PATH="/path/to/markitdown_env"  # 上記のpwdコマンドで表示されたパス
+```
 
 ## ⚙️ 初期設定
 
@@ -327,6 +358,7 @@ QUARTO_PATH="/path/to/quarto/bin" # 例: /opt/quarto/bin
 インストール手順の詳細は、[外部ツールのセットアップ](#️-外部ツールのセットアップ)セクションを参照してください。
 
 インストール後、`.env.local` ファイルに `JUPYTER_PATH` と `QUARTO_PATH` を設定し、開発サーバーを再起動してください。
+
 
 ## 📖 使い方
 
