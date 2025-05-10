@@ -205,7 +205,8 @@ Markitdownは多様なファイル形式をマークダウンに変換するツ�
 
 ```bash
 # 仮想環境を作成
-mkdir markitdown_env && cd markitdown_env
+git clone https://github.com/microsoft/markitdown.git
+cd markitdown
 python3 -m venv venv
 
 # 仮想環境を有効化
@@ -216,6 +217,9 @@ pip install 'markitdown[all]'
 
 # 仮想環境のパスを確認（このパスを.env.localのMARKITDOWN_PATHに設定）
 pwd
+
+# 仮想環境を無効化
+deactivate
 ```
 
 .env.localに以下の設定を追加します：
