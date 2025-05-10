@@ -910,7 +910,7 @@ export const AIChat = React.memo(({
               value={recognizedText ? `${latestInputRef.current}${latestInputRef.current && !latestInputRef.current.endsWith(' ') ? ' ' : ''}${recognizedText}` : input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDownCallback}
-              placeholder="AIに質問する... (Shift+Enterで改行)"
+              placeholder="AIに質問する... (@editorでエディタの内容を参照、Shift+Enterで改行)"
               className={`flex-1 text-sm resize-none px-2 py-1.5 rounded-md ${isDarkMode ? 'bg-[#1E1E1EFF] text-[#e6edf3] placeholder-[#8b949e]' : 'bg-white text-gray-900 placeholder-gray-500'} focus:outline-none overflow-hidden`}
               disabled={isLoading || availableModels.length === 0}
               minRows={1}
