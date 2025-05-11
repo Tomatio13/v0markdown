@@ -300,7 +300,8 @@ const MessageItem = React.memo(({
     }, []);
 
     const messageContent = React.useMemo(() => getMessageContent(message.content), [message.content, getMessageContent]);
-    const shouldUseAccordion = React.useMemo(() => message.role === 'assistant' && isLongMessage(messageContent), [message.role, messageContent, isLongMessage]);
+    // メッセージが長い場合はロールに関係なくアコーディオンを使用
+    const shouldUseAccordion = React.useMemo(() => isLongMessage(messageContent), [messageContent, isLongMessage]);
 
     // プレビュー用のコンテンツを生成（最初の数行を表示）
     const previewContent = React.useMemo(() => {
@@ -737,19 +738,8 @@ export const AIChat = React.memo(({
         状態: result ? '成功' : '応答なし',
         メッセージID: result || '生成されず'
       });
-      
-      // ストリーミングレスポンスの場合、resultの値はnullでも問題ない
-      // エラーチェックを削除して、常に成功として扱う
-      /* 以下のコードを削除
-      if (result === null || result === undefined) {
-        console.warn("AIからの応答がありませんでした");
-        setErrorMessage("AIからの応答がありませんでした。サーバー側でエラーが発生したか、タイムアウトした可能性があります。");
-        return;
-      }
-      */
-      
-      // console.log(`メッセージ送信完了。レスポンスID: ${result}`);
-      
+    
+        
       // 入力とファイルをリセット
       if (setInput) {
         setInput('');
