@@ -194,10 +194,10 @@ const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId
     return { provider: anthropic, modelId: modelId };
   }
   if (modelConfig.ollama?.models.includes(modelId)) {
-    return { 
-      provider: ollama, 
+    return {
+      provider: ollama,
       modelId: modelId,
-      modelSettings: { simulateStreaming: true } // ツールとストリーミングを正常に動作させるために必要
+      // Ollama はネイティブストリーミングをサポートするため simulateStreaming は設定しない
     };
   }
   console.warn(`設定に存在しない、またはAPIキーが設定されていないモデルIDが指定されました: ${modelId}`);
@@ -354,11 +354,21 @@ export async function POST(req: Request) {
       ? providerInfo.provider(providerInfo.modelId as any, providerInfo.modelSettings)
       : providerInfo.provider(providerInfo.modelId as any);
 
-    // streamTextを使用してストリーミングレスポンスを生成
+    // Ollama で画像や PDF が添付されている場合はツール呼び出しを省く
+    const hasFileAttachment = processedMessages.some(m =>
+      m.role === 'user' && Array.isArray(m.content) && m.content.some((p: any) => {
+        if (p.type === 'image') return true;
+        if (p.type === 'file') return p.mimeType === 'application/pdf';
+        return false;
+      })
+    );
+
+    const shouldIncludeTools = !(providerInfo.provider === ollama && hasFileAttachment);
+
     const result = await streamText({
-      model: modelInstance, // 生成したLanguageModelインスタンスを使用
-      messages: processedMessages, // 処理済みのメッセージを使用
-      tools,
+      model: modelInstance,
+      messages: processedMessages,
+      ...(shouldIncludeTools ? { tools } : {}),
       maxSteps: 10,
       system: `You are a helpful japanese assistant that can answer questions and help with tasks.speak in japanese.
               Today's date and time in Japan is ${getJapanTime()}.
