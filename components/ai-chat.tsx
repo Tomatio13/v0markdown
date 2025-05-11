@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useCallback, useState, useRef } from 'react'
-import { Send, Trash2, BrainCircuit, Mic, MicOff, Plus, ArrowUp, Paperclip } from 'lucide-react'
+import { Send, Trash2, BrainCircuit, Mic, MicOff, Plus, ArrowUp, Paperclip, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import TextareaAutosize from 'react-textarea-autosize'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -19,6 +19,12 @@ import ReactMarkdown, { Components } from 'react-markdown'
 // --- Temporarily treat remove-markdown as any due to missing types ---
 // import removeMarkdown from 'remove-markdown' // Keep for TTS preparation if needed later
 const removeMarkdown: any = require('remove-markdown'); 
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 interface AvailableModel {
   id: string;
@@ -106,6 +112,8 @@ const MessageItem = React.memo(({
   isDarkMode: boolean;
   handleInsertToEditor: (text: string) => void;
 }) => {
+    const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(false);
+
     const markdownComponents: Components = React.useMemo(() => ({
       pre: ({ node, ...props }: any) => (
         <div className="my-0 rounded overflow-hidden">
@@ -285,59 +293,165 @@ const MessageItem = React.memo(({
       }
     }, []);
 
-    const RenderedContent = React.useMemo(() => {
-      const messageContent = getMessageContent(message.content);
+    // メッセージの長さをチェック
+    const isLongMessage = React.useCallback((content: string): boolean => {
+      const lines = content.split('\n');
+      return lines.length > 15 || content.length > 1000;
+    }, []);
+
+    const messageContent = React.useMemo(() => getMessageContent(message.content), [message.content, getMessageContent]);
+    const shouldUseAccordion = React.useMemo(() => message.role === 'assistant' && isLongMessage(messageContent), [message.role, messageContent, isLongMessage]);
+
+    // プレビュー用のコンテンツを生成（最初の数行を表示）
+    const previewContent = React.useMemo(() => {
+      if (!shouldUseAccordion) return '';
       
+      const lines = messageContent.split('\n');
+      const previewLines = lines.slice(0, 8); // 最初の8行を表示
+      let preview = previewLines.join('\n');
+      
+      // プレビューが途中で切れる場合は「...」を追加
+      if (lines.length > 8) {
+        preview += '\n\n...';
+      }
+      
+      return preview;
+    }, [messageContent, shouldUseAccordion]);
+
+    const renderMarkdown = React.useCallback((content: string) => (
+      <ReactMarkdown
+        className="markdown-content leading-none"
+        components={markdownComponents}
+      >
+        {content}
+      </ReactMarkdown>
+    ), [markdownComponents]);
+
+    const RenderedContent = React.useMemo(() => {      
       return (
         <div className="whitespace-pre-wrap text-xs leading-relaxed">
           {message.role === 'user' ? (
             <div style={{ whiteSpace: 'pre-wrap' }}>{messageContent}</div>
           ) : (
-            <ReactMarkdown
-              className="markdown-content leading-none"
-              components={markdownComponents}
-            >
-              {messageContent}
-            </ReactMarkdown>
+            renderMarkdown(messageContent)
           )}
         </div>
       );
-    }, [message.content, message.role, markdownComponents, getMessageContent]);
+    }, [message.role, messageContent, renderMarkdown]);
+
+    const PreviewContent = React.useMemo(() => {
+      if (!shouldUseAccordion) return null;
+      
+      return (
+        <div className="whitespace-pre-wrap text-xs leading-relaxed">
+          {message.role === 'user' ? (
+            <div style={{ whiteSpace: 'pre-wrap' }}>{previewContent}</div>
+          ) : (
+            renderMarkdown(previewContent)
+          )}
+        </div>
+      );
+    }, [shouldUseAccordion, message.role, previewContent, renderMarkdown]);
+
+    // エディタに挿入するボタン
+    const InsertToEditorButton = React.useMemo(() => (
+      message.role === 'assistant' && !isLoading && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => handleInsertToEditor(typeof message.content === 'string' ? message.content : getMessageContent(message.content))}
+          className={`mt-1 text-[10px] px-1 py-0.5 h-auto leading-none ${isDarkMode ? 'text-blue-400 hover:bg-[#30363d]' : 'text-blue-600 hover:bg-gray-100'}`}
+          suppressHydrationWarning
+        >
+          エディタに挿入
+        </Button>
+      )
+    ), [message.role, message.content, isLoading, handleInsertToEditor, getMessageContent, isDarkMode]);
+
+    // アコーディオンを使用しない標準表示
+    const StandardDisplay = React.useMemo(() => (
+      <div>
+        {RenderedContent}
+        {InsertToEditorButton}
+      </div>
+    ), [RenderedContent, InsertToEditorButton]);
+
+    // アコーディオンの状態を監視
+    const handleAccordionValueChange = useCallback((value: string) => {
+      setIsAccordionOpen(value === 'content');
+    }, []);
+
+    // カスタムアコーディオントリガー
+    const CustomAccordionTrigger = React.forwardRef<
+      HTMLButtonElement,
+      React.ButtonHTMLAttributes<HTMLButtonElement> & { isOpen: boolean }
+    >(({ className, children, isOpen, ...props }, ref) => (
+      <button
+        ref={ref}
+        className={className}
+        {...props}
+      >
+        <div className="flex items-center gap-1">
+          {children}
+          <ChevronDown
+            className={`h-3 w-3 shrink-0 transition-transform duration-200 ${
+              isOpen ? 'rotate-180' : ''
+            }`}
+          />
+        </div>
+      </button>
+    ));
+    CustomAccordionTrigger.displayName = 'CustomAccordionTrigger';
+
+    // アコーディオンを使用した折りたたみ表示
+    const AccordionDisplay = React.useMemo(() => (
+      <div>
+        {!isAccordionOpen && PreviewContent}
+        <div className={`flex justify-center items-center ${isDarkMode ? 'bg-[#21262d]' : 'bg-white'} rounded-sm mt-2 mb-1`}>
+          <CustomAccordionTrigger 
+            isOpen={isAccordionOpen}
+            onClick={() => setIsAccordionOpen(!isAccordionOpen)}
+            className={`px-2 py-1 text-[10px] font-medium rounded-full transition-colors ${
+              isDarkMode 
+                ? 'hover:bg-[#30363d] text-blue-400 hover:text-blue-300' 
+                : 'hover:bg-gray-100 text-blue-600 hover:text-blue-500'
+            }`}
+          >
+            {isAccordionOpen ? '折りたたむ' : '続きを読む'}
+          </CustomAccordionTrigger>
+        </div>
+        {isAccordionOpen ? (
+          <div className="pt-1 pb-0 overflow-hidden transition-all duration-300 ease-in-out animate-accordion-down">
+            {RenderedContent}
+            {InsertToEditorButton}
+          </div>
+        ) : null}
+      </div>
+    ), [PreviewContent, RenderedContent, InsertToEditorButton, isDarkMode, isAccordionOpen]);
 
     return (
-        <div className="pb-3">
-            <Card
-                key={message.id}
-                className={`
-                    max-w-[90%] rounded-lg shadow-sm
-                    ${message.role === 'user'
-                        ? isDarkMode
-                            ? 'bg-[#161b22] text-[#e6edf3] ml-auto'
-                            : 'bg-blue-50 ml-auto'
-                        : isDarkMode
-                            ? 'bg-[#21262d] text-[#e6edf3] mr-auto'
-                            : 'bg-white mr-auto'
-                    }
-                    ${isDarkMode ? 'border border-[#30363d]' : 'border border-gray-200'}
-                `}
-                suppressHydrationWarning
-            >
-                <CardContent className="p-1.5">
-                    {RenderedContent}
-                    {message.role === 'assistant' && !isLoading && (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleInsertToEditor(typeof message.content === 'string' ? message.content : getMessageContent(message.content))}
-                            className={`mt-1 text-[10px] px-1 py-0.5 h-auto leading-none ${isDarkMode ? 'text-blue-400 hover:bg-[#30363d]' : 'text-blue-600 hover:bg-gray-100'}`}
-                            suppressHydrationWarning
-                        >
-                            エディタに挿入
-                        </Button>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+      <div className="pb-3">
+        <Card
+          key={message.id}
+          className={`
+            max-w-[90%] rounded-lg shadow-sm
+            ${message.role === 'user'
+              ? isDarkMode
+                ? 'bg-[#161b22] text-[#e6edf3] ml-auto'
+                : 'bg-blue-50 ml-auto'
+              : isDarkMode
+                ? 'bg-[#21262d] text-[#e6edf3] mr-auto'
+                : 'bg-white mr-auto'
+            }
+            ${isDarkMode ? 'border border-[#30363d]' : 'border border-gray-200'}
+          `}
+          suppressHydrationWarning
+        >
+          <CardContent className="p-1.5">
+            {shouldUseAccordion ? AccordionDisplay : StandardDisplay}
+          </CardContent>
+        </Card>
+      </div>
     );
 });
 MessageItem.displayName = 'MessageItem';
