@@ -41,6 +41,8 @@ interface AIChatProps {
   append?: (message: CreateMessage, options?: { body?: Record<string, any> }) => Promise<string | null | undefined>;
   onInsertToEditor?: (text: string) => void;
   getEditorContent?: () => string;
+  getSelectedEditorContent?: () => string | null;
+  replaceSelectedEditorContent?: (text: string) => void;
   isDarkMode?: boolean;
 }
 
@@ -106,11 +108,13 @@ const MessageItem = React.memo(({
   isLoading,
   isDarkMode,
   handleInsertToEditor,
+  replaceSelectedEditorContent,
 }: {
   message: Message;
   isLoading: boolean;
   isDarkMode: boolean;
   handleInsertToEditor: (text: string) => void;
+  replaceSelectedEditorContent?: (text: string) => void;
 }) => {
     const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(false);
 
@@ -360,14 +364,21 @@ const MessageItem = React.memo(({
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => handleInsertToEditor(typeof message.content === 'string' ? message.content : getMessageContent(message.content))}
+          onClick={() => {
+            const content = typeof message.content === 'string' ? message.content : getMessageContent(message.content);
+            if (replaceSelectedEditorContent) {
+              replaceSelectedEditorContent(content);
+            } else {
+              handleInsertToEditor(content);
+            }
+          }}
           className={`mt-1 text-[10px] px-1 py-0.5 h-auto leading-none ${isDarkMode ? 'text-blue-400 hover:bg-[#30363d]' : 'text-blue-600 hover:bg-gray-100'}`}
           suppressHydrationWarning
         >
           エディタに挿入
         </Button>
       )
-    ), [message.role, message.content, isLoading, handleInsertToEditor, getMessageContent, isDarkMode]);
+    ), [message.role, message.content, isLoading, handleInsertToEditor, replaceSelectedEditorContent, getMessageContent, isDarkMode]);
 
     // アコーディオンを使用しない標準表示
     const StandardDisplay = React.useMemo(() => (
@@ -463,12 +474,14 @@ const MessageList = React.memo(({
   isLoading,
   isDarkMode,
   handleInsertToEditor,
+  replaceSelectedEditorContent,
   virtuosoRef,
 }: {
   messages: Message[];
   isLoading: boolean;
   isDarkMode: boolean;
   handleInsertToEditor: (text: string) => void;
+  replaceSelectedEditorContent?: (text: string) => void;
   virtuosoRef: React.RefObject<VirtuosoHandle>;
 }) => {
   console.log('Rendering MessageList (Virtuoso)');
@@ -500,6 +513,7 @@ const MessageList = React.memo(({
           isLoading={isLoading}
           isDarkMode={isDarkMode}
           handleInsertToEditor={handleInsertToEditor}
+          replaceSelectedEditorContent={replaceSelectedEditorContent}
         />
       )}
       components={{ Footer: renderLoader }}
@@ -518,6 +532,8 @@ export const AIChat = React.memo(({
   append,
   onInsertToEditor,
   getEditorContent,
+  getSelectedEditorContent,
+  replaceSelectedEditorContent,
   isDarkMode = false,
 }: AIChatProps) => {
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
@@ -603,21 +619,45 @@ export const AIChat = React.memo(({
     }
   }, [onInsertToEditor]);
 
+  const replaceSelectedEditorContentCallback = useCallback((text: string) => {
+    // 選択テキスト置換関数が提供されている場合は使用
+    if (replaceSelectedEditorContent) {
+      replaceSelectedEditorContent(text);
+    } else if (onInsertToEditor) {
+      // 置換関数がない場合は通常の挿入を使用
+      onInsertToEditor(text);
+    }
+  }, [replaceSelectedEditorContent, onInsertToEditor]);
+
   const getEditorContentCallback = useCallback(() => {
-      if (getEditorContent) {
-          try {
-              const content = getEditorContent();
-              console.log('エディタ内容のチェック (コールバック経由):', content ? content.substring(0, 50) + '...' : 'エディタ内容が空です');
-              return content ?? '';
-          } catch (err) {
-              console.error('getEditorContent関数エラー:', err);
-              return '';
-          }
-      } else {
-        console.warn('getEditorContent関数が提供されていません');
+    if (getEditorContent) {
+      try {
+        const content = getEditorContent();
+        console.log('エディタ内容のチェック (コールバック経由):', content ? content.substring(0, 50) + '...' : 'エディタ内容が空です');
+        return content ?? '';
+      } catch (err) {
+        console.error('getEditorContent関数エラー:', err);
         return '';
       }
+    } else {
+      console.warn('getEditorContent関数が提供されていません');
+      return '';
+    }
   }, [getEditorContent]);
+
+  const getSelectedEditorContentCallback = useCallback(() => {
+    if (getSelectedEditorContent) {
+      try {
+        const selectedContent = getSelectedEditorContent();
+        console.log('選択テキストのチェック (コールバック経由):', selectedContent ? selectedContent.substring(0, 50) + '...' : '選択なし');
+        return selectedContent;
+      } catch (err) {
+        console.error('getSelectedEditorContent関数エラー:', err);
+        return null;
+      }
+    }
+    return null;
+  }, [getSelectedEditorContent]);
 
   const handleFileClick = useCallback(() => {
     // すでにファイルがアップロードされている場合は処理を中止
@@ -782,14 +822,29 @@ export const AIChat = React.memo(({
     let contentToSend = trimmedInput;
 
     if (trimmedInput.includes('@editor')) {
-        const editorContent = getEditorContentCallback();
-        contentToSend = trimmedInput.replace('@editor', `\n\n### エディタ内容:\n\`\`\`\n${editorContent}\n\`\`\`\n`);
-        console.log('エディタ内容を含む送信コンテンツ:', contentToSend.substring(0, 100) + '...');
+      // 選択テキストがあればそれを使用、なければ全体を使用
+      const selectedContent = getSelectedEditorContentCallback();
+      const editorContent = selectedContent !== null ? selectedContent : getEditorContentCallback();
+      
+      // @editor に続く内容を抽出（指示内容）
+      const editorPromptMatch = trimmedInput.match(/@editor\s+(.*)/);
+      const editorPrompt = editorPromptMatch ? editorPromptMatch[1].trim() : '';
+      
+      // 指示内容がある場合はそれを含める
+      let replacementText = '';
+      if (editorPrompt) {
+        replacementText = `\n\n### 指示内容:\n${editorPrompt}\n\n### ${selectedContent !== null ? '選択中の' : ''}エディタ内容:\n\`\`\`\n${editorContent}\n\`\`\`\n`;
+      } else {
+        replacementText = `\n\n### ${selectedContent !== null ? '選択中の' : ''}エディタ内容:\n\`\`\`\n${editorContent}\n\`\`\`\n`;
+      }
+      
+      contentToSend = trimmedInput.replace(/@editor.*/, replacementText);
+      console.log('エディタ内容を含む送信コンテンツ:', contentToSend.substring(0, 100) + '...');
     }
 
     await sendMessage(contentToSend);
 
-  }, [input, getEditorContentCallback, sendMessage, clearMessages, setInput, uploadedFiles.length]);
+  }, [input, getEditorContentCallback, getSelectedEditorContentCallback, sendMessage, clearMessages, setInput, uploadedFiles.length]);
 
   const handleKeyDownCallback = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -948,6 +1003,7 @@ export const AIChat = React.memo(({
           isLoading={isLoading}
           isDarkMode={isDarkMode}
           handleInsertToEditor={handleInsertToEditorCallback}
+          replaceSelectedEditorContent={replaceSelectedEditorContentCallback}
           virtuosoRef={virtuosoRef}
         />
       </div>

@@ -361,6 +361,46 @@ export default function MarkdownEditor() {
     }
   }, [setMarkdownContent]); // 依存配列: viewRef は含めず、安定した setMarkdownContent を追加
 
+  // 選択テキストを取得する関数
+  const getSelectedEditorContent = useCallback((): string | null => {
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const selection = view.state.selection.main;
+      // 選択範囲がない場合はnullを返す
+      if (selection.from === selection.to) {
+        return null;
+      }
+      // 選択範囲のテキストを返す
+      return view.state.sliceDoc(selection.from, selection.to);
+    }
+    return null;
+  }, []);
+
+  // 選択テキストを置換する関数
+  const replaceSelectedEditorContent = useCallback((text: string): void => {
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const selection = view.state.selection.main;
+      // 選択範囲がある場合のみ置換
+      if (selection.from !== selection.to) {
+        view.dispatch({
+          changes: { from: selection.from, to: selection.to, insert: text },
+          selection: { anchor: selection.from + text.length },
+          userEvent: "input"
+        });
+        view.focus();
+      } else {
+        // 選択範囲がない場合は通常の挿入と同じ動作
+        const currentPos = view.state.selection.main.head;
+        view.dispatch({
+          changes: { from: currentPos, to: currentPos, insert: text },
+          selection: { anchor: currentPos + text.length }
+        });
+        view.focus();
+      }
+    }
+  }, []);
+
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     // ... (ここは変更なし) ...
      const file = event.target.files?.[0];
@@ -881,6 +921,16 @@ export default function MarkdownEditor() {
   const getEditorContentCallback = useCallback((): string => {
     return viewRef.current?.state.doc.toString() ?? markdownContent;
   }, [markdownContent]); // markdownContentを依存配列に追加
+
+  // 選択テキスト取得関数をメモ化
+  const getSelectedEditorContentCallback = useCallback((): string | null => {
+    return getSelectedEditorContent();
+  }, [getSelectedEditorContent]);
+
+  // 選択テキスト置換関数をメモ化
+  const replaceSelectedEditorContentCallback = useCallback((text: string): void => {
+    replaceSelectedEditorContent(text);
+  }, [replaceSelectedEditorContent]);
 
   // --- UI Handlers ---
   const toggleDarkMode = () => {
@@ -1917,6 +1967,8 @@ export default function MarkdownEditor() {
                   : null
                 }
                 getEditorContent={getEditorContentCallback}
+                getSelectedEditorContent={getSelectedEditorContentCallback}
+                replaceSelectedEditorContent={replaceSelectedEditorContentCallback}
                 setInput={setInput}
                 append={append as any}
               />
