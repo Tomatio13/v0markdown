@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { Marp } from '@marp-team/marp-core'
 import mermaid from 'mermaid'
 
@@ -68,11 +68,50 @@ const extractThemeFromFrontmatter = (md: string): string | null => {
 export default function MarpPreview({ markdown, isDarkMode = false }: MarpPreviewProps) {
   const [html, setHtml] = useState<string>('')
   const containerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const prevScrollRef = useRef<{ slideId: string | null; yOffset: number }>({ slideId: null, yOffset: 0 })
+  const [slidesCount, setSlidesCount] = useState(0)
 
   useEffect(() => {
     // Marpレンダリング処理を非同期関数に
     const renderMarp = async () => {
       try {
+        // 現在のスクロール位置を識別可能な方法で保存（更新前）
+        if (containerRef.current && contentRef.current) {
+          const container = containerRef.current;
+          const slides = contentRef.current.querySelectorAll('section.marpit');
+          const scrollPosition = container.scrollTop;
+          
+          // 現在見えているスライドを検出
+          let currentSlideId = null;
+          let yOffsetInSlide = 0;
+          
+          for (let i = 0; i < slides.length; i++) {
+            const slide = slides[i] as HTMLElement;
+            const slideTop = slide.offsetTop;
+            const slideBottom = slideTop + slide.offsetHeight;
+            
+            if (scrollPosition >= slideTop && scrollPosition < slideBottom) {
+              // このスライドが現在見えている
+              currentSlideId = slide.id || `slide-${i}`;
+              yOffsetInSlide = scrollPosition - slideTop;
+              break;
+            }
+            
+            // もし最後までどのスライドも条件に合わなければ、最も近いスライドを選択
+            if (i === slides.length - 1 && currentSlideId === null) {
+              currentSlideId = slide.id || `slide-${i}`;
+              yOffsetInSlide = 0;
+            }
+          }
+          
+          // 保存
+          prevScrollRef.current = {
+            slideId: currentSlideId,
+            yOffset: yOffsetInSlide
+          };
+        }
+
         // Marpインスタンスの作成
         const marp = new Marp({
           html: true,
@@ -108,12 +147,22 @@ export default function MarpPreview({ markdown, isDarkMode = false }: MarpPrevie
         // 4. Marp が生成した CSS をそのまま使用 (すでにテーマ適用後の CSS)
         const combinedCss = `\n${marpCss}\n`;
         
-        // 5. スタイルとHTMLを結合 (Mermaid要素を後で処理するためクラス付与)
+        // スライドに一意のIDを付与する処理を追加
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = marpHtml;
+        const sections = tempDiv.querySelectorAll('section.marpit');
+        sections.forEach((section, index) => {
+          if (!section.id) {
+            section.id = `slide-${index}`;
+          }
+        });
+
         const combinedHtml = `
 <style>${combinedCss}</style>
-<div class="marpit mermaid-container">${marpHtml}</div> 
+<div class="marpit mermaid-container">${tempDiv.innerHTML}</div> 
 `;
-        
+
+        setSlidesCount(sections.length);
         setHtml(combinedHtml);
       } catch (error) {
         console.error('Marpレンダリングエラー:', error);
@@ -160,16 +209,59 @@ export default function MarpPreview({ markdown, isDarkMode = false }: MarpPrevie
     }
   }, [html, isDarkMode]); // htmlの内容またはダークモードが変わったら再実行
 
+  // マークダウン表示の処理後、スクロール位置を復元
+  useLayoutEffect(() => {
+    if (containerRef.current && contentRef.current && html) {
+      // Mermaidのレンダリングが完了するまで少し待機
+      setTimeout(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        
+        const content = contentRef.current;
+        if (!content) return;
+        
+        const { slideId, yOffset } = prevScrollRef.current;
+        
+        if (slideId) {
+          // IDでスライドを見つける
+          const targetSlide = content.querySelector(`#${slideId}`);
+          if (targetSlide) {
+            // スライドが見つかった場合、その位置にスクロール
+            const targetY = (targetSlide as HTMLElement).offsetTop + yOffset;
+            container.scrollTop = targetY;
+            return;
+          }
+        }
+        
+        // IDでスライドが見つからない場合、比率で推定（フォールバック）
+        const slides = content.querySelectorAll('section.marpit');
+        if (slides.length > 0 && slidesCount > 0) {
+          // スライド数の比率で最も近い位置を計算
+          const slideRatio = Math.min(slides.length - 1, Math.floor(slidesCount / 2));
+          const targetSlide = slides[slideRatio] as HTMLElement;
+          if (targetSlide) {
+            container.scrollTop = targetSlide.offsetTop;
+          }
+        }
+      }, 50); // 短い待機時間で試す
+    }
+  }, [html, slidesCount]);
+
   return (
     <div 
       ref={containerRef}
-      className={`marp-preview mermaid-container ${isDarkMode ? 'dark' : ''}`}
-      dangerouslySetInnerHTML={{ __html: html }}
+      className={`marp-preview-wrapper ${isDarkMode ? 'dark' : ''}`}
       style={{
         height: '100%',
         overflow: 'auto',
         backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
       }}
-    />
+    >
+      <div 
+        ref={contentRef}
+        className="marp-preview-content mermaid-container"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </div>
   )
 } 
