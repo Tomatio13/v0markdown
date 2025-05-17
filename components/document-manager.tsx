@@ -662,6 +662,7 @@ export default function DocumentManager() {
             isListening={isListening}
             onToggleVoiceInput={toggleVoiceInput}
             onToggleVimMode={toggleVimMode}
+            isDarkMode={isDarkMode}
           />
         </>
       )}

@@ -1024,10 +1024,10 @@ export const AIChat = React.memo(({
                   disabled={isLoading}
                 >
                   <SelectTrigger
-                    className={`h-7 text-xs pr-2 pl-1 border-0 ${isDarkMode ? 'bg-transparent text-[#8b949e]' : 'bg-transparent text-gray-500'} focus:ring-0 focus:ring-offset-0`}
+                    className={`h-7 text-xs pr-2 pl-1 border-0 w-40 ${isDarkMode ? 'bg-transparent text-[#8b949e]' : 'bg-transparent text-gray-500'} focus:ring-0 focus:ring-offset-0`}
                     suppressHydrationWarning
                   >
-                    <SelectValue className="text-xs" placeholder="モデルを選択..." />
+                    <SelectValue className="text-xs truncate" placeholder="モデルを選択..." />
                   </SelectTrigger>
                   <SelectContent>
                     {availableModels.map((model) => (
@@ -1046,7 +1046,7 @@ export const AIChat = React.memo(({
               value={recognizedText ? `${latestInputRef.current}${latestInputRef.current && !latestInputRef.current.endsWith(' ') ? ' ' : ''}${recognizedText}` : input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDownCallback}
-              placeholder="AIに質問する(@editorでエディタの内容を参照、Shift+Enterで改行)"
+              placeholder="(@editorでエディタ引用、Shift+Enterで改行)"
               className={`flex-1 text-sm resize-none px-2 py-1.5 rounded-md ${isDarkMode ? 'bg-[#1E1E1EFF] text-[#e6edf3] placeholder-[#8b949e]' : 'bg-white text-gray-900 placeholder-gray-500'} focus:outline-none overflow-hidden`}
               disabled={isLoading || availableModels.length === 0}
               minRows={1}

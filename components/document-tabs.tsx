@@ -29,6 +29,7 @@ interface DocumentTabsProps {
   isListening?: boolean
   onToggleVoiceInput?: () => void
   onToggleVimMode?: () => void
+  isDarkMode?: boolean
 }
 
 export function DocumentTabs({
@@ -44,7 +45,8 @@ export function DocumentTabs({
   onToggleTripleLayout,
   isListening = false,
   onToggleVoiceInput,
-  onToggleVimMode
+  onToggleVimMode,
+  isDarkMode = false
 }: DocumentTabsProps) {
   // タブの表示が更新されたらスクロールエリアの位置を調整
   const handleTabChange = useCallback((tabId: string) => {
@@ -59,7 +61,7 @@ export function DocumentTabs({
   const activeTab = tabs.find(tab => tab.id === activeTabId)
 
   return (
-    <div className="w-auto border-t border-border/40 bg-[#171717] flex items-center text-xs text-foreground h-7 sticky bottom-0 left-[33px] right-[33px] z-50 mx-[33px]">
+    <div className={`w-auto border-t ${isDarkMode ? 'border-border/40 bg-[#171717]' : 'border-gray-200 bg-gray-100'} flex items-center text-xs text-foreground h-7 sticky bottom-0 left-[33px] right-[33px] z-50 mx-[33px]`}>
       <div className="w-full flex items-center justify-between overflow-hidden px-2 py-1">
         {/* 左側エリア - タブリスト */}
         <div className="flex items-center overflow-hidden" style={{ width: '350px', minWidth: '350px', maxWidth: '350px' }}>
