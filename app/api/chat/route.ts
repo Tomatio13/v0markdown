@@ -82,7 +82,6 @@ const loadCustomPrompt = (): string => {
     
     // ファイルを読み込んで内容を返す
     const promptContent = fs.readFileSync(promptPath, 'utf-8');
-    console.log(`カスタムプロンプトを読み込みました: ${customPromptFile}`);
     
     return promptContent;
   } catch (error) {
@@ -329,8 +328,6 @@ export async function POST(req: Request) {
     const modelIdToUse = requestedModelId && availableModels.some(m => m.id === requestedModelId)
       ? requestedModelId
       : availableModels[0].id; // フォールバックとして最初の利用可能モデル
-
-    console.log(`使用するモデル: ${modelIdToUse}`); // デバッグログ
 
     // ヘルパー関数を使ってプロバイダーとモデルIDを取得 (letに変更)
     let providerInfo = getProviderAndModelId(modelIdToUse);

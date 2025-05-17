@@ -1,0 +1,89 @@
+/* default CSS theme for Marp */
+:root {
+  --color-background: #fff;
+  --color-foreground: #333;
+  --color-highlight: #0288d1;
+  --color-dimmed: #888;
+}
+
+section {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  padding: 1.5rem;
+}
+
+section.invert {
+  background-color: #1e1e1e;
+  color: #f0f0f0;
+}
+
+h1 {
+  color: var(--color-highlight);
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: 1.8rem;
+  border-bottom: 1px solid var(--color-dimmed);
+  padding-bottom: 0.5rem;
+}
+
+h3 {
+  font-size: 1.5rem;
+}
+
+a {
+  color: var(--color-highlight);
+}
+
+code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+pre {
+  background-color: #f5f5f5;
+  padding: 1rem;
+  border-radius: 5px;
+  overflow: auto;
+}
+
+section.invert pre {
+  background-color: #2d2d2d;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+footer {
+  font-size: 0.8rem;
+  color: var(--color-dimmed);
+  text-align: right;
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+}
+
+header {
+  font-size: 0.8rem;
+  color: var(--color-dimmed);
+  text-align: left;
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+}
+
+section::after {
+  content: attr(data-marpit-pagination) '/' attr(data-marpit-pagination-total);
+  font-size: 0.8rem;
+  color: var(--color-dimmed);
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+}

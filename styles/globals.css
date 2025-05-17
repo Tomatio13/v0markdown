@@ -1,0 +1,24 @@
+/* スクロールバーを非表示にするクラス - ブラウザ互換性を考慮 */
+.scrollbar-hide {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;  /* Chrome, Safari and Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* タブコンテナ専用のスクロールバー非表示 */
+.tabs-container {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+  overflow-y: hidden !important;
+}
+
+.tabs-container::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+} 

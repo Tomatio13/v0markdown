@@ -484,8 +484,6 @@ const MessageList = React.memo(({
   replaceSelectedEditorContent?: (text: string) => void;
   virtuosoRef: React.RefObject<VirtuosoHandle>;
 }) => {
-  console.log('Rendering MessageList (Virtuoso)');
-
   const renderLoader = () => {
     if (isLoading && (!messages.length || messages[messages.length - 1]?.role === 'user')) {
         return (
@@ -633,7 +631,6 @@ export const AIChat = React.memo(({
     if (getEditorContent) {
       try {
         const content = getEditorContent();
-        console.log('エディタ内容のチェック (コールバック経由):', content ? content.substring(0, 50) + '...' : 'エディタ内容が空です');
         return content ?? '';
       } catch (err) {
         console.error('getEditorContent関数エラー:', err);
@@ -649,7 +646,6 @@ export const AIChat = React.memo(({
     if (getSelectedEditorContent) {
       try {
         const selectedContent = getSelectedEditorContent();
-        console.log('選択テキストのチェック (コールバック経由):', selectedContent ? selectedContent.substring(0, 50) + '...' : '選択なし');
         return selectedContent;
       } catch (err) {
         console.error('getSelectedEditorContent関数エラー:', err);
@@ -723,7 +719,6 @@ export const AIChat = React.memo(({
     }
 
     setErrorMessage(''); // エラーメッセージをクリア
-    console.log(`モデル '${selectedModel}' を使用してメッセージを送信します。`);
 
     try {
       let result: string | null | undefined;
@@ -754,7 +749,6 @@ export const AIChat = React.memo(({
           });
         });
         
-        // console.log(`ファイル付きメッセージを送信します...`);
         result = await append(
           { 
             role: 'user',
@@ -764,22 +758,12 @@ export const AIChat = React.memo(({
         );
       } else {
         // 通常のテキストメッセージ
-        // console.log(`テキストメッセージを送信します...`);
         result = await append(
           { content, role: 'user' },
           { body: { model: selectedModel } }
         );
       }
       
-      // // AIレスポンスの詳細解析
-      console.log(`AIレスポンス解析:`, {
-        型: typeof result,
-        値: result,
-        状態: result ? '成功' : '応答なし',
-        メッセージID: result || '生成されず'
-      });
-    
-        
       // 入力とファイルをリセット
       if (setInput) {
         setInput('');
@@ -809,7 +793,6 @@ export const AIChat = React.memo(({
     if (!trimmedInput && uploadedFiles.length === 0) return;
 
     if (trimmedInput === 'クリア' && uploadedFiles.length === 0) {
-      console.log('入力が "クリア" のため、メッセージをクリアします。');
       clearMessages();
       if (setInput) {
         setInput('');
@@ -839,7 +822,6 @@ export const AIChat = React.memo(({
       }
       
       contentToSend = trimmedInput.replace(/@editor.*/, replacementText);
-      console.log('エディタ内容を含む送信コンテンツ:', contentToSend.substring(0, 100) + '...');
     }
 
     await sendMessage(contentToSend);
@@ -862,7 +844,6 @@ export const AIChat = React.memo(({
   const stopRecognition = useCallback(() => {
     if (recognitionRef.current) {
       try {
-        console.log('音声認識を停止します');
         recognitionRef.current.onend = () => {};
         recognitionRef.current.onerror = () => {};
         recognitionRef.current.stop();
@@ -884,7 +865,6 @@ export const AIChat = React.memo(({
     }
 
     if (recognitionRef.current || isListening) {
-      console.log('音声認識はすでに実行中です。');
       return;
     }
 
@@ -898,7 +878,6 @@ export const AIChat = React.memo(({
       recognition.onstart = () => {
         setIsListening(true);
         setRecognizedText("");
-        console.log('音声認識開始');
       };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -919,7 +898,6 @@ export const AIChat = React.memo(({
         if (finalTranscript) {
           if (setInput) {
             const trimmedFinal = finalTranscript.trim();
-            console.log('確定音声:', trimmedFinal);
             const currentVal = latestInputRef.current || input;
             const newVal = currentVal + (currentVal.length > 0 && !currentVal.endsWith(' ') ? ' ' : '') + trimmedFinal;
             setInput(newVal);
@@ -938,7 +916,6 @@ export const AIChat = React.memo(({
       };
 
       recognition.onend = () => {
-        console.log('音声認識終了 (onend)');
         if (recognitionRef.current) {
             recognitionRef.current = null;
             setIsListening(false);
@@ -947,7 +924,6 @@ export const AIChat = React.memo(({
       };
 
       recognition.start();
-
     } catch (error) {
       console.error('音声認識の初期化エラー:', error);
       setIsListening(false);
@@ -997,7 +973,7 @@ export const AIChat = React.memo(({
           </Button>
         </div>
       </div>
-      <div className="flex-grow h-[calc(100%-4rem)] p-4 overflow-y-auto custom-scrollbar">
+      <div className="flex-grow h-[calc(100%-4rem-35px)] p-4 overflow-y-auto custom-scrollbar">
         <MessageList
           messages={messages}
           isLoading={isLoading}
@@ -1035,7 +1011,7 @@ export const AIChat = React.memo(({
 
       <form 
         onSubmit={handleFormSubmitCallback} 
-        className={`px-4 py-2 ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-gray-100'}`}
+        className={`px-4 py-2 mb-8 ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-gray-100'}`}
         suppressHydrationWarning
       >
         <div className="flex items-center gap-2 relative">
@@ -1070,7 +1046,7 @@ export const AIChat = React.memo(({
               value={recognizedText ? `${latestInputRef.current}${latestInputRef.current && !latestInputRef.current.endsWith(' ') ? ' ' : ''}${recognizedText}` : input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDownCallback}
-              placeholder="AIに質問する... (@editorでエディタの内容を参照、Shift+Enterで改行)"
+              placeholder="AIに質問する(@editorでエディタの内容を参照、Shift+Enterで改行)"
               className={`flex-1 text-sm resize-none px-2 py-1.5 rounded-md ${isDarkMode ? 'bg-[#1E1E1EFF] text-[#e6edf3] placeholder-[#8b949e]' : 'bg-white text-gray-900 placeholder-gray-500'} focus:outline-none overflow-hidden`}
               disabled={isLoading || availableModels.length === 0}
               minRows={1}

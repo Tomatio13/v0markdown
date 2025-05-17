@@ -40,7 +40,7 @@ interface SpeechRecognitionAlternative {
   confidence: number;
 }
 
-import { useState, useRef, useCallback, useEffect, useMemo } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo, useImperativeHandle, forwardRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
@@ -115,16 +115,45 @@ declare global {
   }
 }
 
+// デフォルトのMarkdownコンテンツ
+const DEFAULT_CONTENT = "# Hello, World!\n\n## Section 1\nSome text\n\n## Section 2\nMore text"
+
 // --- コンポーネント本体 ---
-export default function MarkdownEditor() {
+const MarkdownEditor = forwardRef(({ 
+  initialContent, 
+  onContentChange,
+  onEditorStateUpdate,
+  isDarkMode: propIsDarkMode,
+  onToggleDarkMode,
+  isFirstAccess = true,
+  onFileSaved,
+  tabTitle,
+}: { 
+  initialContent?: string;
+  onContentChange?: (content: string) => void;
+  onEditorStateUpdate?: (
+    cursorPosition: { line: number, col: number },
+    outputMode: string,
+    previewMode: string | null,
+    isVimMode: boolean
+  ) => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
+  isFirstAccess?: boolean;
+  onFileSaved?: (fileName: string) => void;
+  tabTitle?: string;
+}, ref) => {
   // --- State Variables ---
 
   // Editor State
-  const [markdownContent, setMarkdownContent] = useState("# Hello, World!\n\n## Section 1\nSome text\n\n## Section 2\nMore text")
+  const [markdownContent, setMarkdownContent] = useState(initialContent || DEFAULT_CONTENT)
   const [isVimMode, setIsVimMode] = useState(false)
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [previewFontSize, setPreviewFontSize] = useState(16);
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  // 親からダークモードが渡されている場合はそれを使用し、そうでなければローカルステートを使用
+  const [localIsDarkMode, setLocalIsDarkMode] = useState(false)
+  const isDarkMode = propIsDarkMode !== undefined ? propIsDarkMode : localIsDarkMode;
+  
   const [outputMode, setOutputMode] = useState<'markdown' | 'marp' | 'quarto'>('markdown')
   const [viewMode, setViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split' | 'markmap' | 'markmap-split'>('split')
   const [isSaving, setIsSaving] = useState(false)
@@ -137,7 +166,8 @@ export default function MarkdownEditor() {
   const [selectedMarpTheme, setSelectedMarpTheme] = useState("default");
   const [marpThemes, setMarpThemes] = useState<string[]>(["default"]);
   const [isLoadingThemes, setIsLoadingThemes] = useState(false);
-
+  // AIチャットから戻る時に前の状態を記憶するための状態変数
+  const [previousViewMode, setPreviousViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split' | 'markmap' | 'markmap-split'>('split');
 
   // Google Drive State
   const [driveEnabled, setDriveEnabled] = useState(false)
@@ -147,6 +177,38 @@ export default function MarkdownEditor() {
 
   // AI Chat State (using useChat hook)
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append, reload, stop } = useChat();
+
+  // コンテンツが変更されたときの処理 - 親コンポーネントに通知
+  useEffect(() => {
+    if (onContentChange) {
+      onContentChange(markdownContent);
+    }
+  }, [markdownContent, onContentChange]);
+
+  // エディタの状態情報を親コンポーネントに通知
+  useEffect(() => {
+    if (onEditorStateUpdate) {
+      const previewModeStr = getPreviewModeName();
+      // モード切替中は通知をスキップ（handleModeChangeで直接通知するため）
+      if (!previewModeStr || 
+          (previewModeStr === 'Markdown' && outputMode === 'markdown') ||
+          (previewModeStr === 'Marp' && outputMode === 'marp') ||
+          (previewModeStr === 'Quarto' && outputMode === 'quarto') ||
+          (previewModeStr === 'Markmap' && outputMode === 'markdown')) {
+        onEditorStateUpdate(
+          cursorPosition,
+          outputMode,
+          previewModeStr,
+          isVimMode
+        );
+      }
+    }
+
+    // AIチャットモードに入る前の状態を記憶（型安全な方法で）
+    if (viewMode !== 'triple' && previousViewMode !== viewMode) {
+      setPreviousViewMode(viewMode);
+    }
+  }, [cursorPosition, outputMode, viewMode, isVimMode, onEditorStateUpdate, previousViewMode]);
 
   // 音声入力関連のステート
   const [isListening, setIsListening] = useState(false)
@@ -488,11 +550,22 @@ export default function MarkdownEditor() {
     setIsTocVisible(prev => !prev);
   }, [setIsTocVisible]);
 
-  // --- ▼ MOVED/REMOVED ▼ ---
-  // マニュアル表示ハンドラは不要になるか、別の場所に移動
-  // const handleOpenMarpManual = useCallback(() => { ... });
-  // const handleOpenQuartoManual = useCallback(() => { ... });
-  // --- ▲ MOVED/REMOVED ▲ ---
+  // --- ▼ MODIFIED ▼ ---
+  // toggleDarkMode関数を更新
+  const toggleDarkMode = useCallback(() => {
+    if (onToggleDarkMode) {
+      // 親コンポーネントから関数が渡されている場合はそれを使用
+      onToggleDarkMode();
+    } else {
+      // 渡されていない場合はローカルステートを更新
+      setLocalIsDarkMode(prev => {
+        const newMode = !prev;
+        document.documentElement.classList.toggle('dark', newMode);
+        return newMode;
+      });
+    }
+  }, [onToggleDarkMode]);
+  // --- ▲ MODIFIED ▲ ---
 
   const handleTocJump = useCallback((lineNumber: number) => {
     // ... (ここは変更なし) ...
@@ -514,13 +587,24 @@ export default function MarkdownEditor() {
 
   // --- File & Export Handlers ---
   const generateFileName = (content: string, defaultExt: string = 'md'): string => {
-    // ... (ここは変更なし) ...
-     const firstLine = content.split('\n')[0] || '';
+    console.log('ファイル名生成を開始:', content.substring(0, 100) + '...');
+    const firstLine = content.split('\n')[0] || '';
+    console.log('最初の行:', firstLine);
+    
+    // デフォルトコンテンツの場合や空の場合は「Untitled」を返す
+    if (!firstLine.trim() || firstLine.trim() === '# New Document') {
+      console.log('デフォルトコンテンツを検出、「Untitled」を使用します');
+      return `Untitled.${defaultExt}`;
+    }
+    
     let baseName = firstLine.replace(/^#+\s*/, '').trim();
     baseName = baseName.replace(/\s+/g, '_'); // スペースをアンダースコアに
     baseName = baseName.replace(/[\\/:*?"<>|]/g, '_'); // ファイル名に使えない文字を置換
+    
     const potentialFileName = baseName ? `${baseName}.${defaultExt}` : '';
-    return potentialFileName || `untitled-${uuidv4().substring(0, 8)}.${defaultExt}`;
+    const result = potentialFileName || `Untitled.${defaultExt}`;
+    console.log('生成されたファイル名:', result);
+    return result;
   };
 
   const handleDriveSave = useCallback(async () => {
@@ -528,7 +612,13 @@ export default function MarkdownEditor() {
      if (!accessToken) return;
     setIsSaving(true);
     try {
-      const fileName = selectedFile?.name || generateFileName(markdownContent);
+      // selectedFileがある場合はその名前、なければタブ名、最後の手段としてgenerateFileName関数を使用
+      const fileName = selectedFile?.name || 
+                      (tabTitle && tabTitle !== 'Untitled' ? `${tabTitle}.md` : generateFileName(markdownContent));
+      console.log('Google Driveへの保存用ファイル名:', fileName, 
+                 '(選択済みファイル:', Boolean(selectedFile), 
+                 'タブ名から生成:', Boolean(!selectedFile && tabTitle && tabTitle !== 'Untitled'), ')');
+      
       const method = selectedFile ? 'PUT' : 'POST';
       const response = await fetch('/api/drive/save', {
         method,
@@ -555,29 +645,62 @@ export default function MarkdownEditor() {
         modifiedTime: savedFileData.modifiedTime
       });
       console.log('Google Driveに保存しました:', savedFileData);
+      
+      // Google Driveへの保存後に親コンポーネントに通知
+      if (onFileSaved) {
+        onFileSaved(savedFileData.name);
+      }
     } catch (error: any) {
       console.error('Google Drive保存エラー:', error);
       alert(error.message || 'Google Driveへの保存に失敗しました');
     } finally {
       setIsSaving(false);
     }
-  }, [accessToken, markdownContent, selectedFile, setSelectedFile]);
+  }, [accessToken, markdownContent, selectedFile, setSelectedFile, onFileSaved, tabTitle]);
 
   const handleLocalSave = async () => {
-    // ... (ここは変更なし) ...
-     setIsSaving(true);
+    setIsSaving(true);
     try {
-      const suggestedName = generateFileName(markdownContent);
+      // tabTitleが存在し、「Untitled」でない場合はそれを使用、それ以外は従来通りgenerateFileName関数を使用
+      const suggestedName = (tabTitle && tabTitle !== 'Untitled')
+        ? `${tabTitle}.md`
+        : generateFileName(markdownContent);
+      
+      console.log('======= ファイル保存開始 =======');
+      console.log('提案されたファイル名:', suggestedName, 'タブ名から生成:', Boolean(tabTitle && tabTitle !== 'Untitled'));
+      
       if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
+        console.log('File System Access APIを使用します');
         const fileHandle = await window.showSaveFilePicker({
           suggestedName,
           types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
         });
+        
+        // ファイルハンドルから名前を取得（実際にユーザーが選択した名前）
+        const fileHandleAny = fileHandle as any;
+        console.log('ファイルハンドル:', fileHandleAny);
+        
+        // 名前プロパティの存在確認
+        let fileName = suggestedName;
+        if (fileHandleAny && 'name' in fileHandleAny) {
+          fileName = fileHandleAny.name;
+          console.log('取得したファイル名:', fileName);
+        } else {
+          console.warn('ファイルハンドルからname属性を取得できませんでした');
+        }
+        
         const writable = await fileHandle.createWritable();
         await writable.write(markdownContent);
         await writable.close();
         console.log("ファイルが保存されました (File System Access API)");
+        
+        // 実際にユーザーが選択したファイル名を使用
+        if (onFileSaved) {
+          console.log('onFileSavedコールバックを呼び出します。ファイル名:', fileName);
+          onFileSaved(fileName);
+        }
       } else {
+        console.log('従来のダウンロード方式を使用します');
         // Fallback
         const blob = new Blob([markdownContent], { type: "text/markdown" });
         const url = URL.createObjectURL(blob);
@@ -588,23 +711,17 @@ export default function MarkdownEditor() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        console.log("従来の方法でファイルがダウンロードされました");
+        console.log("従来の方法でファイルがダウンロードされました:", suggestedName);
+        
+        // ファイル保存後に親コンポーネントに通知
+        if (onFileSaved) {
+          console.log('onFileSavedコールバックを呼び出します。ファイル名:', suggestedName);
+          onFileSaved(suggestedName);
+        }
       }
+      console.log('======= ファイル保存完了 =======');
     } catch (error) {
-      console.error("ファイル保存エラー:", error);
-      // エラー時もフォールバックを試みる (ユーザーキャンセルを除く)
-      if ((error as DOMException).name !== 'AbortError') {
-         try {
-           const suggestedName = generateFileName(markdownContent);
-           const blob = new Blob([markdownContent], { type: "text/markdown" });
-           const url = URL.createObjectURL(blob);
-           const a = document.createElement("a"); a.href = url; a.download = suggestedName;
-           document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-         } catch (fallbackError) {
-           console.error("フォールバック保存エラー:", fallbackError);
-           alert("ファイルの保存に失敗しました。");
-         }
-      }
+      console.error("ファイル保存中にエラーが発生しました:", error);
     } finally {
       setIsSaving(false);
     }
@@ -932,34 +1049,77 @@ export default function MarkdownEditor() {
     replaceSelectedEditorContent(text);
   }, [replaceSelectedEditorContent]);
 
-  // --- UI Handlers ---
-  const toggleDarkMode = () => {
-    // ... (ここは変更なし) ...
-     setIsDarkMode(prev => {
-      const newMode = !prev;
-      document.documentElement.classList.toggle('dark', newMode);
-      return newMode;
-    });
-  };
-
   // --- ▼ ADDED ▼ ---
   // サイドバーでのモード切替ハンドラ
   const handleModeChange = useCallback((newMode: 'markdown' | 'marp' | 'quarto') => {
-    setOutputMode(newMode);
-    // viewMode も連動して切り替える (Splitをデフォルトにする)
+    console.log('handleModeChange が呼ばれました:', newMode);
+    
+    // プレビュータイプとビューモードを事前に決定
+    let newPreviewMode: string;
+    let newViewMode: 'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split' | 'markmap' | 'markmap-split';
+    
+    // モードに応じてプレビュータイプとビューモードを設定
     switch (newMode) {
       case 'markdown':
-        setViewMode('split');
+        newPreviewMode = 'Markdown';
+        newViewMode = 'split';
         break;
       case 'marp':
-        setViewMode('marp-split');
+        newPreviewMode = 'Marp';
+        newViewMode = 'marp-split';
         break;
       case 'quarto':
-        setViewMode('quarto-split');
+        newPreviewMode = 'Quarto';
+        newViewMode = 'quarto-split';
         break;
+      default:
+        newPreviewMode = 'Markdown';
+        newViewMode = 'split';
     }
-  }, [setOutputMode, setViewMode]);
-  // --- ▲ ADDED ▲ ---
+    
+    console.log(`モード切替: ${outputMode} → ${newMode}, プレビュータイプ: ${newPreviewMode}, ビューモード: ${newViewMode}`);
+    
+    // 状態更新を一括で行う（バッチ処理）
+    // React の状態更新をバッチ処理する関数を使ってみる
+    const batchUpdates = () => {
+      // 出力モードを更新
+      setOutputMode(newMode);
+      // viewModeを設定
+      setViewMode(newViewMode);
+    };
+    
+    // バッチ更新を実行
+    batchUpdates();
+    
+    // 親コンポーネントに直接通知（状態更新とは別に行う）
+    if (onEditorStateUpdate && viewRef.current) {
+      try {
+        // カーソル位置情報を取得
+        const doc = viewRef.current.state.doc;
+        const selection = viewRef.current.state.selection;
+        
+        if (doc && selection) {
+          const head = selection.main.head;
+          const line = doc.lineAt(head).number;
+          const lineStart = doc.lineAt(head).from;
+          const col = head - lineStart + 1;
+          
+          console.log(`モード切替時に親コンポーネントに通知: モード=${newMode}, プレビュー=${newPreviewMode}`);
+          
+          // 親コンポーネントに直接通知
+          onEditorStateUpdate(
+            { line, col },
+            newMode,  // 新しいモードを使用
+            newPreviewMode,  // 新しいプレビュータイプを使用
+            isVimMode
+          );
+        }
+      } catch (err) {
+        console.error('エディタ状態の取得中にエラーが発生しました:', err);
+      }
+    }
+  }, [onEditorStateUpdate, viewRef, isVimMode, outputMode, setOutputMode, setViewMode]);
+  // --- ▲ MODIFIED ▲ ---
 
   // プレビューモード名取得ヘルパー (変更なし)
   const getPreviewModeName = () => {
@@ -968,6 +1128,11 @@ export default function MarkdownEditor() {
     if (viewMode.includes('markmap')) return 'Markmap'; // 追加
     if (viewMode.includes('preview') || viewMode.includes('split')) return 'Markdown';
     return null;
+  };
+
+  // トリプルモードかどうかを判定
+  const isTripleView = () => {
+    return viewMode === 'triple';
   };
 
   // --- Effects ---
@@ -988,48 +1153,18 @@ export default function MarkdownEditor() {
 
   useAutoSave({ content: markdownContent, fileId: selectedFile?.id });
 
+  // ドラフト保存機能は削除し、コンテンツ変更時は親コンポーネント（DocumentManager）に
+  // 通知するだけにします。DocumentManagerがmarkdown-app-tabsに保存を行います。
   useEffect(() => {
-    // ... (ドラフト復元、変更なし) ...
-     const restoreDraft = async () => {
-      if (typeof window === 'undefined') return;
-      const lastId = localStorage.getItem('lastDraftId');
-      if (!lastId) return;
-
-      try {
-        const draft = await loadDraft(lastId);
-
-        if (draft && draft.content) {
-          // ドラフトが存在し、内容がある場合
-          if (window.confirm('前回の自動保存データを復元しますか？')) {
-            setMarkdownContent(draft.content);
-            // オプション: 復元したらlocalStorageのIDはクリアしても良いかも
-            // localStorage.removeItem('lastDraftId');
-          } else {
-            // 復元しない場合はドラフト削除
-            await deleteDraft(lastId);
-            localStorage.removeItem('lastDraftId');
-          }
-        } else if (draft === null) {
-          // IndexedDBにデータがない場合 (破損など) はlocalStorageのIDも削除
-          console.warn(`Draft data for ID ${lastId} not found in IndexedDB. Removing stale ID from localStorage.`);
-          localStorage.removeItem('lastDraftId');
-        }
-        // draft.contentが空の場合は何もしない（復元する価値がない）
-      } catch (error) {
-        console.error("Error loading draft:", error);
-        // エラーが発生した場合も、問題のあるIDをlocalStorageから削除する方が安全
-        localStorage.removeItem('lastDraftId');
-      }
-    };
-
-    // 少し遅延させて実行し、初期レンダリングとの競合を避ける
-    const timerId = setTimeout(restoreDraft, 100);
-
-    // クリーンアップ関数
-    return () => clearTimeout(timerId);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // 変更があった場合、親コンポーネントに通知
+    if (onContentChange) {
+      // 少し遅延させて連続更新を防止
+      const timeoutId = setTimeout(() => {
+        onContentChange(markdownContent);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [markdownContent, onContentChange]);
 
   // --- 音声入力の関数 ---
   const startSpeechRecognition = useCallback(() => {
@@ -1538,15 +1673,28 @@ export default function MarkdownEditor() {
         const response = await fetch('/api/marp-themes');
         if (!response.ok) {
           console.error('テーマ取得エラー:', response.statusText);
+          // エラー時にはデフォルトテーマのみを設定
+          setMarpThemes(['default']);
           return;
         }
         const data = await response.json();
         if (data.themes && Array.isArray(data.themes)) {
           setMarpThemes(data.themes);
           console.log('Marpテーマを取得しました:', data.themes);
+        } else if (data.error) {
+          // エラーがある場合はログ出力
+          console.error('テーマ取得エラー:', data.error);
+          // エラー時にもデフォルトテーマのみを設定
+          setMarpThemes(['default']);
+        } else {
+          // 正しい形式でレスポンスが返ってこない場合
+          console.error('不正なレスポンス形式:', data);
+          setMarpThemes(['default']);
         }
       } catch (error) {
         console.error('テーマ取得中に例外が発生しました:', error);
+        // エラー時にはデフォルトテーマのみを設定
+        setMarpThemes(['default']);
       } finally {
         setIsLoadingThemes(false);
       }
@@ -1569,6 +1717,111 @@ export default function MarkdownEditor() {
   ), [markdownContent, isDarkMode]);
   // --- ▲ ADDED ▲ ---
 
+  // 設定マネージャの参照
+  const configManagerRef = useRef<HTMLDivElement>(null)
+  const isConfigManagerVisible = useRef(false)
+
+  // ref経由で公開するメソッド
+  useImperativeHandle(ref, () => ({
+    // viewModeを取得
+    getViewMode: () => viewMode,
+    // viewModeを設定
+    setViewMode: (newViewMode: 'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split' | 'markmap' | 'markmap-split') => {
+      console.log('setViewMode が呼ばれました:', newViewMode);
+      
+      // AIチャット処理を特別に扱う
+      if (newViewMode === 'triple') {
+        // AIチャットに切り替える前に現在のビューモードを保存
+        if (viewMode !== 'triple') {
+          setPreviousViewMode(viewMode);
+        }
+      } else if (viewMode === 'triple') {
+        // AIチャットからの復帰時
+        if (previousViewMode && previousViewMode !== 'triple') {
+          // DocumentManagerからの要求を上書きして、記憶していた前の状態に戻す
+          console.log(`AIチャットから復帰します。要求されたモード:${newViewMode} → 復元するモード:${previousViewMode}`);
+          newViewMode = previousViewMode;
+        }
+      }
+      
+      // プレビューモード名を先に決定（viewMode変更前に取得）
+      const newPreviewModeName = (() => {
+        if (typeof newViewMode === 'string' && newViewMode.includes('marp')) return 'Marp';
+        if (typeof newViewMode === 'string' && newViewMode.includes('quarto')) return 'Quarto';
+        if (typeof newViewMode === 'string' && newViewMode.includes('markmap')) return 'Markmap';
+        if (typeof newViewMode === 'string' && (newViewMode.includes('preview') || newViewMode.includes('split'))) return 'Markdown';
+        return null;
+      })();
+      
+      console.log(`viewMode: ${viewMode} → ${newViewMode}, previewMode: ${newPreviewModeName}`);
+      
+      // viewModeの状態を更新
+      setViewMode(newViewMode);
+      
+      // 親コンポーネントに通知（同期的に呼び出す）
+      if (onEditorStateUpdate && viewRef.current) {
+        try {
+          // 現在のカーソル位置情報を取得
+          const doc = viewRef.current.state.doc;
+          const selection = viewRef.current.state.selection;
+          
+          if (doc && selection) {
+            const head = selection.main.head;
+            const line = doc.lineAt(head).number;
+            const lineStart = doc.lineAt(head).from;
+            const col = head - lineStart + 1;
+            
+            console.log(`親コンポーネントに通知: viewMode=${newViewMode}, previewType=${newPreviewModeName}`);
+            
+            // 親コンポーネントに通知
+            onEditorStateUpdate(
+              { line, col },
+              outputMode,
+              newPreviewModeName,
+              isVimMode
+            );
+          }
+        } catch (err) {
+          console.error('エディタ状態の取得中にエラーが発生しました:', err);
+        }
+      }
+    },
+    // エディタのコンテンツを取得
+    getContent: () => markdownContent,
+    // 選択中のテキストを取得
+    getSelectedContent: getSelectedEditorContentCallback,
+    // 選択中のテキストを置換
+    replaceSelectedContent: replaceSelectedEditorContentCallback
+  }));
+  
+  // Marp関連の設定
+  const [marpTheme, setMarpTheme] = useState("default")
+
+  // プレビューモードが変更されたときに左サイドバーのアクティブ状態を更新
+  useEffect(() => {
+    // プレビューモードが変更されたときにサイドバーアイコンのフォーカスを更新
+    console.log(`プレビューモードが変更されました: ${getPreviewModeName()}`);
+    // 実際の処理はレンダリング時の条件式で行うため、ここでは特に何もしない
+  }, [viewMode]);
+
+  // --- ▼ MODIFIED ▼ ---
+  // このuseEffectによる2回目の更新を防ぐため、コメントアウト
+  /*
+  useEffect(() => {
+    // 親コンポーネントに状態情報を通知
+    if (onEditorStateUpdate) {
+      const previewModeStr = getPreviewModeName();
+      onEditorStateUpdate(
+        cursorPosition,
+        outputMode,
+        previewModeStr,
+        isVimMode
+      );
+    }
+  }, [cursorPosition, outputMode, viewMode, isVimMode, onEditorStateUpdate]);
+  */
+  // --- ▲ MODIFIED ▲ ---
+
   // --- Render ---
   return (
     <div className={`fixed inset-0 flex ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
@@ -1584,7 +1837,12 @@ export default function MarkdownEditor() {
           <Tooltip>
             <TooltipTrigger asChild>
               {/* ▼ MODIFIED: 選択時の背景色を dark:bg-[#2F2F2F] に */}
-              <Button variant={outputMode === 'markdown' ? 'secondary' : 'ghost'} size="icon" className={`h-10 w-10 ${outputMode === 'markdown' && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} onClick={() => handleModeChange('markdown')}>
+              <Button 
+                variant={getPreviewModeName() === 'Markdown' ? 'secondary' : outputMode === 'markdown' && getPreviewModeName() !== 'Marp' && getPreviewModeName() !== 'Quarto' && getPreviewModeName() !== 'Markmap' ? 'secondary' : 'ghost'} 
+                size="icon" 
+                className={`h-10 w-10 ${(getPreviewModeName() === 'Markdown' || (outputMode === 'markdown' && getPreviewModeName() !== 'Marp' && getPreviewModeName() !== 'Quarto' && getPreviewModeName() !== 'Markmap')) && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
+                onClick={() => handleModeChange('markdown')}
+              >
                 <FileText className="h-6 w-6" />
               </Button>
             </TooltipTrigger>
@@ -1593,7 +1851,12 @@ export default function MarkdownEditor() {
           <Tooltip>
             <TooltipTrigger asChild>
               {/* ▼ MODIFIED: 選択時の背景色を dark:bg-[#2F2F2F] に */}
-              <Button variant={outputMode === 'marp' ? 'secondary' : 'ghost'} size="icon" className={`h-10 w-10 ${outputMode === 'marp' && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} onClick={() => handleModeChange('marp')}>
+              <Button 
+                variant={getPreviewModeName() === 'Marp' ? 'secondary' : outputMode === 'marp' && getPreviewModeName() !== 'Markdown' && getPreviewModeName() !== 'Quarto' && getPreviewModeName() !== 'Markmap' ? 'secondary' : 'ghost'} 
+                size="icon" 
+                className={`h-10 w-10 ${(getPreviewModeName() === 'Marp' || (outputMode === 'marp' && getPreviewModeName() !== 'Markdown' && getPreviewModeName() !== 'Quarto' && getPreviewModeName() !== 'Markmap')) && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
+                onClick={() => handleModeChange('marp')}
+              >
                 <Presentation className="h-6 w-6" />
               </Button>
             </TooltipTrigger>
@@ -1602,7 +1865,12 @@ export default function MarkdownEditor() {
           <Tooltip>
             <TooltipTrigger asChild>
               {/* ▼ MODIFIED: 選択時の背景色を dark:bg-[#2F2F2F] に */}
-              <Button variant={outputMode === 'quarto' ? 'secondary' : 'ghost'} size="icon" className={`h-10 w-10 ${outputMode === 'quarto' && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} onClick={() => handleModeChange('quarto')}>
+              <Button 
+                variant={getPreviewModeName() === 'Quarto' ? 'secondary' : outputMode === 'quarto' && getPreviewModeName() !== 'Markdown' && getPreviewModeName() !== 'Marp' && getPreviewModeName() !== 'Markmap' ? 'secondary' : 'ghost'} 
+                size="icon" 
+                className={`h-10 w-10 ${(getPreviewModeName() === 'Quarto' || (outputMode === 'quarto' && getPreviewModeName() !== 'Markdown' && getPreviewModeName() !== 'Marp' && getPreviewModeName() !== 'Markmap')) && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
+                onClick={() => handleModeChange('quarto')}
+              >
                 <FileChartColumn className="h-6 w-6" />
               </Button>
             </TooltipTrigger>
@@ -1755,7 +2023,31 @@ export default function MarkdownEditor() {
                     <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-split')} className={`h-7 w-7 ${viewMode === 'quarto-split' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><ChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Quarto)</TooltipContent></Tooltip>
                   </>
                 )}
-                {showToolbarButton('AI Chat View') && <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'triple' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('triple')} className={`h-7 w-7 ${viewMode === 'triple' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><BotMessageSquare size={18} /></Button></TooltipTrigger><TooltipContent>AI Chat View</TooltipContent></Tooltip>}
+                {/* AIチャットボタン - トグル動作を改善 */}
+                {showToolbarButton('AI Chat View') && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant={viewMode === 'triple' ? 'secondary' : 'ghost'} 
+                        size="icon" 
+                        onClick={() => {
+                          if (viewMode === 'triple') {
+                            // AIチャットから戻る時は記憶していた前の状態に戻す
+                            setViewMode(previousViewMode);
+                          } else {
+                            // AIチャットに切り替える時は現在の状態を記憶しておく
+                            setPreviousViewMode(viewMode);
+                            setViewMode('triple');
+                          }
+                        }} 
+                        className={`h-7 w-7 ${viewMode === 'triple' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}
+                      >
+                        <BotMessageSquare size={18} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>AI Chat View</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
               {/* Settings & Drive & Manuals */}
               {/* --- ▼ MODIFIED ▼ --- */}
@@ -1859,278 +2151,130 @@ export default function MarkdownEditor() {
         {/* --- ▼ MODIFIED ▼ --- */}
         {/* flex-grow を適用し、残りの高さを埋めるようにする */}
         <div className="flex-grow overflow-hidden"> {/* overflow-auto から overflow-hidden に変更 */}
-          {/* ResizablePanelGroup and view modes */}
-          {/* (ここの内部構造は変更なし、ただし親要素の高さ管理が変わった) */}
-          {viewMode === 'editor' && (
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {/* ScrollArea に custom-scrollbar を追加 */}
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
+          {/* viewMode が 'triple' の場合のみ TripleLayout を使用、それ以外は通常のレイアウト */}
+          {viewMode === 'triple' ? (
+            <TripleLayout
+              // EditorComponent を含む div に custom-scrollbar を追加
+              editorComponent={<div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>}
+              previewComponent={
+                // 各プレビューコンポーネントは自身のルートに custom-scrollbar がある
+                outputMode === 'marp' ? MarpPreviewComponent :
+                outputMode === 'quarto' ? QuartoPreviewComponent :
+                PreviewComponent
+              }
+              onAIContentInsert={handleAIContentInsert}
+              isDarkMode={isDarkMode}
+              messages={messages}
+              input={input}
+              handleInputChange={handleInputChange}
+              handleSubmit={handleSubmit}
+              isLoading={isLoading}
+              clearMessages={clearMessages}
+              driveEnabled={driveEnabled && isAuthenticated}
+              driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
+              tocVisible={!driveEnabled && isTocVisible}
+              // TOCコンポーネントを ScrollArea でラップし custom-scrollbar を追加
+              tocComponent={
+                (!driveEnabled && isTocVisible) ?
+                <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                  <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                </ScrollArea>
+                : null
+              }
+              getEditorContent={getEditorContentCallback}
+              getSelectedEditorContent={getSelectedEditorContentCallback}
+              replaceSelectedEditorContent={replaceSelectedEditorContentCallback}
+              setInput={setInput}
+              append={append as any}
+            />
+          ) : (
+             /* 通常のビューモード (triple以外) */
+             viewMode.includes('editor') ? (
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                    <>
+                      <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                        {/* ScrollArea に custom-scrollbar を追加 */}
+                        <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                          {driveEnabled && isAuthenticated && accessToken ? (
+                            <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                          ) : (
+                            <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                          )}
+                        </ScrollArea>
+                      </ResizablePanel>
+                      {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                      <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                    </>
+                  ) : null}
+                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                    {/* EditorComponent を含む div に custom-scrollbar を追加 */}
+                    <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+             ) : viewMode.includes('preview') && !viewMode.includes('split') && !viewMode.includes('markmap') ? (
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                    <>
+                      <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                        {/* ScrollArea に custom-scrollbar を追加 */}
+                        <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                          {driveEnabled && isAuthenticated && accessToken ? (
+                            <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                          ) : (
+                            <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                          )}
+                        </ScrollArea>
+                      </ResizablePanel>
+                      {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                      <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                    </>
+                  ) : null}
+                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                    {viewMode.includes('marp') ? MarpPreviewComponent :
+                     viewMode.includes('quarto') ? QuartoPreviewComponent :
+                     viewMode.includes('markmap') ? MarkmapPreviewComponent :
+                     PreviewComponent}
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+             ) : (
+               /* Split View (デフォルト) */
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                    <>
+                      <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                        {/* ScrollArea に custom-scrollbar を追加 */}
+                        <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                          {driveEnabled && isAuthenticated && accessToken ? (
+                            <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                          ) : (
+                            <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                          )}
+                        </ScrollArea>
+                      </ResizablePanel>
+                      {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                      <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                    </>
+                  ) : null}
+                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                    <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
                   </ResizablePanel>
                   {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
                   <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                 {/* EditorComponent を含む div に custom-scrollbar を追加 */}
-                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-          {/* ...他の viewMode の分岐も同様 ... */}
-           {viewMode === 'preview' && (
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {/* ScrollArea に custom-scrollbar を追加 */}
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
+                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                    {viewMode.includes('marp') ? MarpPreviewComponent :
+                     viewMode.includes('quarto') ? QuartoPreviewComponent :
+                     viewMode.includes('markmap') ? MarkmapPreviewComponent :
+                     PreviewComponent}
                   </ResizablePanel>
-                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                {PreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-           {viewMode === 'split' && (
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {/* ScrollArea に custom-scrollbar を追加 */}
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
-                  </ResizablePanel>
-                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
-              </ResizablePanel>
-              {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                {PreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-           {viewMode === 'triple' && (
-             <TripleLayout
-                // EditorComponent を含む div に custom-scrollbar を追加
-                editorComponent={<div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>}
-                previewComponent={
-                    // 各プレビューコンポーネントは自身のルートに custom-scrollbar がある
-                    outputMode === 'marp' ? MarpPreviewComponent :
-                    outputMode === 'quarto' ? QuartoPreviewComponent :
-                    PreviewComponent
-                }
-                onAIContentInsert={handleAIContentInsert}
-                isDarkMode={isDarkMode}
-                messages={messages}
-                input={input}
-                handleInputChange={handleInputChange}
-                handleSubmit={handleSubmit}
-                isLoading={isLoading}
-                clearMessages={clearMessages}
-                driveEnabled={driveEnabled && isAuthenticated}
-                driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
-                tocVisible={!driveEnabled && isTocVisible}
-                // TOCコンポーネントを ScrollArea でラップし custom-scrollbar を追加
-                tocComponent={
-                  (!driveEnabled && isTocVisible) ?
-                   <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                     <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                   </ScrollArea>
-                  : null
-                }
-                getEditorContent={getEditorContentCallback}
-                getSelectedEditorContent={getSelectedEditorContentCallback}
-                replaceSelectedEditorContent={replaceSelectedEditorContentCallback}
-                setInput={setInput}
-                append={append as any}
-              />
-          )}
-           {viewMode === 'marp-preview' && (
-             <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {/* ScrollArea に custom-scrollbar を追加 */}
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
-                  </ResizablePanel>
-                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                {MarpPreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-           {viewMode === 'marp-split' && (
-             <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {/* ScrollArea に custom-scrollbar を追加 */}
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
-                  </ResizablePanel>
-                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
-              </ResizablePanel>
-              {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                {MarpPreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-           {viewMode === 'quarto-preview' && (
-             <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                     {/* ScrollArea に custom-scrollbar を追加 */}
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
-                  </ResizablePanel>
-                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                 {/* QuartoPreviewComponent は自身のルートに custom-scrollbar がある */}
-                {QuartoPreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-           {viewMode === 'quarto-split' && (
-             <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    {/* ScrollArea に custom-scrollbar を追加 */}
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
-                  </ResizablePanel>
-                  {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                 {/* EditorComponent を含む div に custom-scrollbar を追加 */}
-                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
-              </ResizablePanel>
-              {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                 {/* QuartoPreviewComponent は自身のルートに custom-scrollbar がある */}
-                {QuartoPreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-          {/* Markmap View Only */}
-          {viewMode === 'markmap' && (
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
-                  </ResizablePanel>
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                {MarkmapPreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-          {/* Markmap Split View */}
-          {viewMode === 'markmap-split' && (
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
-                <>
-                  <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                    <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                      {driveEnabled && isAuthenticated && accessToken ? (
-                        <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                      ) : (
-                        <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                      )}
-                    </ScrollArea>
-                  </ResizablePanel>
-                  <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                </>
-              ) : null}
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
-              </ResizablePanel>
-              <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-              <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                {MarkmapPreviewComponent}
-              </ResizablePanel>
-            </ResizablePanelGroup>
+                </ResizablePanelGroup>
+             )
           )}
         </div>
         {/* --- ▲ MODIFIED ▲ --- */}
 
         {/* --- Status Bar --- */}
-        {/* ▼ MODIFIED: ダークモードの背景色を black に、ボーダー色を gray-800 に変更 */}
+        {/* ステータスバーはDocumentManagerとDocumentTabsに移動したため非表示
         <div className={`sticky bottom-0 left-0 right-0 p-1 border-t text-xs flex justify-between items-center shrink-0 z-10 ${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717] text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
           <div>Ln {cursorPosition.line}, Col {cursorPosition.col}</div>
           <div>
@@ -2139,6 +2283,7 @@ export default function MarkdownEditor() {
             {isVimMode && <span className="ml-2 font-bold text-green-500">VIM</span>}
           </div>
         </div>
+        */}
 
         {/* Hidden file input for image upload */}
         <input type="file" ref={imageInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
@@ -2227,5 +2372,7 @@ export default function MarkdownEditor() {
 
     </div> /* End Top Level Flex Container */
   )
-}
+})
+
+export default MarkdownEditor
 
