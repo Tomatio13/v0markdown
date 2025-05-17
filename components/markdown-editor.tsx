@@ -105,6 +105,9 @@ import React from 'react'; // React をインポート
 import MarkmapDiagram from "./markmap-diagram"; // Markmapコンポーネントをインポート
 import { cn } from "@/lib/utils"
 import type { DocumentTab } from './document-tabs'
+import FileExplorer from "./file-explorer";
+import { Folder } from "lucide-react";
+// import { useToast } from "@/components/ui/use-toast" // この機能は使用していないため削除
 
 // --- グローバル型定義 ---
 declare global {
@@ -129,8 +132,30 @@ declare global {
 // デフォルトのMarkdownコンテンツ
 const DEFAULT_CONTENT = "# Hello, World!\n\n## Section 1\nSome text\n\n## Section 2\nMore text"
 
+// MarkdownEditorProps型定義を追加
+interface MarkdownEditorProps {
+  initialContent?: string;
+  onContentChange?: (content: string) => void;
+  onEditorStateUpdate?: (cursorPosition: { line: number, col: number }, 
+                        outputMode: 'markdown' | 'marp' | 'quarto', 
+                        previewMode: string | null, 
+                        isVimMode: boolean) => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
+  isFirstAccess?: boolean;
+  onFileSaved?: (fileName: string) => void;
+  tabTitle?: string;
+  onVoiceInputStateChange?: (isListening: boolean, toggleFunc: () => void) => void;
+  onVimModeStateChange?: (isVimMode: boolean, toggleFunc: () => void) => void;
+  tabs?: DocumentTab[];
+  activeTabId?: string;
+  onTabChange?: (id: string) => void;
+  onTabClose?: (id: string) => void;
+  onTabAdd?: () => void;
+}
+
 // --- コンポーネント本体 ---
-const MarkdownEditor = forwardRef(({ 
+const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({ 
   initialContent, 
   onContentChange,
   onEditorStateUpdate,
@@ -146,27 +171,6 @@ const MarkdownEditor = forwardRef(({
   onTabChange, // タブ切り替え時のコールバック
   onTabClose, // タブ閉じる時のコールバック
   onTabAdd, // 新規タブ追加時のコールバック
-}: { 
-  initialContent?: string;
-  onContentChange?: (content: string) => void;
-  onEditorStateUpdate?: (
-    cursorPosition: { line: number, col: number },
-    outputMode: string,
-    previewMode: string | null,
-    isVimMode: boolean
-  ) => void;
-  isDarkMode?: boolean;
-  onToggleDarkMode?: () => void;
-  isFirstAccess?: boolean;
-  onFileSaved?: (fileName: string) => void;
-  tabTitle?: string;
-  onVoiceInputStateChange?: (isListening: boolean, toggleVoiceInput: () => void) => void; // 音声入力状態変更通知用のコールバック
-  onVimModeStateChange?: (isVimMode: boolean, toggleVimMode: () => void) => void; // Vimモード状態変更通知用のコールバック
-  tabs?: DocumentTab[]; // タブリスト用の配列
-  activeTabId?: string; // アクティブなタブのID
-  onTabChange?: (tabId: string) => void; // タブ切り替え時のコールバック
-  onTabClose?: (tabId: string) => void; // タブ閉じる時のコールバック
-  onTabAdd?: () => void; // 新規タブ追加時のコールバック
 }, ref) => {
   // --- State Variables ---
 
@@ -193,6 +197,8 @@ const MarkdownEditor = forwardRef(({
   const [isLoadingThemes, setIsLoadingThemes] = useState(false);
   // AIチャットから戻る時に前の状態を記憶するための状態変数
   const [previousViewMode, setPreviousViewMode] = useState<'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split' | 'markmap' | 'markmap-split'>('split');
+  // ファイルエクスプローラー関連
+  const [isFileExplorerVisible, setIsFileExplorerVisible] = useState(false);
 
   // Google Drive State
   const [driveEnabled, setDriveEnabled] = useState(false)
@@ -337,6 +343,11 @@ const MarkdownEditor = forwardRef(({
       EditorView.theme({
         // デバッグ用枠線 (ここではコメントアウト)
         /* ".cm-tooltip, .cm-panel, ...": { border: "1px dashed blue !important" } */
+        ".cm-panel": { 
+          zIndex: "100 !important", 
+          bottom: "2.5em !important",
+          maxHeight: "calc(100% - 3em) !important"
+        }
       }),
       EditorView.domEventHandlers({
         keydown: (event, view) => {
@@ -1611,7 +1622,7 @@ const MarkdownEditor = forwardRef(({
 
   const PreviewComponent = useMemo(() => (
     // ... (PreviewComponent の定義を useMemo の外に出すことを検討したが、依存関係が多いため、現状維持)
-    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'} relative group`}>
+    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#171717]' : 'bg-white'} relative group`}>
       {/* 拡大・縮小ボタンコンテナ */}
      <div className={`absolute top-2 right-2 z-10 flex items-center space-x-1 p-1 rounded bg-gray-200 dark:bg-[#171717] opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
        <TooltipProvider>
@@ -1664,7 +1675,7 @@ const MarkdownEditor = forwardRef(({
                 } else {
                     return (
                       <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
-                        <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                        <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-[#171717] text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
                           mermaid
                         </div>
                         <SyntaxHighlighter
@@ -1687,7 +1698,7 @@ const MarkdownEditor = forwardRef(({
                 } else {
                   return (
                     <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
-                      <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                      <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-[#171717] text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
                         mindmap
                       </div>
                       <SyntaxHighlighter
@@ -1714,12 +1725,12 @@ const MarkdownEditor = forwardRef(({
                       const headers = Array.from( new Set(value.flatMap((v) => Object.keys(v))) );
                       return (
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead className={isDarkMode ? "bg-gray-700" : "bg-gray-100"}>
+                          <thead className={isDarkMode ? "bg-[#171717]" : "bg-gray-100"}>
                             <tr>
                               {headers.map((h) => ( <th key={h} className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "text-gray-300" : "text-gray-500" }`} > {h} </th> ))}
                             </tr>
                           </thead>
-                          <tbody className={`divide-y ${ isDarkMode ? "bg-gray-800 divide-gray-700" : "bg-white divide-gray-200" }`} >
+                          <tbody className={`divide-y ${ isDarkMode ? "bg-[#1E1E1E] divide-gray-700" : "bg-white divide-gray-200" }`} >
                             {value.map((row, rIdx) => (
                               <tr key={rIdx}>
                                 {headers.map((h) => ( <td key={h} className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue((row as any)?.[h] ?? '')} </td> ))}
@@ -1734,10 +1745,10 @@ const MarkdownEditor = forwardRef(({
                   if (typeof value === 'object' && value !== null) {
                       return (
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <tbody className={`divide-y ${ isDarkMode ? "bg-gray-800 divide-gray-700" : "bg-white divide-gray-200" }`} >
+                          <tbody className={`divide-y ${ isDarkMode ? "bg-[#1E1E1E] divide-gray-700" : "bg-white divide-gray-200" }`} >
                             {Object.entries(value).map(([k, v]) => (
                               <tr key={k}>
-                                <th className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-500" }`} scope="row" > {k} </th>
+                                <th className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "bg-[#171717] text-gray-300" : "bg-gray-100 text-gray-500" }`} scope="row" > {k} </th>
                                 <td className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue(v)} </td>
                               </tr>
                             ))}
@@ -1752,7 +1763,7 @@ const MarkdownEditor = forwardRef(({
                   if (yamlData === undefined || yamlData === null) {
                       return <span className="text-gray-500 italic">(empty YAML)</span>;
                   }
-                  return ( <div className={`yaml-preview my-4 overflow-x-auto border rounded ${ isDarkMode ? "border-gray-600" : "border-gray-300" }`} > {renderYamlValue(yamlData)} </div> );
+                  return ( <div className={`yaml-preview my-4 overflow-x-auto border rounded ${ isDarkMode ? "border-gray-700" : "border-gray-300" }`} > {renderYamlValue(yamlData)} </div> );
                 } catch (err: any) {
                   console.error("YAML Parse Error:", err);
                   return (
@@ -1762,7 +1773,7 @@ const MarkdownEditor = forwardRef(({
                         {err.message || "Invalid YAML"}
                       </div>
                       <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
-                        <div className={`code-language px-4 py-1 text-xs ${ isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700" }`} > yaml </div>
+                        <div className={`code-language px-4 py-1 text-xs ${ isDarkMode ? "bg-[#171717] text-gray-300" : "bg-gray-200 text-gray-700" }`} > yaml </div>
                         <SyntaxHighlighter language="yaml" PreTag="div" style={isDarkMode ? vscDarkPlus as any : oneLight as any} customStyle={{ /* 既存のスタイル */ }} > {codeContent} </SyntaxHighlighter>
                       </div>
                     </>
@@ -1778,7 +1789,7 @@ const MarkdownEditor = forwardRef(({
               // 通常のコードブロックハイライト (YAML/Mermaid以外)
               return (
                 <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
-                  <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-black text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
+                  <div className={`code-language px-4 py-1 text-xs ${isDarkMode ? 'bg-[#171717] text-gray-300' : 'bg-gray-200 text-gray-700'}`}>
                     {language || 'code'} 
                   </div>
                   <SyntaxHighlighter
@@ -1797,7 +1808,7 @@ const MarkdownEditor = forwardRef(({
               return <div className="overflow-x-auto"><table className="my-4 w-full">{children}</table></div>;
             },
             th({ children }) {
-              return <th className={`p-2 border ${isDarkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-100'}`}>{children}</th>;
+              return <th className={`p-2 border ${isDarkMode ? 'border-gray-700 bg-[#171717]' : 'border-gray-300 bg-gray-100'}`}>{children}</th>;
             },
             td({ children }) {
               return <td className={`p-2 border ${isDarkMode ? 'border-gray-700' : 'border-gray-600'}`}>{children}</td>;
@@ -1816,7 +1827,7 @@ const MarkdownEditor = forwardRef(({
 
   // MarpPreviewComponentの定義を修正
   const MarpPreviewComponent = useMemo(() => (
-    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'}`}>
+    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#171717]' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview h-full w-full" style={{ padding: 0 }}> {/* paddingを0に設定 */}
         <MarpPreviewContainer
           markdown={markdownContent}
@@ -1829,7 +1840,7 @@ const MarkdownEditor = forwardRef(({
 
   const QuartoPreviewComponent = useMemo(() => (
     // ... (変更なし) ...
-      <div className="quarto-preview-wrapper h-full overflow-auto custom-scrollbar">
+      <div className={`quarto-preview-wrapper h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#171717]' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview h-full">
         <QuartoPreview
           markdown={markdownContent}
@@ -1843,7 +1854,9 @@ const MarkdownEditor = forwardRef(({
   // ツールバーボタンの表示/非表示を決定するヘルパー
   const showToolbarButton = (buttonName: string): boolean => {
     // 常に表示するボタン
-    if (buttonName === 'VoiceInput' || buttonName === 'VIM ON/OFF' || buttonName === 'Toc ON/OFF' || buttonName === 'Google Drivew ON/OFF' || buttonName === 'Clear Editor' || buttonName === 'AI Chat View' || buttonName === '💡Markmap') {
+    if (buttonName === 'VoiceInput' || buttonName === 'VIM ON/OFF' || buttonName === 'Toc ON/OFF' || 
+        buttonName === 'Google Drivew ON/OFF' || buttonName === 'Clear Editor' || 
+        buttonName === 'AI Chat View' || buttonName === '💡Markmap' || buttonName === 'File Explorer') {
         return true;
     }
     // 基本的なフォーマットボタンも常に表示
@@ -1960,7 +1973,11 @@ const MarkdownEditor = forwardRef(({
     const fetchMarpThemes = async () => {
       setIsLoadingThemes(true);
       try {
-        const response = await fetch('/api/marp-themes');
+        // タイムスタンプを追加してキャッシュを回避
+        const timestamp = new Date().getTime();
+        // 絶対URLに変更し、キャッシュを無効化するクエリパラメータを追加
+        const baseUrl = window.location.origin;
+        const response = await fetch(`${baseUrl}/api/marp-themes?t=${timestamp}`);
         if (!response.ok) {
           console.error('テーマ取得エラー:', response.statusText);
           // エラー時にはデフォルトテーマのみを設定
@@ -1996,7 +2013,7 @@ const MarkdownEditor = forwardRef(({
   // --- ▼ ADDED ▼ ---
   // マインドマップのコンポーネント
   const MarkmapPreviewComponent = useMemo(() => (
-    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#1E1E1EFF]' : 'bg-white'}`}>
+    <div className={`h-full overflow-auto custom-scrollbar ${isDarkMode ? 'bg-[#171717]' : 'bg-white'}`}>
       <div ref={tabPreviewRef} className="markdown-preview h-full w-full" style={{ padding: 0 }}>
         <MarkmapDiagram 
           markdown={markdownContent}
@@ -2126,6 +2143,80 @@ const MarkdownEditor = forwardRef(({
     }
   }, [isVimMode, toggleVimMode, onVimModeStateChange]);
 
+  // ファイルエクスプローラーの表示/非表示を切り替える関数
+  const toggleFileExplorer = useCallback(() => {
+    setIsFileExplorerVisible(prev => {
+      console.log(`ファイルエクスプローラーの表示を切り替えます: ${!prev ? '表示' : '非表示'}`);
+      return !prev;
+    });
+  }, []);
+  
+  // ローカルファイル選択時の処理
+  const handleLocalFileSelect = useCallback(async (filePath: string, fileName: string) => {
+    try {
+      console.log(`ファイル読み込み開始: ${filePath} (${fileName})`);
+      const url = `/api/files/read?path=${encodeURIComponent(filePath)}`;
+      console.log(`API呼び出し: ${url}`);
+      
+      const response = await fetch(url);
+      console.log(`API応答ステータス: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('APIエラーレスポンス:', errorData);
+        throw new Error(errorData.error || `ファイル読み込みエラー: ${response.statusText}`);
+      }
+      
+      // JSONレスポンスを取得
+      const data = await response.json();
+      
+      // Base64エンコードされたコンテンツをデコード
+      let content = '';
+      if (data.contentBase64 && data.encoding === 'base64') {
+        try {
+          // Base64からデコード - UTF-8対応の方法でデコード
+          const binaryStr = atob(data.contentBase64);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          // UTF-8としてデコード
+          content = new TextDecoder('utf-8').decode(bytes);
+          console.log(`Base64からUTF-8としてデコードしました (${content.length}文字)`);
+        } catch (decodeError) {
+          console.error('Base64デコードエラー:', decodeError);
+          throw new Error('ファイルのデコードに失敗しました');
+        }
+      } else if (data.content) {
+        // 古い形式のレスポンス対応（後方互換性）
+        content = data.content;
+        console.log(`通常形式のコンテンツを取得 (${content.length}文字)`);
+      } else {
+        throw new Error('ファイルの内容を取得できませんでした');
+      }
+      
+      // マークダウンコンテンツをセット
+      setMarkdownContent(content);
+      
+      // 新しいタブとして開くことも考慮した処理
+      if (onFileSaved) {
+        // APIから返されたファイル名を使用（日本語ファイル名対応）
+        const displayFileName = data.fileName || fileName;
+        console.log(`ファイル名をタブに設定: ${displayFileName}`);
+        onFileSaved(displayFileName);
+      }
+      
+      // 成功メッセージを表示
+      const displayFileName = data.fileName || fileName;
+      console.log(`ファイル「${displayFileName}」読み込み完了`);
+      alert(`ファイル「${displayFileName}」を読み込みました`);
+    } catch (error) {
+      console.error('ファイル読み込みエラー詳細:', error);
+      // エラーもアラートで表示
+      alert(error instanceof Error ? `エラー: ${error.message}` : "ファイルを読み込めませんでした");
+    }
+  }, [setMarkdownContent, onFileSaved]);
+
   // --- Render ---
   return (
     <div className={`fixed inset-0 flex ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
@@ -2183,6 +2274,20 @@ const MarkdownEditor = forwardRef(({
 
           <div className="w-full border-t my-2"></div>
 
+          {/* ファイルエクスプローラーボタンを追加 */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={isFileExplorerVisible ? 'secondary' : 'ghost'} 
+                size="icon" 
+                className={`h-10 w-10 ${isFileExplorerVisible && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
+                onClick={toggleFileExplorer}
+              >
+                <Folder className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">ファイルエクスプローラー</TooltipContent>
+          </Tooltip>
 
           {/* ▲ ADDED ▲ */}
         </TooltipProvider>
@@ -2468,7 +2573,22 @@ const MarkdownEditor = forwardRef(({
              /* 通常のビューモード (triple以外) */
              viewMode.includes('editor') ? (
                 <ResizablePanelGroup direction="horizontal" className="h-full">
-                  {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                  {/* ファイルエクスプローラーを追加 */}
+                  {isFileExplorerVisible ? (
+                    <>
+                      <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                        <FileExplorer 
+                          onFileSelect={handleLocalFileSelect} 
+                          isDarkMode={isDarkMode} 
+                          className="custom-scrollbar"
+                        />
+                      </ResizablePanel>
+                      <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
+                    </>
+                  ) : null}
+                  
+                  {/* 既存のドライブ/TOC条件 */}
+                  {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
                     <>
                       <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
                         {/* ScrollArea に custom-scrollbar を追加 */}
@@ -2484,14 +2604,29 @@ const MarkdownEditor = forwardRef(({
                       <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                     </>
                   ) : null}
-                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                  <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
                     {/* EditorComponent を含む div に custom-scrollbar を追加 */}
                     <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
                   </ResizablePanel>
                 </ResizablePanelGroup>
              ) : viewMode.includes('preview') && !viewMode.includes('split') && !viewMode.includes('markmap') ? (
                 <ResizablePanelGroup direction="horizontal" className="h-full">
-                  {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                  {/* ファイルエクスプローラーを追加 */}
+                  {isFileExplorerVisible ? (
+                    <>
+                      <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                        <FileExplorer 
+                          onFileSelect={handleLocalFileSelect} 
+                          isDarkMode={isDarkMode} 
+                          className="custom-scrollbar"
+                        />
+                      </ResizablePanel>
+                      <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
+                    </>
+                  ) : null}
+                  
+                  {/* 既存のドライブ/TOC条件 */}
+                  {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
                     <>
                       <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
                         {/* ScrollArea に custom-scrollbar を追加 */}
@@ -2507,7 +2642,7 @@ const MarkdownEditor = forwardRef(({
                       <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                     </>
                   ) : null}
-                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
+                  <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
                     {viewMode.includes('marp') ? MarpPreviewComponent :
                      viewMode.includes('quarto') ? QuartoPreviewComponent :
                      viewMode.includes('markmap') ? MarkmapPreviewComponent :
@@ -2517,7 +2652,22 @@ const MarkdownEditor = forwardRef(({
              ) : (
                /* Split View (デフォルト) */
                 <ResizablePanelGroup direction="horizontal" className="h-full">
-                  {(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? (
+                  {/* ファイルエクスプローラーを追加 */}
+                  {isFileExplorerVisible ? (
+                    <>
+                      <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
+                        <FileExplorer 
+                          onFileSelect={handleLocalFileSelect} 
+                          isDarkMode={isDarkMode} 
+                          className="custom-scrollbar"
+                        />
+                      </ResizablePanel>
+                      <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
+                    </>
+                  ) : null}
+                  
+                  {/* 既存のドライブ/TOC条件 */}
+                  {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
                     <>
                       <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
                         {/* ScrollArea に custom-scrollbar を追加 */}
@@ -2533,12 +2683,14 @@ const MarkdownEditor = forwardRef(({
                       <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
                     </>
                   ) : null}
-                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                  
+                  {/* エディターとプレビューのパネルサイズを調整 */}
+                  <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                     <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
                   </ResizablePanel>
                   {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
                   <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                  <ResizablePanel defaultSize={(driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                  <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
                     {viewMode.includes('marp') ? MarpPreviewComponent :
                      viewMode.includes('quarto') ? QuartoPreviewComponent :
                      viewMode.includes('markmap') ? MarkmapPreviewComponent :
@@ -2569,7 +2721,7 @@ const MarkdownEditor = forwardRef(({
       {/* --- ▼ ADDED: Sidebar (Right) --- */}
       {/* ▼ MODIFIED: w-14 を w-12 に変更 */}
       {/* ▼ MODIFIED: ダークモードの背景色を #171717 に変更 */}
-      <div className={`w-9 flex flex-col items-center py-4 space-y-4 border-l ${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : 'bg-gray-100 border-gray-300'}`}>
+      <div className={`w-9 flex flex-col items-center py-4 space-y-4 border-l ${isDarkMode ? 'dark:bg-[#171717] dark:border-gray-800' : 'bg-gray-100 border-gray-300'}`}>
         <TooltipProvider>
           {/* Save Button */}
           <Tooltip>
