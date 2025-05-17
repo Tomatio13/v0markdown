@@ -188,7 +188,6 @@ export function DocumentTabs({
           <div className="text-right flex-shrink-0 whitespace-nowrap text-muted-foreground/90" style={{ width: '210px', minWidth: '210px' }}>
             <span className="text-[10px]">Mode: {editorMode}</span>
             {previewMode && <span className="ml-1 text-[10px]">Preview: {previewMode}</span>}
-            {isVimMode && <span className="ml-1 font-bold text-green-500 text-[10px]">VIM</span>}
           </div>
         </div>
       </div>
