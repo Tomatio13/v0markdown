@@ -73,6 +73,11 @@ export default function DocumentManager() {
   const [outputMode, setOutputMode] = useState<string>('Markdown')
   const [previewMode, setPreviewMode] = useState<string | null>(null)
   const [isVimMode, setIsVimMode] = useState<boolean>(false)
+  // 音声入力の状態管理を追加
+  const [isListening, setIsListening] = useState<boolean>(false)
+  const [toggleVoiceInput, setToggleVoiceInput] = useState<(() => void) | undefined>(undefined)
+  // Vimモードの状態管理を追加
+  const [toggleVimMode, setToggleVimMode] = useState<(() => void) | undefined>(undefined)
   
   // エディタへの参照
   const editorRef = useRef<any>(null)
@@ -558,8 +563,26 @@ export default function DocumentManager() {
     };
   }, [tabs, activeTabId, editorRef, setPreviewMode]);
 
+  // 音声入力状態変更のコールバック
+  const handleVoiceInputStateChange = useCallback((
+    listening: boolean,
+    toggleFn: () => void
+  ) => {
+    setIsListening(listening);
+    setToggleVoiceInput(() => toggleFn);
+  }, []);
+
+  // Vimモード状態変更のコールバック
+  const handleVimModeStateChange = useCallback((
+    vimMode: boolean,
+    toggleFn: () => void
+  ) => {
+    setIsVimMode(vimMode);
+    setToggleVimMode(() => toggleFn);
+  }, []);
+
   return (
-    <div className="flex flex-col h-screen">
+    <div className="relative flex flex-col h-full w-full overflow-hidden">
       {!isInitialized ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
@@ -619,6 +642,8 @@ export default function DocumentManager() {
                   console.log('===== ファイル保存コールバック終了 (エラー) =====');
                 }
               }}
+              onVoiceInputStateChange={handleVoiceInputStateChange}
+              onVimModeStateChange={handleVimModeStateChange}
             />
           </div>
           
@@ -634,6 +659,9 @@ export default function DocumentManager() {
             previewMode={previewMode}
             isVimMode={isVimMode}
             onToggleTripleLayout={handleToggleTripleLayout}
+            isListening={isListening}
+            onToggleVoiceInput={toggleVoiceInput}
+            onToggleVimMode={toggleVimMode}
           />
         </>
       )}

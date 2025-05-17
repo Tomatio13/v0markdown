@@ -128,6 +128,8 @@ const MarkdownEditor = forwardRef(({
   isFirstAccess = true,
   onFileSaved,
   tabTitle,
+  onVoiceInputStateChange,
+  onVimModeStateChange, // Vimモード状態変更通知用のコールバック
 }: { 
   initialContent?: string;
   onContentChange?: (content: string) => void;
@@ -142,6 +144,8 @@ const MarkdownEditor = forwardRef(({
   isFirstAccess?: boolean;
   onFileSaved?: (fileName: string) => void;
   tabTitle?: string;
+  onVoiceInputStateChange?: (isListening: boolean, toggleVoiceInput: () => void) => void; // 音声入力状態変更通知用のコールバック
+  onVimModeStateChange?: (isVimMode: boolean, toggleVimMode: () => void) => void; // Vimモード状態変更通知用のコールバック
 }, ref) => {
   // --- State Variables ---
 
@@ -1822,6 +1826,20 @@ const MarkdownEditor = forwardRef(({
   */
   // --- ▲ MODIFIED ▲ ---
 
+  // 音声入力の状態を親コンポーネントに通知
+  useEffect(() => {
+    if (onVoiceInputStateChange) {
+      onVoiceInputStateChange(isListening, toggleSpeechRecognition);
+    }
+  }, [isListening, toggleSpeechRecognition, onVoiceInputStateChange]);
+
+  // Vimモードの状態を親コンポーネントに通知
+  useEffect(() => {
+    if (onVimModeStateChange) {
+      onVimModeStateChange(isVimMode, toggleVimMode);
+    }
+  }, [isVimMode, toggleVimMode, onVimModeStateChange]);
+
   // --- Render ---
   return (
     <div className={`fixed inset-0 flex ${isDarkMode ? 'bg-[#1e1e1e] text-gray-100' : 'bg-white text-gray-900'}`}>
@@ -2023,31 +2041,6 @@ const MarkdownEditor = forwardRef(({
                     <Tooltip><TooltipTrigger asChild><Button variant={viewMode === 'quarto-split' ? 'secondary' : 'ghost'} size="icon" onClick={() => setViewMode('quarto-split')} className={`h-7 w-7 ${viewMode === 'quarto-split' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}><ChartColumn size={18} /></Button></TooltipTrigger><TooltipContent>Split View (Quarto)</TooltipContent></Tooltip>
                   </>
                 )}
-                {/* AIチャットボタン - トグル動作を改善 */}
-                {showToolbarButton('AI Chat View') && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant={viewMode === 'triple' ? 'secondary' : 'ghost'} 
-                        size="icon" 
-                        onClick={() => {
-                          if (viewMode === 'triple') {
-                            // AIチャットから戻る時は記憶していた前の状態に戻す
-                            setViewMode(previousViewMode);
-                          } else {
-                            // AIチャットに切り替える時は現在の状態を記憶しておく
-                            setPreviousViewMode(viewMode);
-                            setViewMode('triple');
-                          }
-                        }} 
-                        className={`h-7 w-7 ${viewMode === 'triple' && isDarkMode ? 'dark:bg-[#212121]' : ''}`}
-                      >
-                        <BotMessageSquare size={18} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>AI Chat View</TooltipContent>
-                  </Tooltip>
-                )}
               </div>
               {/* Settings & Drive & Manuals */}
               {/* --- ▼ MODIFIED ▼ --- */}
@@ -2055,27 +2048,7 @@ const MarkdownEditor = forwardRef(({
               {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
               {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
               <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
-                {/* 音声入力ボタン */}
-                {showToolbarButton('VoiceInput') && 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={toggleSpeechRecognition}
-                        className={`h-7 w-7 ${isListening ? "text-red-500" : ""}`}
-                      >
-                        <Mic className={isListening ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{isListening ? "音声入力停止" : "音声入力開始"}</TooltipContent>
-                  </Tooltip>
-                }
-                
-                {showToolbarButton('VIM ON/OFF') && <Tooltip>
-                  <TooltipTrigger asChild><Button variant="outline" size="icon" onClick={toggleVimMode} className="h-7 w-7 dark:bg-[#171717]"><Terminal className="h-4 w-4" /></Button></TooltipTrigger>
-                  <TooltipContent>{isVimMode ? "Disable Vim Mode" : "Enable Vim Mode"}</TooltipContent>
-                </Tooltip>}
+                {/* 以下3つのボタンを削除: 音声入力ボタン、VIM ON/OFFボタン、Toc ON/OFFボタン */}
                 {showToolbarButton('Toc ON/OFF') && <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

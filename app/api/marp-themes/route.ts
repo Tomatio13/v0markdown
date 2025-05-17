@@ -23,10 +23,10 @@ export async function GET() {
       // Next.jsの開発サーバーでは異なるパスになる場合がある
       path.resolve('public', 'marp_themes'),
       // 絶対パスでも試す
-      '/home/masato/Docker/markdown/public/marp_themes'
+      // '/home/masato/Docker/markdown/public/marp_themes'
     ];
 
-    console.log('プロセスの作業ディレクトリ:', process.cwd());
+    // console.log('プロセスの作業ディレクトリ:', process.cwd());
     
     // 各パスを試行
     for (const themesDir of possiblePaths) {
@@ -37,12 +37,12 @@ export async function GET() {
           // ディレクトリであることを確認
           const stats = await stat(themesDir);
           if (stats.isDirectory()) {
-            console.log(`有効なディレクトリを発見: ${themesDir}`);
+            // console.log(`有効なディレクトリを発見: ${themesDir}`);
             successPath = themesDir;
             
             // ファイル一覧を取得
             const files = await readdir(themesDir);
-            console.log(`テーマファイル一覧 (${themesDir}):`, files);
+            // console.log(`テーマファイル一覧 (${themesDir}):`, files);
             
             // .cssファイルのみをフィルタリングし、拡張子を除いたファイル名を取得
             const themeNames = files
@@ -54,7 +54,7 @@ export async function GET() {
               themeNames.unshift('default');
             }
             
-            console.log('送信するテーマ一覧:', themeNames);
+            // console.log('送信するテーマ一覧:', themeNames);
             return NextResponse.json({ themes: themeNames });
           } else {
             console.log(`パスは存在しますが、ディレクトリではありません: ${themesDir}`);
@@ -66,8 +66,8 @@ export async function GET() {
     }
     
     // すべてのパスが失敗した場合、デフォルトのみを返す
-    console.warn('有効なテーマディレクトリが見つかりませんでした。デフォルトテーマのみを使用します。');
-    console.warn('チェックされたパス:', JSON.stringify(allPaths, null, 2));
+    // console.warn('有効なテーマディレクトリが見つかりませんでした。デフォルトテーマのみを使用します。');
+    // console.warn('チェックされたパス:', JSON.stringify(allPaths, null, 2));
     
     return NextResponse.json({ 
       themes: ['default'],

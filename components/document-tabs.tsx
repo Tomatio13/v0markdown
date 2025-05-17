@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { X, Plus, MessageCircle } from 'lucide-react'
+import { X, Plus, MessageCircle, Mic, Terminal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export interface DocumentTab {
   id: string
@@ -25,6 +26,9 @@ interface DocumentTabsProps {
   previewMode?: string | null
   isVimMode?: boolean
   onToggleTripleLayout?: () => void
+  isListening?: boolean
+  onToggleVoiceInput?: () => void
+  onToggleVimMode?: () => void
 }
 
 export function DocumentTabs({
@@ -37,7 +41,10 @@ export function DocumentTabs({
   editorMode = 'Markdown',
   previewMode = null,
   isVimMode = false,
-  onToggleTripleLayout
+  onToggleTripleLayout,
+  isListening = false,
+  onToggleVoiceInput,
+  onToggleVimMode
 }: DocumentTabsProps) {
   // タブの表示が更新されたらスクロールエリアの位置を調整
   const handleTabChange = useCallback((tabId: string) => {
@@ -120,6 +127,8 @@ export function DocumentTabs({
         
         {/* 右側エリア - ステータス情報 */}
         <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-auto mr-3">
+
+          
           {/* AIチャットトグルボタン */}
           {onToggleTripleLayout && (
             <Button 
@@ -132,7 +141,44 @@ export function DocumentTabs({
               <span className="whitespace-nowrap text-[10px]">AIチャット</span>
             </Button>
           )}
-          
+          {/* 音声入力ボタン */}
+          {onToggleVoiceInput && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={`h-6 px-1 text-xs flex-shrink-0 mr-1 ${isListening ? "text-red-500" : "text-muted-foreground hover:text-foreground"}`}
+                    onClick={onToggleVoiceInput}
+                  >
+                    <Mic className={isListening ? "h-3 w-3.5 mr-0.5 animate-pulse" : "h-3 w-3.5 mr-0.5"} />
+                    <span className="whitespace-nowrap text-[10px]">{isListening ? "音声入力中" : "音声入力"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isListening ? "音声入力を停止" : "音声入力を開始"}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {/* Vimモード切り替えボタン */}
+          {onToggleVimMode && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={`h-6 px-1 text-xs flex-shrink-0 mr-1 ${isVimMode ? "text-green-500" : "text-muted-foreground hover:text-foreground"}`}
+                    onClick={onToggleVimMode}
+                  >
+                    <Terminal className="h-3 w-3.5 mr-0.5" />
+                    <span className="whitespace-nowrap text-[10px]">{isVimMode ? "VIM ON" : "VIM OFF"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isVimMode ? "Vimモードを無効化" : "Vimモードを有効化"}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {/* カーソル位置表示 - 固定幅 */}
           <div className="text-right flex-shrink-0 whitespace-nowrap mr-1 text-muted-foreground/90" style={{ width: '85px', minWidth: '85px' }}>
             <span className="text-[10px]">Ln {cursorPosition?.line || 1}, Col {cursorPosition?.col || 1}</span>
