@@ -46,7 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch, Scissors, Copy, ClipboardPaste
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -68,8 +68,17 @@ import { vscodeDark } from "@uiw/codemirror-theme-vscode"
 import { xcodeLight } from "@uiw/codemirror-theme-xcode" // xcodeLight を別パッケージからインポート
 import { EditorView, keymap, lineNumbers } from "@codemirror/view" // view関連をまとめてインポート
 import { vim } from "@replit/codemirror-vim"
-import { EmojiPicker, EmojiContextMenu } from "./emoji-picker"
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { EmojiPicker } from "./emoji-picker"
+import { 
+  ContextMenu, 
+  ContextMenuContent, 
+  ContextMenuItem, 
+  ContextMenuTrigger, 
+  ContextMenuSeparator, 
+  ContextMenuSub, 
+  ContextMenuSubContent, 
+  ContextMenuSubTrigger 
+} from "@/components/ui/context-menu"
 import MermaidDiagram from "./mermaid-diagram"
 import { AIChat } from "./ai-chat"
 import { TripleLayout } from "./triple-layout"
@@ -1304,24 +1313,289 @@ const MarkdownEditor = forwardRef(({
 
   // --- Component Definitions ---
   const EditorComponent = useMemo(() => (
-    // ... (変更なし) ...
-     <EmojiContextMenu onEmojiSelect={insertEmoji}>
-      <CodeMirror
-        value={markdownContent}
-        height="100%" // 親要素の高さに追従
-        extensions={editorExtensions}
-        onChange={handleContentChange}
-        theme={isDarkMode ? vscodeDark : xcodeLight} // 修正: xcodeLight を使用
-        className={`text-md h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`} // h-full を追加
-        onCreateEditor={(view, state) => {
-          viewRef.current = view;
-          handleCursorUpdate(view); // 初期カーソル位置を取得
-          // デバッグ用スタイル設定 (ここではコメントアウト)
-          /* const styleId = 'codemirror-popup-hider'; ... */
-        }}
-      />
-    </EmojiContextMenu>
-  ), [markdownContent, editorExtensions, handleContentChange, isDarkMode, insertEmoji, handleCursorUpdate]);
+    <ContextMenu>
+      <ContextMenuTrigger>
+        <CodeMirror
+          value={markdownContent}
+          height="100%" // 親要素の高さに追従
+          extensions={editorExtensions}
+          onChange={handleContentChange}
+          theme={isDarkMode ? vscodeDark : xcodeLight} // 修正: xcodeLight を使用
+          className={`text-md h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`} // h-full を追加
+          onCreateEditor={(view, state) => {
+            viewRef.current = view;
+            handleCursorUpdate(view); // 初期カーソル位置を取得
+            // デバッグ用スタイル設定 (ここではコメントアウト)
+            /* const styleId = 'codemirror-popup-hider'; ... */
+          }}
+        />
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <span className="flex items-center">
+              <Bold className="mr-2 h-4 w-4" />
+              フォーマット
+            </span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48">
+            <ContextMenuItem onClick={() => insertText("**", "**")}>
+              <Bold className="mr-2 h-4 w-4" />
+              <span>ボールド</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("*", "*")}>
+              <Italic className="mr-2 h-4 w-4" />
+              <span>イタリック</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("~~", "~~")}>
+              <span className="mr-2 h-4 w-4 flex items-center justify-center">S</span>
+              <span>取り消し線</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("==", "==")}>
+              <span className="mr-2 h-4 w-4 flex items-center justify-center">H</span>
+              <span>ハイライト</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("`", "`")}>
+              <Code className="mr-2 h-4 w-4" />
+              <span>コード</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("$", "$")}>
+              <span className="mr-2 h-4 w-4 flex items-center justify-center">∑</span>
+              <span>数学</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("<!-- ", " -->")}>
+              <span className="mr-2 h-4 w-4 flex items-center justify-center">%</span>
+              <span>コメント</span>
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        
+        {/* パラグラフサブメニュー */}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <span className="flex items-center">
+              <ListOrdered className="mr-2 h-4 w-4" />
+              パラグラフ
+            </span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48">
+            <ContextMenuItem onClick={() => insertText("# ", "\n")}>
+              <Heading1 className="mr-2 h-4 w-4" />
+              <span>見出し 1</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("## ", "\n")}>
+              <Heading2 className="mr-2 h-4 w-4" />
+              <span>見出し 2</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("### ", "\n")}>
+              <Heading3 className="mr-2 h-4 w-4" />
+              <span>見出し 3</span>
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => insertText("- ", "\n")}>
+              <List className="mr-2 h-4 w-4" />
+              <span>箇条書きリスト</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("1. ", "\n")}>
+              <ListOrdered className="mr-2 h-4 w-4" />
+              <span>番号付きリスト</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("- [ ] ", "\n")}>
+              <CheckSquare className="mr-2 h-4 w-4" />
+              <span>タスクリスト</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("> ", "\n")}>
+              <Quote className="mr-2 h-4 w-4" />
+              <span>引用</span>
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        
+        {/* 挿入サブメニュー */}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <span className="flex items-center">
+              <Image className="mr-2 h-4 w-4" />
+              挿入
+            </span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48">
+            <ContextMenuItem onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}>
+              <Table className="mr-2 h-4 w-4" />
+              <span>テーブル</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("```\n", "\n```")}>
+              <Code className="mr-2 h-4 w-4" />
+              <span>コードブロック</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("[^1]: ", "\n")}>
+              <span className="mr-2 h-4 w-4 flex items-center justify-center">F</span>
+              <span>Footnote</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("---\n", "")}>
+              <span className="mr-2 h-4 w-4 flex items-center justify-center">—</span>
+              <span>水平線</span>
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}>
+              <Box className="mr-2 h-4 w-4" />
+              <span>Mermaid図</span>
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => insertText("```mindmap\n# マインドマップ\n## トピック1\n### サブトピック\n## トピック2\n### サブトピック\n#### 詳細\n```\n")}>
+              <GitBranch className="mr-2 h-4 w-4" />
+              <span>マインドマップ</span>
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+
+        {/* ヘッダ挿入サブメニュー */}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <span className="flex items-center">
+              <FileCode className="mr-2 h-4 w-4" />
+              ヘッダ挿入
+            </span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48">
+            {/* Quartoヘッダ挿入 */}
+            <ContextMenuItem onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n  html:\n    code-fold: true\njupyter: python3\n---\n\n`, "")}>
+              <FileCode className="mr-2 h-4 w-4" />
+              <span>Quartoヘッダ</span>
+            </ContextMenuItem>
+            
+            {/* Marpテーマ選択 */}
+            <ContextMenuSeparator />
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <span className="flex items-center">
+                  <Palette className="mr-2 h-4 w-4" />
+                  Marpテーマ
+                </span>
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-48">
+                {isLoadingThemes ? (
+                  <div className="flex items-center justify-center py-2 px-4 text-sm text-muted-foreground">
+                    <span className="animate-spin mr-2">⌛</span>テーマ読み込み中...
+                  </div>
+                ) : marpThemes.length > 0 ? (
+                  marpThemes.map((theme) => (
+                    <ContextMenuItem 
+                      key={theme} 
+                      onClick={() => insertMarpHeader(theme)}
+                      className={selectedMarpTheme === theme ? "font-bold bg-muted" : ""}
+                    >
+                      {theme}
+                    </ContextMenuItem>
+                  ))
+                ) : (
+                  <div className="py-2 px-4 text-sm text-muted-foreground">
+                    テーマが見つかりませんでした
+                  </div>
+                )}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+  
+        {/* 絵文字ピッカー */}
+        <ContextMenuSeparator />
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <span className="flex items-center">
+              <Smile className="mr-2 h-4 w-4" />
+              絵文字
+            </span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-80 p-0">
+            <EmojiPicker onEmojiSelect={insertEmoji} />
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        
+        {/* リンクとイメージ */}
+        <ContextMenuSeparator />          
+        <ContextMenuItem onClick={() => insertText("[", "](url)")}>
+          <Link className="mr-2 h-4 w-4" />
+          <span>リンクを追加</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => imageInputRef.current?.click()}>
+          <Image className="mr-2 h-4 w-4" />
+          <span>画像を追加</span>
+        </ContextMenuItem>
+                
+        {/* 編集操作メニュー */}
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => {
+          if (viewRef.current) {
+            const view = viewRef.current;
+            const selection = view.state.selection.main;
+            if (selection.from !== selection.to) {
+              const selectedText = view.state.sliceDoc(selection.from, selection.to);
+              navigator.clipboard.writeText(selectedText);
+              // カット：選択テキストを削除
+              view.dispatch({
+                changes: { from: selection.from, to: selection.to, insert: "" },
+                selection: { anchor: selection.from }
+              });
+              view.focus();
+            }
+          }
+        }}>
+          <Scissors className="mr-2 h-4 w-4" />
+          <span>カット</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => {
+          if (viewRef.current) {
+            const view = viewRef.current;
+            const selection = view.state.selection.main;
+            if (selection.from !== selection.to) {
+              const selectedText = view.state.sliceDoc(selection.from, selection.to);
+              navigator.clipboard.writeText(selectedText);
+              view.focus();
+            }
+          }
+        }}>
+          <Copy className="mr-2 h-4 w-4" />
+          <span>コピー</span>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (viewRef.current && text) {
+              const view = viewRef.current;
+              const pos = view.state.selection.main.head;
+              view.dispatch({
+                changes: { from: pos, to: pos, insert: text },
+                selection: { anchor: pos + text.length }
+              });
+              view.focus();
+            }
+          } catch (err) {
+            console.error('クリップボードからの読み取りに失敗しました:', err);
+          }
+        }}>
+          <ClipboardPaste className="mr-2 h-4 w-4" />
+          <span>ペースト</span>
+        </ContextMenuItem>
+        
+        {/* すべてを選択 */}
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => {
+          if (viewRef.current) {
+            const view = viewRef.current;
+            const doc = view.state.doc;
+            view.dispatch({
+              selection: { anchor: 0, head: doc.length }
+            });
+          }
+        }}>
+          <span className="mr-2 h-4 w-4 flex items-center justify-center">A</span>
+          <span>すべてを選択</span>
+        </ContextMenuItem>
+        {/* 以下を削除: Marpテーマ選択とQuartoヘッダ（挿入サブメニューに移動したため） */}
+      </ContextMenuContent>
+    </ContextMenu>
+  ), [markdownContent, editorExtensions, handleContentChange, isDarkMode, insertText, handleCursorUpdate, imageInputRef, insertEmoji, isLoadingThemes, marpThemes, selectedMarpTheme]);
 
   const PreviewComponent = useMemo(() => (
     // ... (PreviewComponent の定義を useMemo の外に出すことを検討したが、依存関係が多いため、現状維持)
@@ -1920,57 +2194,12 @@ const MarkdownEditor = forwardRef(({
         {/* --- Toolbar --- */}
         {/* ▼ MODIFIED: py-1 を py-0.5 に変更 */}
         {/* ▼ MODIFIED: ダークモードの背景色を black に、ボーダー色を gray-800 に変更 */}
-        <div className={`bg-muted dark:bg-[#171717]  pl-1 pr-2 py-0.5 flex justify-start items-center border-b shrink-0 ${isDarkMode ? 'dark:border-[#171717]' : 'border-gray-300'} overflow-x-auto whitespace-nowrap`}>
+        <div className={`bg-muted dark:bg-[#171717] pl-1 pr-2 py-0.5 flex justify-between items-center border-b shrink-0 ${isDarkMode ? 'dark:border-[#171717]' : 'border-gray-300'} overflow-x-auto whitespace-nowrap`}>
           <TooltipProvider>
+            {/* 左側の要素 */}
             <div className="flex space-x-0 items-center">
-              {/* Headings */}
-              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
-              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
-              {showToolbarButton('H1') && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("# ", "\n")}><Heading1 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 1</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("## ", "\n")}><Heading2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 2</TooltipContent></Tooltip>
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("### ", "\n")}><Heading3 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Heading 3</TooltipContent></Tooltip>
-              </div>}
-              {/* Text Formatting */}
-              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
-              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
-              {(showToolbarButton('Bold') || showToolbarButton('Italic') || showToolbarButton('Emoji')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Bold') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("**", "**")}><Bold className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bold</TooltipContent></Tooltip>}
-                {showToolbarButton('Italic') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("*", "*")}><Italic className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Italic</TooltipContent></Tooltip>}
-                {showToolbarButton('Emoji') && <Popover>
-                  <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Smile className="h-4 w-4" /></Button></PopoverTrigger>
-                  <PopoverContent className="w-80 p-0"><EmojiPicker onEmojiSelect={insertEmoji} /></PopoverContent>
-                </Popover>}
-              </div>}
-              {/* Lists */}
-              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
-              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
-              {(showToolbarButton('Bullet List') || showToolbarButton('Numberd List') || showToolbarButton('Task List')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Bullet List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("- ", "\n")}><List className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Bullet List</TooltipContent></Tooltip>}
-                {showToolbarButton('Numberd List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("1. ", "\n")}><ListOrdered className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Numbered List</TooltipContent></Tooltip>}
-                {showToolbarButton('Task List') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("- [ ] ", "\n")}><CheckSquare className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Task List</TooltipContent></Tooltip>}
-              </div>}
-              {/* Block Elements */}
-              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
-              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
-              {(showToolbarButton('Quato') || showToolbarButton('Code Block') || showToolbarButton('Table') || showToolbarButton('Mermaid') || showToolbarButton('Mindmap')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Quato') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("> ", "\n")}><Quote className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Quote</TooltipContent></Tooltip>}
-                {showToolbarButton('Code Block') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```\n", "\n```")}><Code className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Code Block</TooltipContent></Tooltip>}
-                {showToolbarButton('Table') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("|  |  |\n|--|--|\n|  |  |\n")}><Table className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Table</TooltipContent></Tooltip>}
-                {showToolbarButton('Mermaid') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```mermaid\ngraph TD\n  A[開始] --> B[処理]\n  B --> C[終了]\n```\n")}><Box className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mermaid Diagram</TooltipContent></Tooltip>}
-                {showToolbarButton('Mindmap') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("```mindmap\n# マインドマップ\n## トピック1\n### サブトピック\n## トピック2\n### サブトピック\n#### 詳細\n```\n")}><GitBranch className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Mind Map</TooltipContent></Tooltip>}
-              </div>}
-              {/* Links & Images & Clear */}
-              {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
-              {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
-              {(showToolbarButton('Link') || showToolbarButton('Image') || showToolbarButton('Clear Editor')) && <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
-                {showToolbarButton('Link') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText("[", "](url)")}><Link className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Link</TooltipContent></Tooltip>}
-                {showToolbarButton('Image') && <Tooltip>
-                  <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => imageInputRef.current?.click()} disabled={isUploadingImage}>{isUploadingImage ? <span className="animate-spin h-4 w-4">⌛</span> : <Image className="h-4 w-4" />}</Button></TooltipTrigger>
-                  <TooltipContent>Image</TooltipContent>
-                </Tooltip>}
-                {showToolbarButton('Clear Editor') && <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClearContent}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent>Clear Editor</TooltipContent></Tooltip>}
-              </div>}
+              {/* 削除: Headings, Text Formatting, Lists, Block Elements, Links & Images & Clear のグループをすべて削除 */}
+              
               {(showToolbarButton('Marp Header') || showToolbarButton('Quatro Header')) && (
                 <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
                   {showToolbarButton('Marp Header') && (
@@ -2010,11 +2239,15 @@ const MarkdownEditor = forwardRef(({
                   )}
                   {showToolbarButton('Quatro Header') && <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n html:\n  code-fold: true\njupter: python3\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertText(`---\ntitle: "Quarto Basics"\nformat:\n html:\n  code-fold: true\njupyter: python3\n---\n\n`, "")}><FileCode className="h-4 w-4" /></Button>
                     </TooltipTrigger><TooltipContent>Quarto Header</TooltipContent>
                   </Tooltip>}
                 </div>
               )}
+            </div>
+
+            {/* 右側の要素 */}
+            <div className="flex items-center space-x-1">
               {/* View Mode Buttons */}
               {/* ▼ MODIFIED: ボタンサイズを h-7 w-7 に変更 */}
               {/* ▼ MODIFIED: グループ背景を dark:bg-[#171717] に */}
@@ -2092,7 +2325,7 @@ const MarkdownEditor = forwardRef(({
                  </Tooltip>
                 }
                 {/* Quarto マニュアル */}
-                {showToolbarButton('💡Quatro') && // 条件を '💡Quatro' に修正
+                {showToolbarButton('💡Quatro') && 
                  <Tooltip>
                    <TooltipTrigger asChild>
                      <Button variant="ghost" size="icon" onClick={() => window.open(`/api/preview-markdown?path=${encodeURIComponent('/manual/quatro_manual.md')}`, '_blank')} className="h-7 w-7"> {/* quatro -> quarto */}
