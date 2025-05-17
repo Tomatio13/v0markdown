@@ -255,6 +255,7 @@ export default function MarpPreview({ markdown, isDarkMode = false }: MarpPrevie
         height: '100%',
         overflow: 'auto',
         backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+        paddingBottom: '40px',
       }}
     >
       <div 

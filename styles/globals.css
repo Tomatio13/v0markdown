@@ -21,4 +21,19 @@
   display: none !important;
   width: 0 !important;
   height: 0 !important;
+}
+
+/* Marpプレビュー用スタイル */
+.marp-preview-wrapper {
+  padding-bottom: 40px !important; /* ステータスバーとかぶらないよう下部にパディングを追加 */
+}
+
+/* Marpスライドセクション用に下部余白を追加 */
+.marp-preview-content .marpit section {
+  margin-bottom: 20px !important; /* 各スライド間の余白も確保 */
+}
+
+/* 最後のスライドには特に大きめの余白を持たせる */
+.marp-preview-content .marpit section:last-child {
+  margin-bottom: 40px !important; 
 } 

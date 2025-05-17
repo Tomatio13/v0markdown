@@ -1642,7 +1642,7 @@ const MarkdownEditor = forwardRef(({
       {/* prose クラスをこの div に移動し、style もここに適用 */}
       <div
         ref={tabPreviewRef}
-        className={`markdown-preview p-4 prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`} // prose をここに追加
+        className={`markdown-preview p-4 pb-8 prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`} // prose をここに追加、pb-8で下部に余白追加
         style={{ fontSize: `${previewFontSize}px` }} // インラインスタイルをここに適用
       >
         <ReactMarkdown
@@ -2284,16 +2284,7 @@ const MarkdownEditor = forwardRef(({
                 <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
                   {showToolbarButton('Marp Header') && (
                     <DropdownMenu>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <Palette className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent>Marpテーマ選択</TooltipContent>
-                      </Tooltip>
+ 
                       <DropdownMenuContent align="start">
                         {isLoadingThemes ? (
                           <div className="flex items-center justify-center py-2 px-4 text-sm text-muted-foreground">
