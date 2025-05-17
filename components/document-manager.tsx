@@ -644,6 +644,11 @@ export default function DocumentManager() {
               }}
               onVoiceInputStateChange={handleVoiceInputStateChange}
               onVimModeStateChange={handleVimModeStateChange}
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabChange={handleTabChange}
+              onTabClose={handleCloseTab}
+              onTabAdd={handleAddTab}
             />
           </div>
           

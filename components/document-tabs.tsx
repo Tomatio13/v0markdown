@@ -61,76 +61,10 @@ export function DocumentTabs({
   const activeTab = tabs.find(tab => tab.id === activeTabId)
 
   return (
-    <div className={`w-auto border-t ${isDarkMode ? 'border-border/40 bg-[#171717]' : 'border-gray-200 bg-gray-100'} flex items-center text-xs text-foreground h-7 sticky bottom-0 left-[33px] right-[33px] z-50 mx-[33px]`}>
-      <div className="w-full flex items-center justify-between overflow-hidden px-2 py-1">
-        {/* 左側エリア - タブリスト */}
-        <div className="flex items-center overflow-hidden" style={{ width: '350px', minWidth: '350px', maxWidth: '350px' }}>
-          {/* タブリスト - 完全左寄せ */}
-          <div className="overflow-x-auto overflow-y-hidden scrollbar-hide" style={{ width: '350px', minWidth: '350px', maxWidth: '350px', flexShrink: 0, paddingLeft: 0 }}>
-            <style jsx global>{`
-              /* スクロールバーを強制的に非表示 */
-              .tabs-container::-webkit-scrollbar {
-                display: none !important;
-                width: 0 !important;
-                height: 0 !important;
-              }
-              .tabs-container {
-                -ms-overflow-style: none !important;
-                scrollbar-width: none !important;
-                overflow-y: hidden !important;
-              }
-              /* 横スクロールバーも非表示 */
-              .horizontal-tabs {
-                -ms-overflow-style: none !important;
-                scrollbar-width: none !important;
-              }
-              .horizontal-tabs::-webkit-scrollbar {
-                display: none !important;
-                width: 0 !important;
-                height: 0 !important;
-              }
-            `}</style>
-            <Tabs value={activeTabId} onValueChange={handleTabChange} className="w-full">
-              <TabsList className="h-5 flex justify-start bg-transparent tabs-container">
-                {tabs.map((tab) => (
-                  <TabsTrigger 
-                    key={tab.id}
-                    value={tab.id}
-                    className={cn(
-                      "h-5 px-1.5 text-[10px] text-muted-foreground/90 data-[state=active]:bg-muted/80 data-[state=active]:text-foreground flex items-center gap-1 relative",
-                      tab.isUnsaved && "after:content-['*'] after:ml-0.5"
-                    )}
-                    style={{ width: '70px', minWidth: '70px', maxWidth: '70px', flexShrink: 0 }}
-                  >
-                    <span className="truncate">{tab.title}</span>
-                    <div
-                      className="opacity-50 hover:opacity-100 ml-0.5 h-3 w-3 flex items-center justify-center rounded-full hover:bg-muted-foreground/20 cursor-pointer flex-shrink-0"
-                      onClick={(e) => handleTabClose(e, tab.id)}
-                      aria-label="Close tab"
-                      title="タブを閉じる"
-                    >
-                      <X className="h-2 w-2" />
-                    </div>
-                  </TabsTrigger>
-                ))}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-5 w-5 rounded-sm flex-shrink-0 text-muted-foreground/90 hover:text-foreground"
-                  onClick={onTabAdd}
-                  aria-label="New tab"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </TabsList>
-            </Tabs>
-          </div>
-        </div>
-        
+    <div className={`w-auto border-t ${isDarkMode ? 'border-border/40 bg-[#171717]' : 'border-gray-200 bg-gray-100'} flex items-center text-xs text-foreground h-7 sticky bottom-0 z-10`}>
+      <div className="w-full flex items-center justify-end overflow-hidden px-2 py-1">
         {/* 右側エリア - ステータス情報 */}
         <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-auto mr-3">
-
-          
           {/* AIチャットトグルボタン */}
           {onToggleTripleLayout && (
             <Button 

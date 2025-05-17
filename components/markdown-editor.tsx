@@ -46,7 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch, Scissors, Copy, ClipboardPaste
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch, Scissors, Copy, ClipboardPaste, Plus, X
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -103,6 +103,8 @@ import { load } from "js-yaml";      // ★ 追加：YAML パーサ
 import { type LoadOptions } from 'js-yaml'; // YamlLoadOptions -> LoadOptions に修正
 import React from 'react'; // React をインポート
 import MarkmapDiagram from "./markmap-diagram"; // Markmapコンポーネントをインポート
+import { cn } from "@/lib/utils"
+import type { DocumentTab } from './document-tabs'
 
 // --- グローバル型定義 ---
 declare global {
@@ -139,6 +141,11 @@ const MarkdownEditor = forwardRef(({
   tabTitle,
   onVoiceInputStateChange,
   onVimModeStateChange, // Vimモード状態変更通知用のコールバック
+  tabs = [], // タブリスト用の配列を追加
+  activeTabId = '', // アクティブなタブのID
+  onTabChange, // タブ切り替え時のコールバック
+  onTabClose, // タブ閉じる時のコールバック
+  onTabAdd, // 新規タブ追加時のコールバック
 }: { 
   initialContent?: string;
   onContentChange?: (content: string) => void;
@@ -155,6 +162,11 @@ const MarkdownEditor = forwardRef(({
   tabTitle?: string;
   onVoiceInputStateChange?: (isListening: boolean, toggleVoiceInput: () => void) => void; // 音声入力状態変更通知用のコールバック
   onVimModeStateChange?: (isVimMode: boolean, toggleVimMode: () => void) => void; // Vimモード状態変更通知用のコールバック
+  tabs?: DocumentTab[]; // タブリスト用の配列
+  activeTabId?: string; // アクティブなタブのID
+  onTabChange?: (tabId: string) => void; // タブ切り替え時のコールバック
+  onTabClose?: (tabId: string) => void; // タブ閉じる時のコールバック
+  onTabAdd?: () => void; // 新規タブ追加時のコールバック
 }, ref) => {
   // --- State Variables ---
 
@@ -2198,7 +2210,75 @@ const MarkdownEditor = forwardRef(({
           <TooltipProvider>
             {/* 左側の要素 */}
             <div className="flex space-x-0 items-center">
-              {/* 削除: Headings, Text Formatting, Lists, Block Elements, Links & Images & Clear のグループをすべて削除 */}
+              {/* タブリスト - 左詰め */}
+              <div className="flex items-center overflow-hidden mr-2" style={{ maxWidth: '550px' }}>
+                <div className="overflow-x-auto overflow-y-hidden scrollbar-hide" style={{ maxWidth: '550px', flexShrink: 0, paddingLeft: 0 }}>
+                  <style jsx global>{`
+                    /* スクロールバーを強制的に非表示 */
+                    .tabs-container::-webkit-scrollbar {
+                      display: none !important;
+                      width: 0 !important;
+                      height: 0 !important;
+                    }
+                    .tabs-container {
+                      -ms-overflow-style: none !important;
+                      scrollbar-width: none !important;
+                      overflow-y: hidden !important;
+                    }
+                    /* 横スクロールバーも非表示 */
+                    .horizontal-tabs {
+                      -ms-overflow-style: none !important;
+                      scrollbar-width: none !important;
+                    }
+                    .horizontal-tabs::-webkit-scrollbar {
+                      display: none !important;
+                      width: 0 !important;
+                      height: 0 !important;
+                    }
+                  `}</style>
+                  {tabs.length > 0 && (
+                    <Tabs value={activeTabId} onValueChange={onTabChange} className="w-full">
+                      <TabsList className="h-7 flex justify-start bg-transparent tabs-container">
+                        {tabs.map((tab) => (
+                          <TabsTrigger 
+                            key={tab.id}
+                            value={tab.id}
+                            className={cn(
+                              "h-7 px-2 text-xs text-muted-foreground/90 data-[state=active]:bg-muted/80 data-[state=active]:text-foreground flex items-center gap-1 relative",
+                              tab.isUnsaved && "after:content-['*'] after:ml-0.5"
+                            )}
+                            style={{ width: '100px', minWidth: '100px', maxWidth: '100px', flexShrink: 0 }}
+                          >
+                            <span className="truncate">{tab.title}</span>
+                            <div
+                              className="opacity-50 hover:opacity-100 ml-0.5 h-4 w-4 flex items-center justify-center rounded-full hover:bg-muted-foreground/20 cursor-pointer flex-shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTabClose && onTabClose(tab.id);
+                              }}
+                              aria-label="Close tab"
+                              title="タブを閉じる"
+                            >
+                              <X className="h-3 w-3" />
+                            </div>
+                          </TabsTrigger>
+                        ))}
+                        {onTabAdd && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 rounded-sm flex-shrink-0 text-muted-foreground/90 hover:text-foreground"
+                            onClick={onTabAdd}
+                            aria-label="New tab"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TabsList>
+                    </Tabs>
+                  )}
+                </div>
+              </div>
               
               {(showToolbarButton('Marp Header') || showToolbarButton('Quatro Header')) && (
                 <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-[#171717] p-1 rounded-md mr-1 flex-shrink-0">
