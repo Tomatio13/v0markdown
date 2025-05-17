@@ -134,11 +134,17 @@ export default function DocumentManager() {
         console.log(`タブ "${tabToUpdate.title}" のプレビュータイプを "${tabToUpdate.previewType || 'なし'}" から "${preview}" に更新します`);
         
         // 新しいタブ配列を作成（参照を変更するため）
-        return prevTabs.map(tab => 
-          tab.id === activeTabId 
-            ? { ...tab, previewType: preview } 
-            : tab
-        );
+        return prevTabs.map(tab => {
+          if (tab.id === activeTabId) {
+            // プレビュータイプのみを更新し、isUnsavedは既存の値を維持
+            return { 
+              ...tab, 
+              previewType: preview 
+              // isUnsavedは明示的に指定せずスプレッド演算子で継承
+            };
+          }
+          return tab;
+        });
       });
     }
   }, [activeTabId, ignoreNextPreviewUpdate]);
@@ -405,13 +411,33 @@ export default function DocumentManager() {
   // コンテンツ更新ハンドラ
   const handleContentUpdate = useCallback((content: string) => {
     console.log('コンテンツ更新:', activeTabId);
-    setTabs(prev => 
-      prev.map(tab => 
-        tab.id === activeTabId 
-          ? { ...tab, content, isUnsaved: true } 
-          : tab
-      )
-    )
+    
+    setTabs(prev => {
+      // 現在のタブ情報を取得（デバッグ用）
+      const currentTab = prev.find(tab => tab.id === activeTabId);
+      const isChanged = currentTab && currentTab.content !== content;
+      
+      console.log(`タブ内容更新: ID=${activeTabId}, タイトル=${currentTab?.title}, 変更あり=${isChanged}`);
+      
+      // 内容が実際に変更された場合のみisUnsavedをtrueに設定
+      return prev.map(tab => {
+        if (tab.id === activeTabId) {
+          const shouldMarkUnsaved = tab.content !== content;
+          const updatedTab = { 
+            ...tab, 
+            content,
+            isUnsaved: shouldMarkUnsaved ? true : tab.isUnsaved
+          };
+          
+          if (shouldMarkUnsaved && !tab.isUnsaved) {
+            console.log(`タブ "${tab.title}" を未保存状態に設定: isUnsaved=${tab.isUnsaved} → true`);
+          }
+          
+          return updatedTab;
+        }
+        return tab;
+      });
+    });
   }, [activeTabId])
 
   // 選択されたコンテンツを置換する関数（実装例）
@@ -461,11 +487,19 @@ export default function DocumentManager() {
     }
     
     setTabs(prev => {
-      const updatedTabs = prev.map(tab => 
-        tab.id === tabId 
-          ? { ...tab, title: newTitle, isUnsaved: false } 
-          : tab
-      );
+      const updatedTabs = prev.map(tab => {
+        if (tab.id === tabId) {
+          // タイトル更新と同時に保存済み状態にする
+          const updatedTab = { 
+            ...tab, 
+            title: newTitle, 
+            isUnsaved: false  // 保存されたのでフラグをリセット
+          };
+          console.log(`タブ "${tab.title}" を更新: タイトル="${newTitle}", isUnsaved=${tab.isUnsaved} → false`);
+          return updatedTab;
+        }
+        return tab;
+      });
       
       // ローカルストレージにも保存
       try {
@@ -485,6 +519,12 @@ export default function DocumentManager() {
   // タブ切替ハンドラ - プレビュータイプも復元する
   const handleTabChange = useCallback((tabId: string) => {
     console.log('タブを切り替えます:', tabId);
+    
+    // 現在のタブが変更されていない場合は何もしない
+    if (activeTabId === tabId) {
+      console.log('既に選択されているタブなので何もしません:', tabId);
+      return;
+    }
     
     // 現在のアクティブタブと選択されたタブの情報を詳細に記録（デバッグ用）
     if (activeTabId) {
