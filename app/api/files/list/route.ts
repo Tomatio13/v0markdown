@@ -62,6 +62,16 @@ export async function GET(request: NextRequest) {
       );
     }
     
+    // ディレクトリを先に、ファイルを後に表示するようにソート
+    files.sort((a, b) => {
+      // 両方ともディレクトリまたは両方ともファイルの場合は名前でソート
+      if (a.isDirectory === b.isDirectory) {
+        return a.name.localeCompare(b.name);
+      }
+      // ディレクトリを先に表示
+      return a.isDirectory ? -1 : 1;
+    });
+    
     // console.log(`取得されたファイル数: ${files.length}`);
     
     // 結果をより詳細に返す

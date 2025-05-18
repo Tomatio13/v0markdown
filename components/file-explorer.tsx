@@ -4,8 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { 
   Folder, 
   File, 
-  ChevronRight, 
-  ChevronDown, 
   FileText, 
   FileCode,
   FileJson,
@@ -81,25 +79,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [currentPath, setCurrentPath] = useState('/');
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['/']));
   const [rootDirName, setRootDirName] = useState('root');
+  const [rootDirFullPath, setRootDirFullPath] = useState('');
   // マークダウンファイルのみ表示するフラグをデフォルトでtrueに設定
   const [showOnlyMarkdownFiles, setShowOnlyMarkdownFiles] = useState(true);
-  
-  // フォルダの展開状態を切り替える
-  const toggleFolder = (folderPath: string) => {
-    const newExpandedFolders = new Set(expandedFolders);
-    
-    if (newExpandedFolders.has(folderPath)) {
-      newExpandedFolders.delete(folderPath);
-    } else {
-      newExpandedFolders.add(folderPath);
-      // フォルダを展開時に、そのフォルダ内のファイル一覧を取得
-      loadFiles(folderPath);
-    }
-    
-    setExpandedFolders(newExpandedFolders);
-  };
   
   // ファイル一覧を取得する
   const loadFiles = async (dirPath = '/') => {
@@ -130,6 +113,18 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
       if (data.rootDir) {
         setRootDirName(data.rootDir);
       }
+      
+      // ルートディレクトリのフルパスを保存
+      if (data.fullRootDir) {
+        setRootDirFullPath(data.fullRootDir);
+        // ローカルストレージにルートディレクトリのパスを保存
+        localStorage.setItem('markdownEditorRootDir', data.fullRootDir);
+      }
+      
+      // 現在のパスをローカルストレージに保存
+      console.log('現在のフォルダパスを保存します:', dirPath);
+      localStorage.setItem('markdownEditorCurrentPath', dirPath);
+      
     } catch (error) {
       console.error('Error loading files:', error);
       setError(error instanceof Error ? error.message : String(error));
@@ -140,7 +135,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
   
   // 初回マウント時にファイル一覧を取得
   useEffect(() => {
-    loadFiles('/');
+    // ローカルストレージから最後に開いていたパスを取得
+    const lastPath = localStorage.getItem('markdownEditorCurrentPath') || '/';
+    loadFiles(lastPath);
   }, []);
   
   // Markdownフィルター設定変更時にファイル一覧を再読み込み
@@ -171,9 +168,23 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
   // ファイルがクリックされたときの処理
   const handleFileClick = async (file: FileItem) => {
     if (file.isDirectory) {
-      toggleFolder(file.path);
+      // フォルダの場合は、そのフォルダに移動
+      loadFiles(file.path);
     } else {
       try {
+        // ファイルの場合は、そのファイルを選択
+        // ファイルが存在するフォルダのパスを取得して保存
+        const fileDir = file.path.substring(0, file.path.lastIndexOf('/'));
+        const folderPath = fileDir || '/'; // パスが取得できない場合はルートディレクトリを使用
+        
+        console.log('ファイル選択時のフォルダパス保存:', {
+          filePath: file.path,
+          folderPath: folderPath
+        });
+        
+        // ファイルのあるフォルダパスをローカルストレージに保存
+        localStorage.setItem('markdownEditorCurrentPath', folderPath);
+        
         onFileSelect(file.path, file.name);
       } catch (err: any) {
         console.error('ファイル選択エラー:', err);
@@ -183,9 +194,9 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
     }
   };
 
-  // フォルダツリーをレンダリングする再帰的な関数
-  const renderFileTree = (parentPath = '/') => {
-    // 親パスに基づいてファイルをフィルタリング
+  // ファイル一覧をレンダリングする関数
+  const renderFiles = () => {
+    // 現在のパスのファイルをフィルタリング
     let filteredFiles = files.filter(file => {
       // パス処理を改善
       let fileDirPath;
@@ -195,7 +206,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
         fileDirPath = '/';
       }
       
-      return fileDirPath === parentPath;
+      return fileDirPath === currentPath;
     });
     
     // マークダウンファイルのみ表示するフィルタリングを適用（ディレクトリは常に表示）
@@ -212,13 +223,12 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
       if (error) {
         return <div className="pl-5 py-1 text-red-500">エラー: {error}</div>;
       }
-      return <div className="pl-5 py-1 text-gray-500">(空)</div>;
+      return <div className="pl-5 py-1 text-gray-500">このフォルダには表示可能なファイルがありません</div>;
     }
     
     return filteredFiles.map((file: FileItem) => {
-      const isExpanded = expandedFolders.has(file.path);
       const depth = file.path.split('/').length;
-      const paddingLeft = depth * 12;
+      const paddingLeft = depth * 4; // パディングを調整（ツリー表示ではないため少なくする）
       
       // file.pathだけではなく、ファイルの完全なパスを生成して一意なkeyを作成
       const uniqueKey = `${file.path}-${file.name}-${file.isDirectory ? 'dir' : 'file'}`;
@@ -229,42 +239,34 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
             className={cn(
               "flex items-center py-1 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group rounded-sm",
               "transition-colors duration-150 ease-in-out",
-              !file.isDirectory && file.name.toLowerCase().endsWith('.md') ? "bg-blue-100 dark:bg-[#1A1A1A] border-l-4 border-gray-500 dark:border-gray-700" : ""
+              !file.isDirectory && file.name.toLowerCase().endsWith('.md') ? "bg-blue-100 dark:bg-[#1A1A1A] border-l-4 border-gray-500 dark:border-gray-700" : "",
+              file.isDirectory ? "font-medium" : ""
             )}
             style={{ paddingLeft: `${paddingLeft}px` }}
             onClick={() => handleFileClick(file)}
-            onDoubleClick={() => file.isDirectory ? loadFiles(file.path) : handleFileClick(file)} 
+            onDoubleClick={() => handleFileClick(file)} 
             title={`${file.name}${file.isDirectory ? '' : ` (${formatFileSize(file.size)})`}`}
           >
             {file.isDirectory ? (
-              <>
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 mr-1 text-gray-500 dark:text-gray-400" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 mr-1 text-gray-500 dark:text-gray-400" />
-                )}
-                <Folder className={cn("h-4 w-4 mr-2", isExpanded ? (isDarkMode ? "text-gray-300" : "text-yellow-500") : "text-gray-500 dark:text-gray-400")} />
-              </>
+              <Folder className={cn("h-4 w-4 mr-2", isDarkMode ? "text-gray-300" : "text-blue-500")} />
             ) : (
-              <div className="w-5 ml-4 mr-1"></div> // アイコンの位置揃え用の空div
+              getFileIcon(file.name, isDarkMode)
             )}
-            
-            {!file.isDirectory && getFileIcon(file.name, isDarkMode)}
             
             <span className="truncate flex-1">{file.name}</span>
             
             {!file.isDirectory && (
-              <span className="text-gray-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                {formatFileSize(file.size)}
+              <span className="text-gray-500 text-xs opacity-100 transition-opacity">
+                {new Date(file.modifiedTime).toLocaleString('ja-JP', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }).replace(/\//g, '/').replace(',', '')}
               </span>
             )}
           </div>
-          
-          {file.isDirectory && isExpanded && (
-            <div className="ml-4">
-              {renderFileTree(file.path)}
-            </div>
-          )}
         </div>
       );
     });
@@ -390,7 +392,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
               </div>
             )}
             
-            {renderFileTree(currentPath)}
+            {renderFiles()}
           </div>
         )}
       </ScrollArea>

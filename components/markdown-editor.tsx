@@ -767,6 +767,22 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         // FILE_UPLOADがOFFでない場合、新しいAPIを使用してサーバーサイドに保存
         console.log('HTTP APIを使用してFILE_EXPLORER_ROOT_DIRにファイルを保存します');
         
+        // ローカルストレージから現在のパスとルートディレクトリを取得
+        const currentPath = localStorage.getItem('markdownEditorCurrentPath') || '/';
+        const rootDir = localStorage.getItem('markdownEditorRootDir');
+        
+        console.log('保存先ディレクトリ情報:', {
+          currentPath,
+          rootDir,
+          folderPathType: typeof currentPath,
+          folderPathLength: currentPath.length,
+          requestBodySample: JSON.stringify({
+            fileName: suggestedName,
+            content: markdownContent.substring(0, 50) + '...',
+            folderPath: currentPath
+          }, null, 2)
+        });
+        
         const response = await fetch('/api/files/save', {
           method: 'POST',
           headers: {
@@ -774,7 +790,8 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           },
           body: JSON.stringify({
             fileName: suggestedName,
-            content: markdownContent
+            content: markdownContent,
+            folderPath: currentPath // 現在選択中のフォルダパスを送信
           })
         });
         
