@@ -43,6 +43,22 @@ export const TripleLayout = React.memo(({
   tocVisible = false,
   tocComponent
 }: TripleLayoutProps) => {
+  // エディタとプレビューの比率状態
+  const [editorPreviewRatio, setEditorPreviewRatio] = useState({
+    editor: 50,
+    preview: 50
+  });
+
+  // サイズ変更時のハンドラー
+  const handleResizeEditorPreview = (sizes: number[]) => {
+    if (sizes.length >= 2) {
+      setEditorPreviewRatio({
+        editor: sizes[0],
+        preview: sizes[1]
+      });
+    }
+  };
+
   return (
     <ResizablePanelGroup direction="horizontal" className={`h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
       {/* Google Driveパネル（有効時のみ表示） */}
