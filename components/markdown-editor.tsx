@@ -46,7 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch, Scissors, Copy, ClipboardPaste, Plus, X
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch, Scissors, Copy, ClipboardPaste, Plus, X, Pencil
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -152,6 +152,7 @@ interface MarkdownEditorProps {
   onTabChange?: (id: string) => void;
   onTabClose?: (id: string) => void;
   onTabAdd?: () => void;
+  onUpdateTabTitle?: (id: string, title: string) => void;
 }
 
 // --- コンポーネント本体 ---
@@ -171,6 +172,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   onTabChange, // タブ切り替え時のコールバック
   onTabClose, // タブ閉じる時のコールバック
   onTabAdd, // 新規タブ追加時のコールバック
+  onUpdateTabTitle, // タブ名更新用のコールバック
 }, ref) => {
   // --- State Variables ---
 
@@ -705,49 +707,86 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       console.log('======= ファイル保存開始 =======');
       console.log('提案されたファイル名:', suggestedName, 'タブ名から生成:', Boolean(tabTitle && tabTitle !== 'Untitled'));
       
-      if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
-        console.log('File System Access APIを使用します');
-        const fileHandle = await window.showSaveFilePicker({
-          suggestedName,
-          types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
-        });
+      // 環境変数FILE_UPLOADがOFFの場合、従来のローカル保存処理を行う
+      const fileUploadEnabled = process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF';
+      
+      if (!fileUploadEnabled) {
+        console.log('FILE_UPLOAD=OFFのため、従来のローカル保存処理を実行します');
         
-        // ファイルハンドルから名前を取得（実際にユーザーが選択した名前）
-        const fileHandleAny = fileHandle as any;
-        console.log('ファイルハンドル:', fileHandleAny);
-        
-        // 名前プロパティの存在確認
-        let fileName = suggestedName;
-        if (fileHandleAny && 'name' in fileHandleAny) {
-          fileName = fileHandleAny.name;
-          console.log('取得したファイル名:', fileName);
+        if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
+          console.log('File System Access APIを使用します');
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName,
+            types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+          });
+          
+          // ファイルハンドルから名前を取得（実際にユーザーが選択した名前）
+          const fileHandleAny = fileHandle as any;
+          console.log('ファイルハンドル:', fileHandleAny);
+          
+          // 名前プロパティの存在確認
+          let fileName = suggestedName;
+          if (fileHandleAny && 'name' in fileHandleAny) {
+            fileName = fileHandleAny.name;
+            console.log('取得したファイル名:', fileName);
+          } else {
+            console.warn('ファイルハンドルからname属性を取得できませんでした');
+          }
+          
+          const writable = await fileHandle.createWritable();
+          await writable.write(markdownContent);
+          await writable.close();
+          console.log("ファイルが保存されました (File System Access API)");
+          
+          // 実際にユーザーが選択したファイル名を使用
+          if (onFileSaved) {
+            console.log('onFileSavedコールバックを呼び出します。ファイル名:', fileName);
+            onFileSaved(fileName);
+          }
         } else {
-          console.warn('ファイルハンドルからname属性を取得できませんでした');
-        }
-        
-        const writable = await fileHandle.createWritable();
-        await writable.write(markdownContent);
-        await writable.close();
-        console.log("ファイルが保存されました (File System Access API)");
-        
-        // 実際にユーザーが選択したファイル名を使用
-        if (onFileSaved) {
-          console.log('onFileSavedコールバックを呼び出します。ファイル名:', fileName);
-          onFileSaved(fileName);
+          console.log('従来のダウンロード方式を使用します');
+          // Fallback
+          const blob = new Blob([markdownContent], { type: "text/markdown" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = suggestedName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          console.log("従来の方法でファイルがダウンロードされました:", suggestedName);
+          
+          // ファイル保存後に親コンポーネントに通知
+          if (onFileSaved) {
+            console.log('onFileSavedコールバックを呼び出します。ファイル名:', suggestedName);
+            onFileSaved(suggestedName);
+          }
         }
       } else {
-        console.log('従来のダウンロード方式を使用します');
-        // Fallback
-        const blob = new Blob([markdownContent], { type: "text/markdown" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = suggestedName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        console.log("従来の方法でファイルがダウンロードされました:", suggestedName);
+        // FILE_UPLOADがOFFでない場合、新しいAPIを使用してサーバーサイドに保存
+        console.log('HTTP APIを使用してFILE_EXPLORER_ROOT_DIRにファイルを保存します');
+        
+        const response = await fetch('/api/files/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            fileName: suggestedName,
+            content: markdownContent
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('ファイル保存結果:', result);
+        
+        alert(`ファイル「${suggestedName}」をサーバーに保存しました`);
         
         // ファイル保存後に親コンポーネントに通知
         if (onFileSaved) {
@@ -755,9 +794,11 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           onFileSaved(suggestedName);
         }
       }
+      
       console.log('======= ファイル保存完了 =======');
     } catch (error) {
       console.error("ファイル保存中にエラーが発生しました:", error);
+      alert(`保存エラー: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsSaving(false);
     }
@@ -1853,10 +1894,16 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   // --- ▼ ADDED ▼ ---
   // ツールバーボタンの表示/非表示を決定するヘルパー
   const showToolbarButton = (buttonName: string): boolean => {
+    // File UploaderがOFFの場合、ファイルエクスプローラーボタンを非表示
+    if (buttonName === 'File Explorer' && process.env.NEXT_PUBLIC_FILE_UPLOAD === 'OFF') {
+      return false;
+    }
+    
     // 常に表示するボタン
     if (buttonName === 'VoiceInput' || buttonName === 'VIM ON/OFF' || buttonName === 'Toc ON/OFF' || 
         buttonName === 'Google Drivew ON/OFF' || buttonName === 'Clear Editor' || 
-        buttonName === 'AI Chat View' || buttonName === '💡Markmap' || buttonName === 'File Explorer') {
+        buttonName === 'AI Chat View' || buttonName === '💡Markmap' || 
+        (buttonName === 'File Explorer' && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF')) {
         return true;
     }
     // 基本的なフォーマットボタンも常に表示
@@ -2145,6 +2192,12 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
 
   // ファイルエクスプローラーの表示/非表示を切り替える関数
   const toggleFileExplorer = useCallback(() => {
+    // FILE_UPLOADがOFFの場合は何もしない
+    if (process.env.NEXT_PUBLIC_FILE_UPLOAD === 'OFF') {
+      console.log('FILE_UPLOAD=OFFのため、ファイルエクスプローラーは使用できません');
+      return;
+    }
+    
     setIsFileExplorerVisible(prev => {
       console.log(`ファイルエクスプローラーの表示を切り替えます: ${!prev ? '表示' : '非表示'}`);
       return !prev;
@@ -2275,19 +2328,21 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           <div className="w-full border-t my-2"></div>
 
           {/* ファイルエクスプローラーボタンを追加 */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant={isFileExplorerVisible ? 'secondary' : 'ghost'} 
-                size="icon" 
-                className={`h-10 w-10 ${isFileExplorerVisible && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
-                onClick={toggleFileExplorer}
-              >
-                <Folder className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">ファイルエクスプローラー</TooltipContent>
-          </Tooltip>
+          {process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant={isFileExplorerVisible ? 'secondary' : 'ghost'} 
+                  size="icon" 
+                  className={`h-10 w-10 ${isFileExplorerVisible && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
+                  onClick={toggleFileExplorer}
+                >
+                  <Folder className="h-6 w-6" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">ファイルエクスプローラー</TooltipContent>
+            </Tooltip>
+          )}
 
           {/* ▲ ADDED ▲ */}
         </TooltipProvider>
@@ -2344,30 +2399,99 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
                   {tabs.length > 0 && (
                     <Tabs value={activeTabId} onValueChange={onTabChange} className="w-full">
                       <TabsList className="h-7 flex justify-start bg-transparent tabs-container">
-                        {tabs.map((tab) => (
-                          <TabsTrigger 
-                            key={tab.id}
-                            value={tab.id}
-                            className={cn(
-                              "h-7 px-2 text-xs text-muted-foreground/90 data-[state=active]:bg-muted/80 data-[state=active]:text-foreground flex items-center gap-1 relative",
-                              tab.isUnsaved && "after:content-['*'] after:ml-0.5"
-                            )}
-                            style={{ width: '100px', minWidth: '100px', maxWidth: '100px', flexShrink: 0 }}
-                          >
-                            <span className="truncate">{tab.title}</span>
-                            <div
-                              className="opacity-50 hover:opacity-100 ml-0.5 h-4 w-4 flex items-center justify-center rounded-full hover:bg-muted-foreground/20 cursor-pointer flex-shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onTabClose && onTabClose(tab.id);
-                              }}
-                              aria-label="Close tab"
-                              title="タブを閉じる"
+                        {tabs.map((tab) => {
+                          const [isEditing, setIsEditing] = useState(false);
+                          const [editValue, setEditValue] = useState(tab.title);
+                          const inputRef = useRef<HTMLInputElement>(null);
+                          
+                          const startEditing = (e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            setIsEditing(true);
+                            setEditValue(tab.title);
+                            
+                            // フォーカスを遅延設定（DOMが更新された後）
+                            setTimeout(() => {
+                              if (inputRef.current) {
+                                inputRef.current.focus();
+                                inputRef.current.select();
+                              }
+                            }, 50);
+                          };
+                          
+                          const confirmEdit = (e?: React.MouseEvent | React.FormEvent) => {
+                            if (e) e.stopPropagation();
+                            if (editValue.trim() !== '' && onUpdateTabTitle) {
+                              onUpdateTabTitle(tab.id, editValue.trim());
+                            }
+                            setIsEditing(false);
+                          };
+                          
+                          const handleKeyDown = (e: React.KeyboardEvent) => {
+                            if (e.key === 'Enter') {
+                              confirmEdit();
+                            } else if (e.key === 'Escape') {
+                              setIsEditing(false);
+                            }
+                          };
+                          
+                          return (
+                            <TabsTrigger 
+                              key={tab.id}
+                              value={tab.id}
+                              className={cn(
+                                "h-7 px-2 text-xs text-muted-foreground/90 data-[state=active]:bg-muted/80 data-[state=active]:text-foreground flex items-center gap-1 relative group",
+                                tab.isUnsaved && "after:content-['*'] after:ml-0.5"
+                              )}
+                              style={{ width: '100px', minWidth: '100px', maxWidth: '100px', flexShrink: 0 }}
+                              onClick={() => !isEditing && onTabChange && onTabChange(tab.id)}
                             >
-                              <X className="h-3 w-3" />
-                            </div>
-                          </TabsTrigger>
-                        ))}
+                              {isEditing ? (
+                                <form 
+                                  onSubmit={confirmEdit}
+                                  onClick={(e) => e.stopPropagation()} 
+                                  className="flex items-center w-full"
+                                >
+                                  <input
+                                    ref={inputRef}
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    onBlur={confirmEdit}
+                                    className="h-5 w-full py-0 px-1 text-xs bg-background border border-input rounded"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </form>
+                              ) : (
+                                <>
+                                  <span className="truncate">{tab.title}</span>
+                                  <div className="opacity-0 group-hover:opacity-100 inline-flex ml-auto">
+                                    {tab.id === activeTabId && (
+                                      <button
+                                        type="button"
+                                        className="h-4 w-4 p-0 flex items-center justify-center rounded-full hover:bg-muted-foreground/20"
+                                        onClick={startEditing}
+                                        aria-label="Edit tab name"
+                                      >
+                                        <Pencil className="h-2.5 w-2.5" />
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="h-4 w-4 p-0 ml-0.5 flex items-center justify-center rounded-full hover:bg-muted-foreground/20"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onTabClose && onTabClose(tab.id);
+                                      }}
+                                      aria-label="Close tab"
+                                    >
+                                      <X className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </TabsTrigger>
+                          );
+                        })}
                         {onTabAdd && (
                           <Button 
                             variant="ghost" 
@@ -2574,7 +2698,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
              viewMode.includes('editor') ? (
                 <ResizablePanelGroup direction="horizontal" className="h-full">
                   {/* ファイルエクスプローラーを追加 */}
-                  {isFileExplorerVisible ? (
+                  {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
                     <>
                       <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
                         <FileExplorer 
@@ -2612,7 +2736,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
              ) : viewMode.includes('preview') && !viewMode.includes('split') && !viewMode.includes('markmap') ? (
                 <ResizablePanelGroup direction="horizontal" className="h-full">
                   {/* ファイルエクスプローラーを追加 */}
-                  {isFileExplorerVisible ? (
+                  {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
                     <>
                       <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
                         <FileExplorer 
@@ -2653,7 +2777,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
                /* Split View (デフォルト) */
                 <ResizablePanelGroup direction="horizontal" className="h-full">
                   {/* ファイルエクスプローラーを追加 */}
-                  {isFileExplorerVisible ? (
+                  {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
                     <>
                       <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
                         <FileExplorer 

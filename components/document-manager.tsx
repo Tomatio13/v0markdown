@@ -689,6 +689,7 @@ export default function DocumentManager() {
               onTabChange={handleTabChange}
               onTabClose={handleCloseTab}
               onTabAdd={handleAddTab}
+              onUpdateTabTitle={updateTabTitle}
             />
           </div>
           
@@ -708,6 +709,7 @@ export default function DocumentManager() {
             onToggleVoiceInput={toggleVoiceInput}
             onToggleVimMode={toggleVimMode}
             isDarkMode={isDarkMode}
+            onUpdateTabTitle={updateTabTitle}
           />
         </>
       )}

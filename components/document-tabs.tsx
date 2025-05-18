@@ -1,11 +1,12 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { X, Plus, MessageCircle, Mic, Terminal } from 'lucide-react'
+import { X, Plus, MessageCircle, Mic, Terminal, Check, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Input } from '@/components/ui/input'
 
 export interface DocumentTab {
   id: string
@@ -30,6 +31,7 @@ interface DocumentTabsProps {
   onToggleVoiceInput?: () => void
   onToggleVimMode?: () => void
   isDarkMode?: boolean
+  onUpdateTabTitle?: (tabId: string, newTitle: string) => void
 }
 
 export function DocumentTabs({
@@ -46,25 +48,18 @@ export function DocumentTabs({
   isListening = false,
   onToggleVoiceInput,
   onToggleVimMode,
-  isDarkMode = false
+  isDarkMode = false,
+  onUpdateTabTitle
 }: DocumentTabsProps) {
-  // タブの表示が更新されたらスクロールエリアの位置を調整
-  const handleTabChange = useCallback((tabId: string) => {
-    onTabChange(tabId)
-  }, [onTabChange])
-
-  const handleTabClose = useCallback((e: React.MouseEvent, tabId: string) => {
-    e.stopPropagation()
-    onTabClose(tabId)
-  }, [onTabClose])
-
-  const activeTab = tabs.find(tab => tab.id === activeTabId)
-
+  // ステータスバー情報のみを表示する
   return (
     <div className={`w-auto border-t ${isDarkMode ? 'border-border/40 bg-[#171717]' : 'border-gray-200 bg-gray-100'} flex items-center text-xs text-foreground h-7 sticky bottom-0 z-10`}>
-      <div className="w-full flex items-center justify-end overflow-hidden px-2 py-1">
+      <div className="w-full flex items-center justify-between overflow-hidden px-2 py-1">
+        {/* 左側エリア - 空にする（タブリストを削除） */}
+        <div></div>
+
         {/* 右側エリア - ステータス情報 */}
-        <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-auto mr-3">
+        <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-auto">
           {/* AIチャットトグルボタン */}
           {onToggleTripleLayout && (
             <Button 
