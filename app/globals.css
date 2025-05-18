@@ -126,10 +126,12 @@
   line-height: 1.5;
 }
 
+/* コードブロックのスタイル - ライトモード用 */
 .prose pre {
-  background-color: #1e1e1e;
-  color: #d4d4d4;
+  background-color: #f5f5f5; /* ライトモード時は薄いグレー背景 */
+  color: #333333; /* ライトモード時は濃い灰色テキスト */
   border-radius: 6px;
+  border: 1px solid #e0e0e0; /* 境界線を追加*/
 }
 
 .prose code {
@@ -199,10 +201,26 @@
   color: #d4d4d4;
 }
 
+/* シンタックスハイライト - ライトモード用 */
+pre[class*="language-"] {
+  background-color: #f5f5f5 !important; /* ライトモード時は薄いグレー背景 */
+  border: 1px solid #e0e0e0; /* 境界線を追加 */
+}
+
 /* シンタックスハイライターのダークモード対応 */
 .dark pre[class*="language-"] {
   background-color: #000000 !important; /* 黒背景 */
   border: none; /* 境界線を削除 */
+}
+
+/* インラインコードのスタイル - ライトモード用 */
+.prose :not(pre) > code {
+  background-color: #f5f5f5;
+  color: #333333;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  border: 0px solid #e0e0e0; /* 境界線を追加 */
+  font-size: 0.875em;
 }
 
 /* インラインコードのダークモード対応 */
@@ -215,7 +233,19 @@
   font-size: 0.875em;
 }
 
-/* シンタックスハイライトの色調整 */
+/* トークンの色 - ライトモード用 */
+.token.keyword { color: #0000ff !important; } /* キーワード - 青 */
+.token.string { color: #a31515 !important; } /* 文字列 - 赤茶色 */
+.token.function { color: #795e26 !important; } /* 関数名 - 茶色 */
+.token.comment { color: #008000 !important; } /* コメント - 緑 */
+.token.class-name { color: #267f99 !important; } /* クラス名 - 青緑 */
+.token.operator { color: #000000 !important; } /* 演算子 - 黒 */
+.token.number { color: #098658 !important; } /* 数値 - 緑 */
+.token.builtin { color: #267f99 !important; } /* 組み込み関数 - 青緑 */
+.token.punctuation { color: #000000 !important; } /* 句読点 - 黒 */
+.token.property { color: #001080 !important; } /* プロパティ - 濃い青 */
+
+/* シンタックスハイライトの色調整 - ダークモード用 */
 .dark .token.keyword { color: #569CD6 !important; } /* キーワード（import, as など） */
 .dark .token.string { color: #CE9178 !important; } /* 文字列 */
 .dark .token.function { color: #DCDCAA !important; } /* 関数名 */

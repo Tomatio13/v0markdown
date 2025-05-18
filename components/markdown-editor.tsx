@@ -847,10 +847,13 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     const htmlContent = `
     <!DOCTYPE html><html><head><title>Markdown Preview</title><style>
     body{font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;}
-    pre{background-color:#1E1E1E;border-radius:3px;padding:16px;overflow:auto;color:#D4D4D4;}
+    pre{background-color:#f5f5f5;border-radius:6px;padding:16px;overflow:auto;color:#333333;border:1px solid #e0e0e0;}
     pre code{font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background:none;padding:0;color:inherit;}
     code:not(pre > code){font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background-color:rgba(27,31,35,.05);padding:.2em .4em;margin:0;font-size:85%;border-radius:3px;}
-    .token.comment{color:#6A9955;}.token.string{color:#CE9178;}.token.keyword{color:#569CD6;}.token.function{color:#DCDCAA;}.token.number{color:#B5CEA8;}.token.operator{color:#D4D4D4;}.token.class-name{color:#4EC9B0;}
+    /* ライトモード用のトークンカラー */
+    .token.keyword{color:#0000ff;}.token.string{color:#a31515;}.token.function{color:#795e26;}.token.comment{color:#008000;}
+    .token.class-name{color:#267f99;}.token.operator{color:#000000;}.token.number{color:#098658;}.token.builtin{color:#267f99;}
+    .token.punctuation{color:#000000;}.token.property{color:#001080;}
     table{border-collapse:collapse;width:100%;margin-bottom:16px;border-spacing:0;}
     table th, table td{border:1px solid #ddd;padding:8px 12px;text-align:left;}
     /* Remove the background color for even rows */
@@ -1772,72 +1775,72 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
                 }
               }
 
-              // YAML Preview Logic
-              if (language === "yaml" && !isInline) {
-                const renderYamlValue = (value: any): React.ReactNode => {
-                  if ( value === null || ["string", "number", "boolean"].includes(typeof value)) {
-                    return <span>{String(value)}</span>;
-                  }
-                  if (Array.isArray(value)) {
-                    if (value.length && value.every( (v) => v && typeof v === "object" && !Array.isArray(v) )) {
-                      const headers = Array.from( new Set(value.flatMap((v) => Object.keys(v))) );
-                      return (
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead className={isDarkMode ? "bg-[#171717]" : "bg-gray-100"}>
-                            <tr>
-                              {headers.map((h) => ( <th key={h} className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "text-gray-300" : "text-gray-500" }`} > {h} </th> ))}
-                            </tr>
-                          </thead>
-                          <tbody className={`divide-y ${ isDarkMode ? "bg-[#1E1E1E] divide-gray-700" : "bg-white divide-gray-200" }`} >
-                            {value.map((row, rIdx) => (
-                              <tr key={rIdx}>
-                                {headers.map((h) => ( <td key={h} className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue((row as any)?.[h] ?? '')} </td> ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      );
-                    }
-                    return ( <ul className="list-disc pl-4"> {value.map((v, i) => ( <li key={i}>{renderYamlValue(v)}</li> ))} </ul> );
-                  }
-                  if (typeof value === 'object' && value !== null) {
-                      return (
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <tbody className={`divide-y ${ isDarkMode ? "bg-[#1E1E1E] divide-gray-700" : "bg-white divide-gray-200" }`} >
-                            {Object.entries(value).map(([k, v]) => (
-                              <tr key={k}>
-                                <th className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "bg-[#171717] text-gray-300" : "bg-gray-100 text-gray-500" }`} scope="row" > {k} </th>
-                                <td className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue(v)} </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      );
-                  }
-                  return <span>{String(value)}</span>;
-                };
-                try {
-                  const yamlData = load(codeContent, { json: true } as LoadOptions);
-                  if (yamlData === undefined || yamlData === null) {
-                      return <span className="text-gray-500 italic">(empty YAML)</span>;
-                  }
-                  return ( <div className={`yaml-preview my-4 overflow-x-auto border rounded ${ isDarkMode ? "border-gray-700" : "border-gray-300" }`} > {renderYamlValue(yamlData)} </div> );
-                } catch (err: any) {
-                  console.error("YAML Parse Error:", err);
-                  return (
-                    <>
-                      <div className="yaml-parse-error my-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 rounded">
-                        <strong>YAML Parse Error:</strong>{" "}
-                        {err.message || "Invalid YAML"}
-                      </div>
-                      <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
-                        <div className={`code-language px-4 py-1 text-xs ${ isDarkMode ? "bg-[#171717] text-gray-300" : "bg-gray-200 text-gray-700" }`} > yaml </div>
-                        <SyntaxHighlighter language="yaml" PreTag="div" style={isDarkMode ? vscDarkPlus as any : oneLight as any} customStyle={{ /* 既存のスタイル */ }} > {codeContent} </SyntaxHighlighter>
-                      </div>
-                    </>
-                  );
-                }
-              }
+              // // YAML Preview Logic
+              // if (language === "yaml" && !isInline) {
+              //   const renderYamlValue = (value: any): React.ReactNode => {
+              //     if ( value === null || ["string", "number", "boolean"].includes(typeof value)) {
+              //       return <span>{String(value)}</span>;
+              //     }
+              //     if (Array.isArray(value)) {
+              //       if (value.length && value.every( (v) => v && typeof v === "object" && !Array.isArray(v) )) {
+              //         const headers = Array.from( new Set(value.flatMap((v) => Object.keys(v))) );
+              //         return (
+              //           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              //             <thead className={isDarkMode ? "bg-[#171717]" : "bg-gray-100"}>
+              //               <tr>
+              //                 {headers.map((h) => ( <th key={h} className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "text-gray-300" : "text-gray-500" }`} > {h} </th> ))}
+              //               </tr>
+              //             </thead>
+              //             <tbody className={`divide-y ${ isDarkMode ? "bg-[#1E1E1E] divide-gray-700" : "bg-white divide-gray-200" }`} >
+              //               {value.map((row, rIdx) => (
+              //                 <tr key={rIdx}>
+              //                   {headers.map((h) => ( <td key={h} className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue((row as any)?.[h] ?? '')} </td> ))}
+              //                 </tr>
+              //               ))}
+              //             </tbody>
+              //           </table>
+              //         );
+              //       }
+              //       return ( <ul className="list-disc pl-4"> {value.map((v, i) => ( <li key={i}>{renderYamlValue(v)}</li> ))} </ul> );
+              //     }
+              //     if (typeof value === 'object' && value !== null) {
+              //         return (
+              //           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              //             <tbody className={`divide-y ${ isDarkMode ? "bg-[#1E1E1E] divide-gray-700" : "bg-white divide-gray-200" }`} >
+              //               {Object.entries(value).map(([k, v]) => (
+              //                 <tr key={k}>
+              //                   <th className={`px-4 py-2 text-left text-xs font-medium uppercase tracking-wider ${ isDarkMode ? "bg-[#171717] text-gray-300" : "bg-gray-100 text-gray-500" }`} scope="row" > {k} </th>
+              //                   <td className={`px-4 py-2 whitespace-nowrap text-sm ${ isDarkMode ? "text-gray-300" : "text-gray-900" }`} > {renderYamlValue(v)} </td>
+              //                 </tr>
+              //               ))}
+              //             </tbody>
+              //           </table>
+              //         );
+              //     }
+              //     return <span>{String(value)}</span>;
+              //   };
+              //   try {
+              //     const yamlData = load(codeContent, { json: true } as LoadOptions);
+              //     if (yamlData === undefined || yamlData === null) {
+              //         return <span className="text-gray-500 italic">(empty YAML)</span>;
+              //     }
+              //     return ( <div className={`yaml-preview my-4 overflow-x-auto border rounded ${ isDarkMode ? "border-gray-700" : "border-gray-300" }`} > {renderYamlValue(yamlData)} </div> );
+              //   } catch (err: any) {
+              //     console.error("YAML Parse Error:", err);
+              //     return (
+              //       <>
+              //         <div className="yaml-parse-error my-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 rounded">
+              //           <strong>YAML Parse Error:</strong>{" "}
+              //           {err.message || "Invalid YAML"}
+              //         </div>
+              //         <div className="code-block-wrapper my-4 rounded-md overflow-hidden">
+              //           <div className={`code-language px-4 py-1 text-xs ${ isDarkMode ? "bg-[#171717] text-gray-300" : "bg-gray-200 text-gray-700" }`} > yaml </div>
+              //           <SyntaxHighlighter language="yaml" PreTag="div" style={isDarkMode ? vscDarkPlus as any : oneLight as any} customStyle={{ /* 既存のスタイル */ }} > {codeContent} </SyntaxHighlighter>
+              //         </div>
+              //       </>
+              //     );
+              //   }
+              // }
 
               // インラインコード
               if (isInline) {
