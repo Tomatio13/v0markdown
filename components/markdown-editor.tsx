@@ -847,7 +847,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     const htmlContent = `
     <!DOCTYPE html><html><head><title>Markdown Preview</title><style>
     body{font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;}
-    pre{background-color:#f5f5f5;border-radius:6px;padding:16px;overflow:auto;color:#333333;border:1px solid #e0e0e0;}
+    pre{background-color:#f5f5f5;border-radius:6px;padding:16px;overflow:auto;color:#333333;border:1px solid #e0e0e0;margin-bottom:30px;}
     pre code{font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background:none;padding:0;color:inherit;}
     code:not(pre > code){font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background-color:rgba(27,31,35,.05);padding:.2em .4em;margin:0;font-size:85%;border-radius:3px;}
     /* ライトモード用のトークンカラー */
@@ -1714,7 +1714,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       {/* prose クラスをこの div に移動し、style もここに適用 */}
       <div
         ref={tabPreviewRef}
-        className={`markdown-preview p-4 pb-8 prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`} // prose をここに追加、pb-8で下部に余白追加
+        className={`markdown-preview p-4 pb-12 prose ${isDarkMode ? 'prose-invert' : ''} max-w-none`} // prose をここに追加、pb-12で下部に余白拡大
         style={{ fontSize: `${previewFontSize}px` }} // インラインスタイルをここに適用
       >
         <ReactMarkdown
@@ -1968,6 +1968,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       scrollbar-width: thin;
       /* ▼ MODIFIED: ダークモードのトラック色を #171717 に */
       scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) #171717' : 'rgba(0, 0, 0, 0.2) transparent'}; /* ダークモードのトラック色を変更 */
+      padding-bottom: 30px; /* ステータスバーとの重なり防止用の余白 */
     }
 
     /* CodeMirror 用 (.cm-scroller を直接ターゲット) */
@@ -1989,6 +1990,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       scrollbar-width: thin;
       /* ▼ MODIFIED: ダークモードのトラック色を #171717 に */
       scrollbar-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.2) #171717' : 'rgba(0, 0, 0, 0.2) transparent'}; /* ダークモードのトラック色を変更 */
+      padding-bottom: 30px; /* Firefoxブラウザでのステータスバーとの重なり防止用の余白 */
     }
   `, [isDarkMode]);
   // --- ▲ ADDED BACK ▲ ---
