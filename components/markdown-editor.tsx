@@ -698,7 +698,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     }
   }, [accessToken, markdownContent, selectedFile, setSelectedFile, onFileSaved, tabTitle]);
 
-  const handleLocalSave = async () => {
+  const handleLocalSave = async (forceOverwrite = false) => {
     setIsSaving(true);
     try {
       // tabTitleが存在し、「Untitled」でない場合はそれを使用、それ以外は従来通りgenerateFileName関数を使用
@@ -778,13 +778,52 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           rootDir,
           folderPathType: typeof currentPath,
           folderPathLength: currentPath.length,
+          forceOverwrite,
           requestBodySample: JSON.stringify({
             fileName: suggestedName,
             content: markdownContent.substring(0, 50) + '...',
-            folderPath: currentPath
+            folderPath: currentPath,
+            overwrite: forceOverwrite
           }, null, 2)
         });
         
+        // まずファイルの存在を確認する（forceOverwrite=trueの場合はスキップ）
+        if (!forceOverwrite) {
+          console.log('ファイルの存在を確認します');
+          const checkResponse = await fetch('/api/files/save', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              fileName: suggestedName,
+              folderPath: currentPath,
+              checkOnly: true
+            })
+          });
+          
+          const checkResult = await checkResponse.json();
+          console.log('ファイル存在確認結果:', checkResult);
+          
+          if (checkResult.exists) {
+            // ファイルが存在する場合、ユーザーに確認
+            const userConfirmed = window.confirm(
+              `ファイル「${suggestedName}」は既に存在します。上書きしますか？`
+            );
+            
+            if (!userConfirmed) {
+              console.log('ユーザーが上書きをキャンセルしました');
+              setIsSaving(false);
+              return; // 保存処理を中止
+            }
+            
+            // ユーザーが確認した場合は、forceOverwrite=trueで再帰的に呼び出す
+            console.log('ユーザーが上書きを確認しました。強制上書きモードで保存します');
+            return handleLocalSave(true);
+          }
+        }
+        
+        // 通常の保存処理またはforceOverwrite=trueの場合の処理
         const response = await fetch('/api/files/save', {
           method: 'POST',
           headers: {
@@ -793,12 +832,31 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           body: JSON.stringify({
             fileName: suggestedName,
             content: markdownContent,
-            folderPath: currentPath // 現在選択中のフォルダパスを送信
+            folderPath: currentPath, // 現在選択中のフォルダパスを送信
+            overwrite: forceOverwrite // 上書きフラグを設定
           })
         });
         
         if (!response.ok) {
           const errorData = await response.json();
+          
+          // 上書き確認が必要な場合（409 Conflict）
+          if (response.status === 409 && errorData.requiresConfirmation) {
+            const userConfirmed = window.confirm(
+              `ファイル「${suggestedName}」は既に存在します。上書きしますか？`
+            );
+            
+            if (!userConfirmed) {
+              console.log('ユーザーが上書きをキャンセルしました');
+              setIsSaving(false);
+              return; // 保存処理を中止
+            }
+            
+            // ユーザーが確認した場合は、forceOverwrite=trueで再帰的に呼び出す
+            console.log('ユーザーが上書きを確認しました。強制上書きモードで保存します');
+            return handleLocalSave(true);
+          }
+          
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         
@@ -823,12 +881,12 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     }
   };
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (forceOverwrite = false) => {
     // ... (ここは変更なし) ...
      if (driveEnabled && isAuthenticated && accessToken) {
       await handleDriveSave();
     } else {
-      await handleLocalSave();
+      await handleLocalSave(forceOverwrite);
     }
   }, [driveEnabled, isAuthenticated, accessToken, handleDriveSave, handleLocalSave]);
 
@@ -1821,7 +1879,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={handleSave}>
+        <ContextMenuItem onClick={() => handleSave(false)}>
           <Save className="h-4 w-4 mr-2" />
           保存
         </ContextMenuItem>
@@ -1848,7 +1906,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={handleSave}>
+        <ContextMenuItem onClick={() => handleSave(false)}>
           <Save className="h-4 w-4 mr-2" />
           保存
         </ContextMenuItem>
@@ -1873,7 +1931,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={handleSave}>
+        <ContextMenuItem onClick={() => handleSave(false)}>
           <Save className="h-4 w-4 mr-2" />
           保存
         </ContextMenuItem>
@@ -1903,7 +1961,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={handleSave}>
+        <ContextMenuItem onClick={() => handleSave(false)}>
           <Save className="h-4 w-4 mr-2" />
           保存
         </ContextMenuItem>
@@ -2870,11 +2928,11 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         <TooltipProvider>
           {/* Save Button */}
           <Tooltip>
-            <TooltipTrigger asChild>
-              {/* ▼ MODIFIED: variant を ghost に変更 */}
-              <Button variant="ghost" size="icon" onClick={handleSave} className="h-10 w-10" disabled={isSaving || (driveEnabled && !isAuthenticated)}>
-                {isSaving ? <span className="animate-spin">⌛</span> : <Save className="h-5 w-5" />}
-              </Button>
+                          <TooltipTrigger asChild>
+                {/* ▼ MODIFIED: variant を ghost に変更 */}
+                <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); handleSave(false); }} className="h-10 w-10" disabled={isSaving || (driveEnabled && !isAuthenticated)}>
+                  {isSaving ? <span className="animate-spin">⌛</span> : <Save className="h-5 w-5" />}
+                </Button>
             </TooltipTrigger>
             <TooltipContent side="left">{driveEnabled && isAuthenticated ? `Google Driveに保存 (${selectedFile?.name || '新規'})` : "ローカルに保存"}</TooltipContent>
           </Tooltip>

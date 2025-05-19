@@ -14,13 +14,15 @@ export async function POST(request: NextRequest) {
 
     // リクエストボディを取得
     const body = await request.json();
-    const { fileName, content, folderPath } = body;
+    const { fileName, content, folderPath, overwrite = false, checkOnly = false } = body;
     
     console.log('リクエスト情報:', {
       fileName,
       contentLength: content?.length || 0,
       folderPath,
-      folderPathType: typeof folderPath
+      folderPathType: typeof folderPath,
+      overwrite,
+      checkOnly
     });
 
     if (!fileName || typeof fileName !== 'string') {
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ファイル名が指定されていないか不正です' }, { status: 400 });
     }
 
-    if (content === undefined || content === null) {
+    if (content === undefined || content === null && !checkOnly) {
       console.error('コンテンツが指定されていません');
       return NextResponse.json({ error: 'コンテンツが指定されていません' }, { status: 400 });
     }
@@ -88,6 +90,30 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('ファイル保存先パス:', targetPath);
+    
+    // ファイルの存在確認
+    const fileExists = fs.existsSync(targetPath);
+    
+    // ファイル存在確認モードの場合はここで結果を返す
+    if (checkOnly) {
+      console.log(`ファイル存在確認結果: ${fileExists ? '存在する' : '存在しない'} (${targetPath})`);
+      return NextResponse.json({
+        exists: fileExists,
+        fileName: safeFileName,
+        path: targetPath.replace(process.cwd(), '')
+      });
+    }
+    
+    // 上書き確認 - ファイルが存在し、かつ明示的な上書き許可がない場合
+    if (fileExists && !overwrite) {
+      console.log('上書き確認が必要なため保存を中止します:', targetPath);
+      return NextResponse.json({
+        requiresConfirmation: true,
+        exists: true,
+        fileName: safeFileName,
+        path: targetPath.replace(process.cwd(), '')
+      }, { status: 409 }); // 409 Conflict
+    }
 
     // ファイルを書き込み
     fs.writeFileSync(targetPath, content, 'utf8');
