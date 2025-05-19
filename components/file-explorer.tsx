@@ -12,12 +12,20 @@ import {
   RefreshCw,
   Home,
   ArrowUp,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator
+} from "@/components/ui/context-menu";
 
 interface FileItem {
   name: string;
@@ -194,6 +202,69 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
     }
   };
 
+  // ファイルをダウンロードする処理
+  const handleFileDownload = async (file: FileItem) => {
+    try {
+      console.log(`ファイルダウンロード開始: ${file.path} (${file.name})`);
+      const url = `/api/files/read?path=${encodeURIComponent(file.path)}`;
+      console.log(`API呼び出し: ${url}`);
+      
+      const response = await fetch(url);
+      console.log(`API応答ステータス: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('APIエラーレスポンス:', errorData);
+        throw new Error(errorData.error || `ファイル読み込みエラー: ${response.statusText}`);
+      }
+      
+      // JSONレスポンスを取得
+      const data = await response.json();
+      
+      // APIから返されたファイル名を使用（日本語ファイル名対応）
+      const displayFileName = data.fileName || file.name;
+
+      // Base64エンコードされたコンテンツをデコード
+      if (data.contentBase64 && data.encoding === 'base64') {
+        try {
+          // Base64からデコード
+          const binaryStr = atob(data.contentBase64);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          
+          // Blobを作成
+          const blob = new Blob([bytes], { type: data.contentType || 'text/plain' });
+          
+          // ダウンロードリンクを作成
+          const downloadLink = document.createElement('a');
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = displayFileName;
+          
+          // リンクをクリックしてダウンロード
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+          
+          // URLオブジェクトを解放
+          URL.revokeObjectURL(downloadLink.href);
+          
+          console.log(`ファイル「${displayFileName}」のダウンロード完了`);
+        } catch (decodeError) {
+          console.error('Base64デコードエラー:', decodeError);
+          throw new Error('ファイルのデコードに失敗しました');
+        }
+      } else {
+        throw new Error('ファイルの内容を取得できませんでした');
+      }
+    } catch (error) {
+      console.error('ファイルダウンロードエラー詳細:', error);
+      // エラーもアラートで表示
+      alert(error instanceof Error ? `エラー: ${error.message}` : "ファイルをダウンロードできませんでした");
+    }
+  };
+
   // ファイル一覧をレンダリングする関数
   const renderFiles = () => {
     // 現在のパスのファイルをフィルタリング
@@ -235,38 +306,73 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
       
       return (
         <div key={uniqueKey}>
-          <div 
-            className={cn(
-              "flex items-center py-1 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group rounded-sm",
-              "transition-colors duration-150 ease-in-out",
-              !file.isDirectory && file.name.toLowerCase().endsWith('.md') ? "bg-blue-100 dark:bg-[#1A1A1A] border-l-4 border-gray-500 dark:border-gray-700" : "",
-              file.isDirectory ? "font-medium" : ""
-            )}
-            style={{ paddingLeft: `${paddingLeft}px` }}
-            onClick={() => handleFileClick(file)}
-            onDoubleClick={() => handleFileClick(file)} 
-            title={`${file.name}${file.isDirectory ? '' : ` (${formatFileSize(file.size)})`}`}
-          >
-            {file.isDirectory ? (
+          {file.isDirectory ? (
+            // ディレクトリの場合は右クリックメニューなし
+            <div 
+              className={cn(
+                "flex items-center py-1 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group rounded-sm",
+                "transition-colors duration-150 ease-in-out",
+                file.isDirectory ? "font-medium" : ""
+              )}
+              style={{ paddingLeft: `${paddingLeft}px` }}
+              onClick={() => handleFileClick(file)}
+              onContextMenu={(e) => e.preventDefault()}
+              title={file.name}
+            >
               <Folder className={cn("h-4 w-4 mr-2", isDarkMode ? "text-gray-300" : "text-blue-500")} />
-            ) : (
-              getFileIcon(file.name, isDarkMode)
-            )}
-            
-            <span className="truncate flex-1">{file.name}</span>
-            
-            {!file.isDirectory && (
-              <span className="text-gray-500 text-xs opacity-100 transition-opacity">
-                {new Date(file.modifiedTime).toLocaleString('ja-JP', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }).replace(/\//g, '/').replace(',', '')}
-              </span>
-            )}
-          </div>
+              
+              <span className="truncate flex-1">{file.name}</span>
+            </div>
+          ) : (
+            // ファイルの場合のみ右クリックメニューを追加
+            <ContextMenu>
+              <ContextMenuTrigger>
+                <div 
+                  className={cn(
+                    "flex items-center py-1 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group rounded-sm",
+                    "transition-colors duration-150 ease-in-out",
+                    !file.isDirectory && file.name.toLowerCase().endsWith('.md') ? "bg-blue-100 dark:bg-[#1A1A1A] border-l-4 border-gray-500 dark:border-gray-700" : "",
+                    file.isDirectory ? "font-medium" : ""
+                  )}
+                  style={{ paddingLeft: `${paddingLeft}px` }}
+                  onClick={() => handleFileClick(file)}
+                  onDoubleClick={() => handleFileClick(file)} 
+                  title={`${file.name} (${formatFileSize(file.size)})`}
+                >
+                  {getFileIcon(file.name, isDarkMode)}
+                  
+                  <span className="truncate flex-1">{file.name}</span>
+                  
+                  <span className="text-gray-500 text-xs opacity-100 transition-opacity">
+                    {new Date(file.modifiedTime).toLocaleString('ja-JP', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }).replace(/\//g, '/').replace(',', '')}
+                  </span>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onClick={() => handleFileClick(file)}
+                  className="cursor-pointer"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  開く
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => handleFileDownload(file)}
+                  className="cursor-pointer"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  ダウンロード
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          )}
         </div>
       );
     });
