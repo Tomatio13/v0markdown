@@ -153,6 +153,7 @@ interface MarkdownEditorProps {
   onTabClose?: (id: string) => void;
   onTabAdd?: () => void;
   onUpdateTabTitle?: (id: string, title: string) => void;
+  onOpenFileInNewTab?: (filePath: string, fileName: string, content: string) => Promise<string>;
 }
 
 // --- コンポーネント本体 ---
@@ -173,6 +174,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   onTabClose, // タブ閉じる時のコールバック
   onTabAdd, // 新規タブ追加時のコールバック
   onUpdateTabTitle, // タブ名更新用のコールバック
+  onOpenFileInNewTab, // 新規ファイルを開くためのコールバック
 }, ref) => {
   // --- State Variables ---
 
@@ -2245,6 +2247,9 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       // JSONレスポンスを取得
       const data = await response.json();
       
+      // APIから返されたファイル名を使用（日本語ファイル名対応）
+      const displayFileName = data.fileName || fileName;
+      
       // Base64エンコードされたコンテンツをデコード
       let content = '';
       if (data.contentBase64 && data.encoding === 'base64') {
@@ -2270,19 +2275,23 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         throw new Error('ファイルの内容を取得できませんでした');
       }
       
-      // マークダウンコンテンツをセット
-      setMarkdownContent(content);
-      
-      // 新しいタブとして開くことも考慮した処理
-      if (onFileSaved) {
-        // APIから返されたファイル名を使用（日本語ファイル名対応）
-        const displayFileName = data.fileName || fileName;
-        console.log(`ファイル名をタブに設定: ${displayFileName}`);
-        onFileSaved(displayFileName);
+      // 新規タブでファイルを開く
+      if (onOpenFileInNewTab) {
+        console.log(`新規タブでファイル「${displayFileName}」を開きます`);
+        const newTabId = await onOpenFileInNewTab(filePath, displayFileName, content);
+        console.log(`新規タブ作成完了 - タブID: ${newTabId}`);
+      } else {
+        // 後方互換性のため、従来の方法でも対応（新規タブ機能がない場合）
+        console.log(`現在のタブでファイル「${displayFileName}」を開きます（後方互換モード）`);
+        setMarkdownContent(content);
+        
+        if (onFileSaved) {
+          console.log(`ファイル名をタブに設定: ${displayFileName}`);
+          onFileSaved(displayFileName);
+        }
       }
       
       // 成功メッセージを表示
-      const displayFileName = data.fileName || fileName;
       console.log(`ファイル「${displayFileName}」読み込み完了`);
       alert(`ファイル「${displayFileName}」を読み込みました`);
     } catch (error) {
@@ -2290,7 +2299,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       // エラーもアラートで表示
       alert(error instanceof Error ? `エラー: ${error.message}` : "ファイルを読み込めませんでした");
     }
-  }, [setMarkdownContent, onFileSaved]);
+  }, [setMarkdownContent, onFileSaved, onOpenFileInNewTab]);
 
   // --- Render ---
   return (

@@ -621,6 +621,29 @@ export default function DocumentManager() {
     setToggleVimMode(() => toggleFn);
   }, []);
 
+  // ファイルを新規タブで開く関数
+  const handleOpenFileInNewTab = useCallback(async (filePath: string, fileName: string, content: string) => {
+    console.log(`新規タブでファイル「${fileName}」を開きます`);
+    
+    // 新しいタブを作成
+    const newTab: DocumentTab = {
+      id: uuidv4(),
+      title: fileName,
+      content: content,
+      isUnsaved: false,
+      previewType: 'Markdown' // デフォルトのプレビュータイプ
+    };
+    
+    // タブを追加
+    setTabs(prev => [...prev, newTab]);
+    
+    // 新しいタブをアクティブにする
+    setActiveTabId(newTab.id);
+    
+    console.log(`ファイル「${fileName}」を新規タブで開きました。タブID: ${newTab.id}`);
+    return newTab.id;
+  }, []);
+
   return (
     <div className="relative flex flex-col h-full w-full overflow-hidden">
       {!isInitialized ? (
@@ -690,6 +713,7 @@ export default function DocumentManager() {
               onTabClose={handleCloseTab}
               onTabAdd={handleAddTab}
               onUpdateTabTitle={updateTabTitle}
+              onOpenFileInNewTab={handleOpenFileInNewTab}
             />
           </div>
           
