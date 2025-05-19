@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     // marpコマンドの実行
     try {
       // タイムアウトを設定
-      const TIMEOUT_MS = 60000; // 60秒に延長
+      const TIMEOUT_MS = 120000; // 120秒に延長
       log(`タイムアウト設定: ${TIMEOUT_MS}ms`);
 
       // プロジェクトルートディレクトリを取得

@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     // quartoコマンドの実行
     try {
       // タイムアウトを設定
-      const TIMEOUT_MS = 60000; // 60秒
+      const TIMEOUT_MS = 120000; // 120秒
       log(`タイムアウト設定: ${TIMEOUT_MS}ms`)
       
       // シェルスクリプトファイルを作成
