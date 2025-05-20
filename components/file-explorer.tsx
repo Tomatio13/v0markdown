@@ -539,7 +539,10 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
   };
 
   return (
-    <div className={cn("flex flex-col h-full bg-gray-50 dark:bg-[#171717] border-r border-gray-200 dark:border-gray-800", isDarkMode ? 'dark' : '', className)}>
+    <div 
+      className={cn("flex flex-col h-full bg-gray-50 dark:bg-[#171717] border-r border-gray-200 dark:border-gray-800", isDarkMode ? 'dark' : '', className)}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* ヘッダー部分 */}
       <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center">
@@ -650,8 +653,8 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
       
       {/* ファイル一覧 - コンテキストメニュー付き */}
       <ContextMenu>
-        <ContextMenuTrigger className="flex-1">
-          <ScrollArea className="flex-1">
+        <ContextMenuTrigger className="flex-1" onContextMenu={(e) => e.preventDefault()}>
+          <ScrollArea className="flex-1" onContextMenu={(e) => e.preventDefault()}>
             {loading && files.length === 0 ? (
               <div className="flex items-center justify-center h-full p-4">
                 <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-gray-900 dark:border-gray-100"></div>
@@ -663,7 +666,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
                 <span className="text-sm">{error}</span>
               </div>
             ) : (
-              <div className="p-2 min-h-[200px]">
+              <div className="p-2 min-h-[200px]" onContextMenu={(e) => e.preventDefault()}>
                 {currentPath !== '/' && (
                   <div 
                     className="flex items-center py-1 px-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded cursor-pointer"
