@@ -13,7 +13,11 @@ import {
   Home,
   ArrowUp,
   AlertCircle,
-  Download
+  Download,
+  FolderPlus,
+  Edit,
+  Check,
+  X
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,14 @@ import {
   ContextMenuTrigger,
   ContextMenuSeparator
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface FileItem {
   name: string;
@@ -89,8 +101,17 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
   const [currentPath, setCurrentPath] = useState('/');
   const [rootDirName, setRootDirName] = useState('root');
   const [rootDirFullPath, setRootDirFullPath] = useState('');
-  // マークダウンファイルのみ表示するフラグをデフォルトでtrueに設定
   const [showOnlyMarkdownFiles, setShowOnlyMarkdownFiles] = useState(true);
+  
+  // ダイアログ関連の状態
+  const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameItemPath, setRenameItemPath] = useState('');
+  const [renameItemIsFolder, setRenameItemIsFolder] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [operationLoading, setOperationLoading] = useState(false);
+  const [operationError, setOperationError] = useState<string | null>(null);
   
   // ファイル一覧を取得する
   const loadFiles = async (dirPath = '/') => {
@@ -265,6 +286,111 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
     }
   };
 
+  // 新しいフォルダを作成する
+  const createNewFolder = async () => {
+    if (!newFolderName.trim()) {
+      setOperationError('フォルダ名を入力してください');
+      return;
+    }
+    
+    setOperationLoading(true);
+    setOperationError(null);
+    
+    try {
+      const response = await fetch('/api/files/create-folder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          path: currentPath,
+          folderName: newFolderName.trim()
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `フォルダ作成エラー: ${response.statusText}`);
+      }
+      
+      // ダイアログを閉じて状態をリセット
+      setNewFolderDialogOpen(false);
+      setNewFolderName('');
+      
+      // ファイル一覧を再読み込み
+      loadFiles(currentPath);
+      
+    } catch (error) {
+      console.error('フォルダ作成エラー:', error);
+      setOperationError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+  
+  // アイテム（ファイル/フォルダ）の名前を変更する
+  const renameItem = async () => {
+    if (!newName.trim()) {
+      setOperationError('新しい名前を入力してください');
+      return;
+    }
+    
+    if (!renameItemPath) {
+      setOperationError('リネーム対象が選択されていません');
+      return;
+    }
+    
+    setOperationLoading(true);
+    setOperationError(null);
+    
+    try {
+      const response = await fetch('/api/files/rename', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          oldPath: renameItemPath,
+          newName: newName.trim(),
+          isDirectory: renameItemIsFolder
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `リネームエラー: ${response.statusText}`);
+      }
+      
+      // ダイアログを閉じて状態をリセット
+      setRenameDialogOpen(false);
+      setRenameItemPath('');
+      setNewName('');
+      
+      // ファイル一覧を再読み込み
+      loadFiles(currentPath);
+      
+    } catch (error) {
+      console.error('リネームエラー:', error);
+      setOperationError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+  
+  // リネームダイアログを開く関数
+  const openRenameDialog = (file: FileItem) => {
+    setRenameItemPath(file.path);
+    setRenameItemIsFolder(file.isDirectory);
+    setNewName(file.name);
+    setRenameDialogOpen(true);
+  };
+  
+  // 新規フォルダダイアログを開く関数
+  const openNewFolderDialog = () => {
+    setNewFolderName('');
+    setNewFolderDialogOpen(true);
+  };
+
   // ファイル一覧をレンダリングする関数
   const renderFiles = () => {
     // 現在のパスのファイルをフィルタリング
@@ -307,24 +433,51 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
       return (
         <div key={uniqueKey}>
           {file.isDirectory ? (
-            // ディレクトリの場合は右クリックメニューなし
-            <div 
-              className={cn(
-                "flex items-center py-1 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group rounded-sm",
-                "transition-colors duration-150 ease-in-out",
-                file.isDirectory ? "font-medium" : ""
-              )}
-              style={{ paddingLeft: `${paddingLeft}px` }}
-              onClick={() => handleFileClick(file)}
-              onContextMenu={(e) => e.preventDefault()}
-              title={file.name}
-            >
-              <Folder className={cn("h-4 w-4 mr-2", isDarkMode ? "text-gray-300" : "text-blue-500")} />
-              
-              <span className="truncate flex-1">{file.name}</span>
-            </div>
+            // ディレクトリの場合の右クリックメニュー
+            <ContextMenu>
+              <ContextMenuTrigger>
+                <div 
+                  className={cn(
+                    "flex items-center py-1 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer group rounded-sm",
+                    "transition-colors duration-150 ease-in-out",
+                    file.isDirectory ? "font-medium" : ""
+                  )}
+                  style={{ paddingLeft: `${paddingLeft}px` }}
+                  onClick={() => handleFileClick(file)}
+                  title={file.name}
+                >
+                  <Folder className={cn("h-4 w-4 mr-2", isDarkMode ? "text-gray-300" : "text-blue-500")} />
+                  
+                  <span className="truncate flex-1">{file.name}</span>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onClick={() => handleFileClick(file)}
+                  className="cursor-pointer"
+                >
+                  <Folder className="h-4 w-4 mr-2" />
+                  開く
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => openRenameDialog(file)}
+                  className="cursor-pointer"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  名前の変更
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={openNewFolderDialog}
+                  className="cursor-pointer"
+                >
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  新規フォルダ
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           ) : (
-            // ファイルの場合のみ右クリックメニューを追加
+            // ファイルの場合の右クリックメニュー
             <ContextMenu>
               <ContextMenuTrigger>
                 <div 
@@ -364,6 +517,13 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
+                  onClick={() => openRenameDialog(file)}
+                  className="cursor-pointer"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  名前の変更
+                </ContextMenuItem>
+                <ContextMenuItem
                   onClick={() => handleFileDownload(file)}
                   className="cursor-pointer"
                 >
@@ -394,6 +554,24 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
           </span>
         </div>
         <div className="flex items-center">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={openNewFolderDialog}
+                  className="h-7 w-7 p-0 mr-1"
+                >
+                  <FolderPlus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>新規フォルダ</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -470,38 +648,58 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
         })}
       </div>
       
-      {/* ファイル一覧 */}
-      <ScrollArea className="flex-1">
-        {loading && files.length === 0 ? (
-          <div className="flex items-center justify-center h-full p-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-gray-900 dark:border-gray-100"></div>
-            <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">読み込み中...</span>
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-full p-4 text-red-500">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            <span className="text-sm">{error}</span>
-          </div>
-        ) : (
-          <div className="p-2">
-            {currentPath !== '/' && (
-              <div 
-                className="flex items-center py-1 px-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded cursor-pointer"
-                onClick={() => {
-                  // 親ディレクトリのパスを取得
-                  const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
-                  loadFiles(parentPath);
-                }}
-              >
-                <ArrowUp className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
-                <span className="text-sm">上へ</span>
+      {/* ファイル一覧 - コンテキストメニュー付き */}
+      <ContextMenu>
+        <ContextMenuTrigger className="flex-1">
+          <ScrollArea className="flex-1">
+            {loading && files.length === 0 ? (
+              <div className="flex items-center justify-center h-full p-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-gray-900 dark:border-gray-100"></div>
+                <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">読み込み中...</span>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center h-full p-4 text-red-500">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                <span className="text-sm">{error}</span>
+              </div>
+            ) : (
+              <div className="p-2 min-h-[200px]">
+                {currentPath !== '/' && (
+                  <div 
+                    className="flex items-center py-1 px-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded cursor-pointer"
+                    onClick={() => {
+                      // 親ディレクトリのパスを取得
+                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
+                      loadFiles(parentPath);
+                    }}
+                  >
+                    <ArrowUp className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
+                    <span className="text-sm">上へ</span>
+                  </div>
+                )}
+                
+                {renderFiles()}
               </div>
             )}
-            
-            {renderFiles()}
-          </div>
-        )}
-      </ScrollArea>
+          </ScrollArea>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            onClick={openNewFolderDialog}
+            className="cursor-pointer"
+          >
+            <FolderPlus className="h-4 w-4 mr-2" />
+            新規フォルダ
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => loadFiles(currentPath)}
+            className="cursor-pointer"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            更新
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       
       {/* ステータスバー */}
       <div className="p-2 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
@@ -516,6 +714,80 @@ const FileExplorer: React.FC<FileExplorerProps> = ({
           </span>
         )}
       </div>
+
+      {/* 新規フォルダダイアログ */}
+      <Dialog open={newFolderDialogOpen} onOpenChange={setNewFolderDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>新規フォルダの作成</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {operationError && (
+              <div className="mb-4 p-2 bg-red-100 text-red-800 rounded-md text-sm">
+                {operationError}
+              </div>
+            )}
+            <Input
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="フォルダ名"
+              className="mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') createNewFolder();
+              }}
+            />
+            <div className="text-xs text-gray-500 mb-4">
+              現在のパス: {currentPath}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewFolderDialogOpen(false)} disabled={operationLoading}>
+              キャンセル
+            </Button>
+            <Button onClick={createNewFolder} disabled={operationLoading}>
+              {operationLoading ? '作成中...' : '作成'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* リネームダイアログ */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{renameItemIsFolder ? 'フォルダ' : 'ファイル'}名の変更</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {operationError && (
+              <div className="mb-4 p-2 bg-red-100 text-red-800 rounded-md text-sm">
+                {operationError}
+              </div>
+            )}
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="新しい名前"
+              className="mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') renameItem();
+              }}
+            />
+            <div className="text-xs text-gray-500 mb-4">
+              対象: {renameItemPath}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)} disabled={operationLoading}>
+              キャンセル
+            </Button>
+            <Button onClick={renameItem} disabled={operationLoading}>
+              {operationLoading ? '変更中...' : '変更'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
