@@ -21,8 +21,6 @@
   --shadow-medium: 0 8px 15px rgba(0, 0, 0, 0.15);
   --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  --base-font: 'Noto Sans JP', 'Helvetica Neue', Arial, sans-serif;
-  --heading-font: 'Noto Sans JP', 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* ========================================
@@ -31,6 +29,7 @@
 section {
   background: var(--background-color);
   color: var(--text-primary);
+  font-family: 'Helvetica Neue', 'Segoe UI', 'Roboto', 'Arial', sans-serif;
   font-size: 22px;
   line-height: 1.6;
   padding: 2rem;
@@ -119,6 +118,7 @@ section code {
   color: var(--primary-color);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
+  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', 'Menlo', 'Courier', monospace;
   font-size: 0.9em;
   border: 1px solid var(--border-color);
 }
@@ -633,143 +633,19 @@ section.with-logo::before {
    印刷対応
 ======================================== */
 @media print {
-  /* section {
+  section {
     background: white !important;
     color: black !important;
     box-shadow: none !important;
-  } */
-  
-  /* テーブルスタイルの印刷対応 */
-  section table {
-    background: white !important;
-    box-shadow: none !important;
-    border: 1px solid #ccc !important;
   }
   
-  section th {
-    background-color: #f5f5f5 !important;
-    color: black !important;
-    border: 1px solid #ccc !important;
-  }
-  
-  section td {
-    background: white !important;
-    color: black !important;
-    border: 1px solid #ccc !important;
-  }
-  
-  section tr:nth-child(even) {
-    background-color: #f9f9f9 !important;
-  }
-  
-  section tr:hover {
-    background-color: transparent !important;
-  }
-  
-  /* コードブロックの印刷対応 */
-  section pre {
-    background-color: #f5f5f5 !important;
-    color: black !important;
-    border: 1px solid #ccc !important;
-    box-shadow: none !important;
-  }
-  
-  section code {
-    background-color: #f5f5f5 !important;
-    color: black !important;
-    border: 1px solid #ccc !important;
-  }
-  
-  section pre code {
-    background: transparent !important;
-    color: black !important;
-    border: none !important;
-  }
-  
-  /* カードスタイルの印刷対応 */
   .card {
-    background: white !important;
-    color: black !important;
     border: 1px solid #ccc !important;
     box-shadow: none !important;
   }
   
-  .card-header {
-    color: black !important;
-  }
-  
-  .card-content {
-    color: black !important;
-  }
-  
-
-}
-
-/* ========================================
-   PPTX変換対応（追加のメディアクエリ）
-======================================== */
-@media screen and (prefers-color-scheme: light), print, (min-resolution: 150dpi) {
-  /* テーブルの背景を強制的に白に */
-  section table {
-    background: white !important;
-    box-shadow: none !important;
-  }
-  
-  section th {
-    background-color: #f5f5f5 !important;
-    color: black !important;
-  }
-  
-  section td {
+  footer, header {
     background: white !important;
     color: black !important;
   }
-  
-  /* コードブロックの背景を強制的に白に */
-  section pre {
-    background-color: #f5f5f5 !important;
-    color: black !important;
-    box-shadow: none !important;
-  }
-  
-  section code {
-    background-color: #f5f5f5 !important;
-    color: black !important;
-  }
-}
-
-/* ========================================
-   フォールバック用の追加スタイル
-======================================== */
-/* テーブルの黒背景を防ぐための追加設定 */
-section table,
-section table * {
-  background-color: transparent !important;
-}
-
-section th {
-  background-color: var(--primary-color) !important;
-  color: white !important;
-}
-
-section td {
-  background-color: transparent !important;
-}
-
-section tr:nth-child(even) td {
-  background-color: var(--card-bg) !important;
-}
-
-/* コードブロックの黒背景を防ぐための追加設定 */
-section pre,
-section pre * {
-  background-color: var(--card-bg) !important;
-}
-
-section code {
-  background-color: var(--card-bg) !important;
-}
-
-section pre code {
-  background-color: transparent !important;
 } 
