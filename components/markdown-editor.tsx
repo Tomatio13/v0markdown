@@ -154,6 +154,14 @@ interface MarkdownEditorProps {
   onTabAdd?: () => void;
   onUpdateTabTitle?: (id: string, title: string) => void;
   onOpenFileInNewTab?: (filePath: string, fileName: string, content: string) => Promise<string>;
+  // AIチャット関連のプロパティ
+  chatMessages?: Message[];
+  chatInput?: string;
+  chatHandleInputChange?: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => void;
+  chatIsLoading?: boolean;
+  chatSetMessages?: (messages: Message[] | ((messages: Message[]) => Message[])) => void;
+  chatSetInput?: (input: string) => void;
+  chatAppend?: (message: Message | CreateMessage) => Promise<string | null | undefined>;
 }
 
 // --- コンポーネント本体 ---
@@ -175,6 +183,14 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   onTabAdd, // 新規タブ追加時のコールバック
   onUpdateTabTitle, // タブ名更新用のコールバック
   onOpenFileInNewTab, // 新規ファイルを開くためのコールバック
+  // AIチャット関連のプロパティ
+  chatMessages,
+  chatInput,
+  chatHandleInputChange,
+  chatIsLoading,
+  chatSetMessages,
+  chatSetInput,
+  chatAppend,
 }, ref) => {
   // --- State Variables ---
 
@@ -210,8 +226,8 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   const [selectedFile, setSelectedFile] = useState<GoogleFile | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // AI Chat State (using useChat hook)
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append, reload, stop } = useChat();
+  // AI Chat State (using props from parent component)
+  // useChatフックは親コンポーネント（DocumentManager）で呼び出され、propsとして渡される
 
   // コンテンツが変更されたときの処理 - 親コンポーネントに通知
   useEffect(() => {
@@ -1188,8 +1204,10 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   // --- AI Chat Handlers ---
   const clearMessages = useCallback(() => {
     // ... (ここは変更なし) ...
-     setMessages([]);
-  }, [setMessages]);
+     if (chatSetMessages) {
+       chatSetMessages([]);
+     }
+  }, [chatSetMessages]);
 
   // ★★★ 追加：エディタ内容取得関数をメモ化 ★★★
   const getEditorContentCallback = useCallback((): string => {
@@ -2749,11 +2767,10 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
               }
               onAIContentInsert={handleAIContentInsert}
               isDarkMode={isDarkMode}
-              messages={messages}
-              input={input}
-              handleInputChange={handleInputChange}
-              handleSubmit={handleSubmit}
-              isLoading={isLoading}
+              messages={chatMessages as any || []}
+              input={chatInput || ''}
+              handleInputChange={chatHandleInputChange || (() => {})}
+              isLoading={chatIsLoading || false}
               clearMessages={clearMessages}
               driveEnabled={driveEnabled && isAuthenticated}
               driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
@@ -2769,8 +2786,8 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
               getEditorContent={getEditorContentCallback}
               getSelectedEditorContent={getSelectedEditorContentCallback}
               replaceSelectedEditorContent={replaceSelectedEditorContentCallback}
-              setInput={setInput}
-              append={append as any}
+              setInput={chatSetInput as any || (() => {})}
+              append={chatAppend as any}
             />
           ) : (
              /* 通常のビューモード (triple以外) */

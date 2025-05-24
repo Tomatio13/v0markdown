@@ -149,7 +149,7 @@ export default function DocumentManager() {
     }
   }, [activeTabId, ignoreNextPreviewUpdate]);
   
-  // AIチャット関連
+  // AIチャット関連 - グローバルレベルで管理
   const chatHelpers = useChat()
   
   // デフォルトタブの初期化 - 初期化プロセスの詳細をログに追加
@@ -666,6 +666,14 @@ export default function DocumentManager() {
               onToggleDarkMode={toggleDarkMode}
               isFirstAccess={isFirstAccess}
               tabTitle={tabs.find(tab => tab.id === activeTabId)?.title}
+              // AIチャット関連のpropsを追加
+              chatMessages={chatHelpers.messages}
+              chatInput={chatHelpers.input}
+              chatHandleInputChange={chatHelpers.handleInputChange}
+              chatIsLoading={chatHelpers.isLoading}
+              chatSetMessages={chatHelpers.setMessages}
+              chatSetInput={chatHelpers.setInput}
+              chatAppend={chatHelpers.append}
               onFileSaved={(fileName: string) => {
                 console.log('===== ファイル保存コールバック開始 =====');
                 console.log('保存されたファイル名:', fileName);

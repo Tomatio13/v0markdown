@@ -5,7 +5,7 @@ import React, { useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import type { Message, UseChatHelpers } from 'ai/react';
 
-interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 'handleInputChange' | 'handleSubmit' | 'isLoading'> {
+interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 'handleInputChange' | 'isLoading'> {
   editorComponent: React.ReactNode
   previewComponent: React.ReactNode // 使用しないが互換性のために残す
   onAIContentInsert: (text: string) => void
@@ -30,7 +30,6 @@ export const TripleLayout = React.memo(({
   messages,
   input,
   handleInputChange,
-  handleSubmit,
   isLoading,
   clearMessages,
   driveEnabled = false,
