@@ -46,7 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch, Scissors, Copy, ClipboardPaste, Plus, X, Pencil
+  Bold, Italic, List, ListOrdered, Quote, Code, Link, Image, Save, Printer, Heading1, Heading2, Heading3, Table, CheckSquare, Moon, Sun, Smile, Box, MessageSquare, SplitSquareVertical, Trash2, Terminal, Upload, Presentation, Columns, FileDown, FileCode, BotMessageSquare, FileChartColumn, ChartColumn, FileText, Tv, FileBox, UserCheck, UserX, Settings2, LogOut, UploadCloud, DownloadCloud, ExternalLink, CircleHelp, File as FileIcon, Mic, ZoomIn, ZoomOut, Maximize, Minimize, Palette, GitBranch, Scissors, Copy, ClipboardPaste, Plus, X, Pencil, Strikethrough, Minus, Loader2, Download
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -229,12 +229,18 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   // AI Chat State (using props from parent component)
   // useChatフックは親コンポーネント（DocumentManager）で呼び出され、propsとして渡される
 
-  // コンテンツが変更されたときの処理 - 親コンポーネントに通知
+  // --- ▼ MODIFIED: 重複するuseEffectを削除し、デバウンス処理のみ残す ▼ ---
+  // コンテンツが変更されたときの処理 - 親コンポーネントに通知（デバウンス処理付き）
   useEffect(() => {
     if (onContentChange) {
-      onContentChange(markdownContent);
+      // デバウンス処理で連続更新を防止
+      const timeoutId = setTimeout(() => {
+        onContentChange(markdownContent);
+      }, 150); // 300ms から 150ms に短縮してレスポンシブ性を向上
+      return () => clearTimeout(timeoutId);
     }
   }, [markdownContent, onContentChange]);
+  // --- ▲ MODIFIED ▲ ---
 
   // エディタの状態情報を親コンポーネントに通知
   useEffect(() => {
@@ -273,53 +279,67 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   const tabPreviewRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Derived State ---
-  const extractedHeadings = useMemo(() => {
-    // ... (ここは変更なし) ...
-     const headings: Heading[] = []; // 型を Heading[] に指定
-    let currentH1: Heading | null = null;
-    const lines = markdownContent.split('\n');
-    let inCodeBlock = false; // コードブロック内かどうかのフラグ
+  // --- ▼ MODIFIED: 見出し抽出処理を最適化 ▼ ---
+  // 見出し抽出処理をデバウンス化して重い処理を軽減
+  const [debouncedMarkdownContent, setDebouncedMarkdownContent] = useState(markdownContent);
+  
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedMarkdownContent(markdownContent);
+    }, 500); // 500msのデバウンス
+    return () => clearTimeout(timeoutId);
+  }, [markdownContent]);
 
-    lines.forEach((line, index) => {
+  const extractedHeadings = useMemo(() => {
+    const headings: Heading[] = [];
+    let currentH1: Heading | null = null;
+    
+    // 空文字列や短いコンテンツの場合は早期リターン
+    if (!debouncedMarkdownContent || debouncedMarkdownContent.length < 10) {
+      return headings;
+    }
+    
+    const lines = debouncedMarkdownContent.split('\n');
+    let inCodeBlock = false;
+
+    // 処理を最適化：大きなファイルの場合は最初の1000行のみ処理
+    const maxLines = Math.min(lines.length, 1000);
+    
+    for (let index = 0; index < maxLines; index++) {
+      const line = lines[index];
       const lineNumber = index + 1;
 
       // コードブロックの開始/終了を検出
       if (line.trim().startsWith('```')) {
         inCodeBlock = !inCodeBlock;
-        return; // ``` の行自体は見出しではないので処理をスキップ
+        continue;
       }
 
       // コードブロック内は無視
       if (inCodeBlock) {
-        return;
+        continue;
       }
 
       // 見出しの抽出 (コードブロック外のみ)
       if (line.startsWith('# ')) {
         const text = line.substring(2).trim();
-        // level を 1 として明示的に指定
         currentH1 = { level: 1, text, line: lineNumber, children: [] };
         headings.push(currentH1);
       } else if (line.startsWith('## ')) {
         const text = line.substring(3).trim();
-        // level を 2 として明示的に指定
         const h2: Heading = { level: 2, text, line: lineNumber };
         if (currentH1) {
-          // children も Heading[] 型であることを確認
           if (!currentH1.children) {
             currentH1.children = [];
           }
           currentH1.children.push(h2);
         }
-        // H1なしでH2が出現した場合の処理は不要 (型チェックでエラーになるため)
-        // もし許容する場合は、TableOfContents側の型定義も修正が必要
-        // 今回は H1 の下に H2 がある構造のみを抽出する -> 既存ロジック踏襲
       }
-    });
+    }
 
     return headings;
-  }, [markdownContent]);
+  }, [debouncedMarkdownContent]); // デバウンスされたコンテンツを使用
+  // --- ▲ MODIFIED ▲ ---
 
   // --- Editor Core Functions ---
   const handleContentChange = useCallback((value: string) => {
@@ -327,15 +347,13 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, [])
 
   const handleCursorUpdate = useCallback((view: EditorView | null) => {
-    // ... (ここは変更なし) ...
-     if (view) {
+    if (view) {
       const pos = view.state.selection.main.head;
       const line = view.state.doc.lineAt(pos);
       const lineNum = line.number;
       const colNum = pos - line.from + 1; // 1-based column
       setCursorPosition(prevPos => {
         if (prevPos.line !== lineNum || prevPos.col !== colNum) {
-          // console.log("カーソル位置を更新:", lineNum, colNum); // デバッグ用
           return { line: lineNum, col: colNum };
         }
         return prevPos;
@@ -343,26 +361,33 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     }
   }, [setCursorPosition]);
 
+  // --- ▼ MODIFIED: EditorView.updateListenerを最適化 ▼ ---
   const editorExtensions = useMemo(() => {
-    // ... (ここは変更なし) ...
-     const extensions = [
+    const extensions = [
       lineNumbers(),
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
-        // デバッグ用枠線 (ここではコメントアウト)
-        /* if (update.docChanged || update.selectionSet || update.focusChanged || update.viewportChanged) { ... } */
-
-        // カーソル位置更新
-        if (update.selectionSet || update.docChanged) {
-          if (update.view.hasFocus) {
+        // 必要最小限の処理のみ実行
+        if (update.selectionSet && update.view.hasFocus) {
+          // カーソル位置更新のみ（文字入力時は実行しない）
+          if (!update.docChanged) {
             handleCursorUpdate(update.view);
           }
         }
+        
+        // 文字入力時のカーソル位置更新はデバウンス処理
+        if (update.docChanged && update.view.hasFocus) {
+          // デバウンス処理でカーソル位置更新の頻度を下げる
+          if (cursorUpdateTimeoutRef.current) {
+            clearTimeout(cursorUpdateTimeoutRef.current);
+          }
+          cursorUpdateTimeoutRef.current = setTimeout(() => {
+            handleCursorUpdate(update.view);
+          }, 100);
+        }
       }),
       EditorView.theme({
-        // デバッグ用枠線 (ここではコメントアウト)
-        /* ".cm-tooltip, .cm-panel, ...": { border: "1px dashed blue !important" } */
         ".cm-panel": { 
           zIndex: "100 !important", 
           bottom: "2.5em !important",
@@ -371,7 +396,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       }),
       EditorView.domEventHandlers({
         keydown: (event, view) => {
-          // console.log(`Keydown: key=${event.key}, code=${event.code}, ctrl=${event.ctrlKey}, shift=${event.shiftKey}, alt=${event.altKey}, meta=${event.metaKey}`);
           if (event.ctrlKey && (event.code === "Space" || event.key === " ")) {
             event.preventDefault(); return true;
           }
@@ -379,12 +403,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
             const pos = view.state.selection.main.head;
             view.dispatch({ changes: { from: pos, to: pos, insert: "  " } });
             event.preventDefault(); return true;
-          }
-          if (event.key === "Escape") {
-            // console.log("Escape key pressed, applying debug borders.");
-            // デバッグ用枠線 (ここではコメントアウト)
-            /* setTimeout(() => { ... }, 10); */
-            return false; // Allow standard escape behavior
           }
           return false;
         }
@@ -396,10 +414,22 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     return extensions;
   }, [handleCursorUpdate, isVimMode]);
 
+  // カーソル位置更新のデバウンス用タイマー
+  const cursorUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      if (cursorUpdateTimeoutRef.current) {
+        clearTimeout(cursorUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
+  // --- ▲ MODIFIED ▲ ---
+
   // --- Editor Action Handlers ---
   const insertText = useCallback((before: string, after = "") => {
-    // ... (ここは変更なし) ...
-     if (viewRef.current) {
+    if (viewRef.current) {
       const view = viewRef.current;
       const state = view.state;
       const selection = state.selection.main;
@@ -412,16 +442,13 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         userEvent: "input"
       });
       view.focus();
-      // カーソル位置は updateListener で更新される想定
     } else {
       // フォールバック (非推奨)
-      console.warn("viewRef is not available for insertText. Falling back.");
       const selection = window.getSelection?.()?.toString() || "";
       const newText = before + selection + after;
       setMarkdownContent((prev) => {
         const pos = cursorPosRef.current;
         const safePos = Math.max(0, Math.min(pos, prev.length));
-        // 簡易的な置換または挿入
         if (selection && prev.includes(selection)) {
            return prev.replace(selection, newText);
         } else {
@@ -434,8 +461,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, [setMarkdownContent]);
 
   const insertEmoji = useCallback((emoji: string) => {
-    // ... (ここは変更なし) ...
-     if (viewRef.current) {
+    if (viewRef.current) {
       const view = viewRef.current;
       const currentPos = view.state.selection.main.head;
       view.dispatch({
@@ -443,9 +469,8 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         selection: { anchor: currentPos + emoji.length }
       });
       view.focus();
-      cursorPosRef.current = currentPos + emoji.length; // 一応更新
+      cursorPosRef.current = currentPos + emoji.length;
     } else {
-      console.warn("viewRef is not available for emoji insertion. Falling back.");
       setMarkdownContent(prev => {
         const pos = cursorPosRef.current;
         const safePos = Math.max(0, Math.min(pos, prev.length));
@@ -457,8 +482,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, [setMarkdownContent]);
 
   const handleAIContentInsert = useCallback((text: string) => {
-    // ... (ここは変更なし) ...
-     if (viewRef.current) {
+    if (viewRef.current) {
       const view = viewRef.current;
       const currentPos = view.state.selection.main.head;
       view.dispatch({
@@ -466,9 +490,8 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         selection: { anchor: currentPos + text.length }
       });
       view.focus();
-      cursorPosRef.current = currentPos + text.length; // 一応更新
+      cursorPosRef.current = currentPos + text.length;
     } else {
-      console.warn("viewRef is not available for AI content insertion. Falling back.");
       setMarkdownContent(prev => {
         const pos = cursorPosRef.current;
         const safePos = Math.max(0, Math.min(pos, prev.length));
@@ -477,7 +500,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         return newContent;
       });
     }
-  }, [setMarkdownContent]); // 依存配列: viewRef は含めず、安定した setMarkdownContent を追加
+  }, [setMarkdownContent]);
 
   // 選択テキストを取得する関数
   const getSelectedEditorContent = useCallback((): string | null => {
@@ -520,8 +543,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, []);
 
   const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // ... (ここは変更なし) ...
-     const file = event.target.files?.[0];
+    const file = event.target.files?.[0];
     event.target.value = ''; // Reset input
 
     if (!file || !file.type.startsWith('image/')) {
@@ -540,7 +562,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         throw new Error(errorData.message || `画像アップロードエラー: ${response.status}`);
       }
       const data = await response.json();
-      const imageUrl = `![](${window.location.origin}${data.url})`; // Generate markdown image link
+      const imageUrl = `![](${window.location.origin}${data.url})`;
 
       // Insert into CodeMirror
       if (viewRef.current) {
@@ -551,9 +573,8 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           selection: { anchor: currentPos + imageUrl.length },
         });
         view.focus();
-        cursorPosRef.current = currentPos + imageUrl.length; // 一応更新
+        cursorPosRef.current = currentPos + imageUrl.length;
       } else {
-        console.warn("viewRef is not available for image insertion. Falling back.");
         setMarkdownContent(prev => {
           const pos = cursorPosRef.current;
           const safePos = Math.max(0, Math.min(pos, prev.length));
@@ -571,8 +592,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, [setMarkdownContent]);
 
   const handleClearContent = useCallback(() => {
-    // ... (ここは変更なし) ...
-     setMarkdownContent("");
+    setMarkdownContent("");
     cursorPosRef.current = 0;
     if (viewRef.current) {
       viewRef.current.focus();
@@ -580,21 +600,17 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, [setMarkdownContent]);
 
   const toggleVimMode = useCallback(() => {
-    // ... (ここは変更なし) ...
-     if (viewRef.current) {
+    if (viewRef.current) {
       // 現在のカーソル位置を取得 (Vim切替時のカーソル維持のため)
       cursorPosRef.current = viewRef.current.state.selection.main.head;
-      // console.log('Vimモード切り替え前のカーソル位置:', cursorPosRef.current);
     }
     setIsVimMode(prev => !prev);
     // 遅延実行してVim拡張が再適用されるのを待つ
     setTimeout(() => {
       if (viewRef.current) {
-        // console.log('Vimモード切り替え後にフォーカスとカーソル位置設定試行');
         viewRef.current.focus();
         try {
            viewRef.current.dispatch({ selection: { anchor: cursorPosRef.current } });
-          // console.log('カーソル位置設定成功:', cursorPosRef.current);
         } catch (e) {
           console.error("カーソル位置の設定に失敗しました:", e)
         }
@@ -624,8 +640,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   // --- ▲ MODIFIED ▲ ---
 
   const handleTocJump = useCallback((lineNumber: number) => {
-    // ... (ここは変更なし) ...
-     if (viewRef.current) {
+    if (viewRef.current) {
       const view = viewRef.current;
       try {
         const line = view.state.doc.line(lineNumber); // lineNumber は 1-based
@@ -643,13 +658,10 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
 
   // --- File & Export Handlers ---
   const generateFileName = (content: string, defaultExt: string = 'md'): string => {
-    console.log('ファイル名生成を開始:', content.substring(0, 100) + '...');
     const firstLine = content.split('\n')[0] || '';
-    console.log('最初の行:', firstLine);
     
     // デフォルトコンテンツの場合や空の場合は「Untitled」を返す
     if (!firstLine.trim() || firstLine.trim() === '# New Document') {
-      console.log('デフォルトコンテンツを検出、「Untitled」を使用します');
       return `Untitled.${defaultExt}`;
     }
     
@@ -659,21 +671,16 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     
     const potentialFileName = baseName ? `${baseName}.${defaultExt}` : '';
     const result = potentialFileName || `Untitled.${defaultExt}`;
-    console.log('生成されたファイル名:', result);
     return result;
   };
 
   const handleDriveSave = useCallback(async () => {
-    // ... (ここは変更なし) ...
-     if (!accessToken) return;
+    if (!accessToken) return;
     setIsSaving(true);
     try {
       // selectedFileがある場合はその名前、なければタブ名、最後の手段としてgenerateFileName関数を使用
       const fileName = selectedFile?.name || 
                       (tabTitle && tabTitle !== 'Untitled' ? `${tabTitle}.md` : generateFileName(markdownContent));
-      console.log('Google Driveへの保存用ファイル名:', fileName, 
-                 '(選択済みファイル:', Boolean(selectedFile), 
-                 'タブ名から生成:', Boolean(!selectedFile && tabTitle && tabTitle !== 'Untitled'), ')');
       
       const method = selectedFile ? 'PUT' : 'POST';
       const response = await fetch('/api/drive/save', {
@@ -700,7 +707,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         mimeType: 'text/markdown',
         modifiedTime: savedFileData.modifiedTime
       });
-      console.log('Google Driveに保存しました:', savedFileData);
       
       // Google Driveへの保存後に親コンポーネントに通知
       if (onFileSaved) {
@@ -722,17 +728,11 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         ? `${tabTitle}.md`
         : generateFileName(markdownContent);
       
-      console.log('======= ファイル保存開始 =======');
-      console.log('提案されたファイル名:', suggestedName, 'タブ名から生成:', Boolean(tabTitle && tabTitle !== 'Untitled'));
-      
       // 環境変数FILE_UPLOADがOFFの場合、従来のローカル保存処理を行う
       const fileUploadEnabled = process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF';
       
       if (!fileUploadEnabled) {
-        console.log('FILE_UPLOAD=OFFのため、従来のローカル保存処理を実行します');
-        
         if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
-          console.log('File System Access APIを使用します');
           const fileHandle = await window.showSaveFilePicker({
             suggestedName,
             types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
@@ -740,29 +740,22 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           
           // ファイルハンドルから名前を取得（実際にユーザーが選択した名前）
           const fileHandleAny = fileHandle as any;
-          console.log('ファイルハンドル:', fileHandleAny);
           
           // 名前プロパティの存在確認
           let fileName = suggestedName;
           if (fileHandleAny && 'name' in fileHandleAny) {
             fileName = fileHandleAny.name;
-            console.log('取得したファイル名:', fileName);
-          } else {
-            console.warn('ファイルハンドルからname属性を取得できませんでした');
           }
           
           const writable = await fileHandle.createWritable();
           await writable.write(markdownContent);
           await writable.close();
-          console.log("ファイルが保存されました (File System Access API)");
           
           // 実際にユーザーが選択したファイル名を使用
           if (onFileSaved) {
-            console.log('onFileSavedコールバックを呼び出します。ファイル名:', fileName);
             onFileSaved(fileName);
           }
         } else {
-          console.log('従来のダウンロード方式を使用します');
           // Fallback
           const blob = new Blob([markdownContent], { type: "text/markdown" });
           const url = URL.createObjectURL(blob);
@@ -773,39 +766,20 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          console.log("従来の方法でファイルがダウンロードされました:", suggestedName);
           
           // ファイル保存後に親コンポーネントに通知
           if (onFileSaved) {
-            console.log('onFileSavedコールバックを呼び出します。ファイル名:', suggestedName);
             onFileSaved(suggestedName);
           }
         }
       } else {
         // FILE_UPLOADがOFFでない場合、新しいAPIを使用してサーバーサイドに保存
-        console.log('HTTP APIを使用してFILE_EXPLORER_ROOT_DIRにファイルを保存します');
         
         // ローカルストレージから現在のパスとルートディレクトリを取得
         const currentPath = localStorage.getItem('markdownEditorCurrentPath') || '/';
-        const rootDir = localStorage.getItem('markdownEditorRootDir');
-        
-        console.log('保存先ディレクトリ情報:', {
-          currentPath,
-          rootDir,
-          folderPathType: typeof currentPath,
-          folderPathLength: currentPath.length,
-          forceOverwrite,
-          requestBodySample: JSON.stringify({
-            fileName: suggestedName,
-            content: markdownContent.substring(0, 50) + '...',
-            folderPath: currentPath,
-            overwrite: forceOverwrite
-          }, null, 2)
-        });
         
         // まずファイルの存在を確認する（forceOverwrite=trueの場合はスキップ）
         if (!forceOverwrite) {
-          console.log('ファイルの存在を確認します');
           const checkResponse = await fetch('/api/files/save', {
             method: 'POST',
             headers: {
@@ -819,7 +793,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           });
           
           const checkResult = await checkResponse.json();
-          console.log('ファイル存在確認結果:', checkResult);
           
           if (checkResult.exists) {
             // ファイルが存在する場合、ユーザーに確認
@@ -828,16 +801,15 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
             );
             
             if (!userConfirmed) {
-              console.log('ユーザーが上書きをキャンセルしました');
               setIsSaving(false);
               return; // 保存処理を中止
             }
             
             // ユーザーが確認した場合は、forceOverwrite=trueで再帰的に呼び出す
-            console.log('ユーザーが上書きを確認しました。強制上書きモードで保存します');
             return handleLocalSave(true);
           }
         }
+        
         
         // 通常の保存処理またはforceOverwrite=trueの場合の処理
         const response = await fetch('/api/files/save', {
@@ -863,13 +835,11 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
             );
             
             if (!userConfirmed) {
-              console.log('ユーザーが上書きをキャンセルしました');
               setIsSaving(false);
               return; // 保存処理を中止
             }
             
             // ユーザーが確認した場合は、forceOverwrite=trueで再帰的に呼び出す
-            console.log('ユーザーが上書きを確認しました。強制上書きモードで保存します');
             return handleLocalSave(true);
           }
           
@@ -877,13 +847,11 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         }
         
         const result = await response.json();
-        console.log('ファイル保存結果:', result);
         
         alert(`ファイル「${suggestedName}」をサーバーに保存しました`);
         
         // ファイル保存後に親コンポーネントに通知
         if (onFileSaved) {
-          console.log('onFileSavedコールバックを呼び出します。ファイル名:', suggestedName);
           onFileSaved(suggestedName);
         }
       }
@@ -898,8 +866,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   };
 
   const handleSave = useCallback(async (forceOverwrite = false) => {
-    // ... (ここは変更なし) ...
-     if (driveEnabled && isAuthenticated && accessToken) {
+    if (driveEnabled && isAuthenticated && accessToken) {
       await handleDriveSave();
     } else {
       await handleLocalSave(forceOverwrite);
@@ -907,33 +874,29 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, [driveEnabled, isAuthenticated, accessToken, handleDriveSave, handleLocalSave]);
 
   const handlePrint = () => {
-     // コメントアウトされていた部分を元に戻す
      const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
     const activePreviewElement =
       document.querySelector('.tabs-content[data-state="active"] .prose') ||
-      document.querySelector('.markdown-preview .prose') || // Improve selector
+      document.querySelector('.markdown-preview .prose') ||
       splitPreviewRef.current ||
       tabPreviewRef.current;
 
     const currentPreviewContent = activePreviewElement?.innerHTML || "プレビューコンテンツが見つかりません。";
 
-    // HTMLコンテンツの生成 (CSS修正済み)
+    // HTMLコンテンツの生成
     const htmlContent = `
     <!DOCTYPE html><html><head><title>Markdown Preview</title><style>
     body{font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;}
     pre{background-color:#f5f5f5;border-radius:6px;padding:16px;overflow:auto;color:#333333;border:1px solid #e0e0e0;margin-bottom:30px;}
     pre code{font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background:none;padding:0;color:inherit;}
     code:not(pre > code){font-family:SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;background-color:rgba(27,31,35,.05);padding:.2em .4em;margin:0;font-size:85%;border-radius:3px;}
-    /* ライトモード用のトークンカラー */
     .token.keyword{color:#0000ff;}.token.string{color:#a31515;}.token.function{color:#795e26;}.token.comment{color:#008000;}
     .token.class-name{color:#267f99;}.token.operator{color:#000000;}.token.number{color:#098658;}.token.builtin{color:#267f99;}
     .token.punctuation{color:#000000;}.token.property{color:#001080;}
     table{border-collapse:collapse;width:100%;margin-bottom:16px;border-spacing:0;}
     table th, table td{border:1px solid #ddd;padding:8px 12px;text-align:left;}
-    /* Remove the background color for even rows */
-    /* table tr:nth-child(even){background-color:#f6f8fa;} */
     blockquote{border-left:4px solid #dfe2e5;padding:0 1em;margin-left:0;color:#6a737d;}
     img{max-width:100%;height:auto;display:block;}
     h1,h2,h3,h4,h5,h6{margin-top:24px;margin-bottom:16px;font-weight:600;line-height:1.25;}
@@ -970,8 +933,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   };
 
   const handleExportToPptx = async () => {
-    // ... (ここは変更なし、ただし後で handleExport に統合) ...
-     console.log('PowerPoint変換処理を開始します...');
+    console.log('PowerPoint変換処理を開始します...');
     setIsPptxGenerating(true);
     try {
       if (!markdownContent.trim()) {
@@ -1012,8 +974,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   };
 
   const handleExportToQuartoPptx = async () => {
-    // ... (ここは変更なし、ただし後で handleExport に統合) ...
-     console.log('Quarto PowerPoint変換処理を開始します...');
+    console.log('Quarto PowerPoint変換処理を開始します...');
     setIsQuartoPptxGenerating(true);
     try {
       if (!markdownContent.trim()) {
@@ -1153,8 +1114,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
 
   // --- Google Drive Handlers ---
   const handleAuthChange = useCallback((authenticated: boolean, token?: string) => {
-    // ... (ここは変更なし) ...
-     setIsAuthenticated(authenticated);
+    setIsAuthenticated(authenticated);
     setAccessToken(token || null);
     if (!authenticated) {
       setSelectedFile(null); // Logout clears selection
@@ -1163,8 +1123,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, []);
 
   const handleDriveToggle = useCallback((enabled: boolean) => {
-    // ... (ここは変更なし) ...
-     if (enabled && !isAuthenticated) {
+    if (enabled && !isAuthenticated) {
        alert("Google Driveにログインしてください。");
        return;
     }
@@ -1175,8 +1134,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   }, [isAuthenticated]);
 
   const handleFileSelect = useCallback(async (file: GoogleFile) => {
-    // ... (ここは変更なし) ...
-     if (!accessToken) return;
+    if (!accessToken) return;
     try {
       // APIルート経由でファイル内容を取得
       const response = await fetch(`/api/drive/read?fileId=${file.id}`, {
@@ -1203,8 +1161,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
 
   // --- AI Chat Handlers ---
   const clearMessages = useCallback(() => {
-    // ... (ここは変更なし) ...
-     if (chatSetMessages) {
+    if (chatSetMessages) {
        chatSetMessages([]);
      }
   }, [chatSetMessages]);
@@ -1227,8 +1184,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   // --- ▼ ADDED ▼ ---
   // サイドバーでのモード切替ハンドラ
   const handleModeChange = useCallback((newMode: 'markdown' | 'marp' | 'quarto') => {
-    console.log('handleModeChange が呼ばれました:', newMode);
-    
     // プレビュータイプとビューモードを事前に決定
     let newPreviewMode: string;
     let newViewMode: 'editor' | 'preview' | 'split' | 'triple' | 'marp-preview' | 'marp-split' | 'quarto-preview' | 'quarto-split' | 'markmap' | 'markmap-split';
@@ -1252,10 +1207,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
         newViewMode = 'split';
     }
     
-    console.log(`モード切替: ${outputMode} → ${newMode}, プレビュータイプ: ${newPreviewMode}, ビューモード: ${newViewMode}`);
-    
     // 状態更新を一括で行う（バッチ処理）
-    // React の状態更新をバッチ処理する関数を使ってみる
     const batchUpdates = () => {
       // 出力モードを更新
       setOutputMode(newMode);
@@ -1278,8 +1230,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           const line = doc.lineAt(head).number;
           const lineStart = doc.lineAt(head).from;
           const col = head - lineStart + 1;
-          
-          console.log(`モード切替時に親コンポーネントに通知: モード=${newMode}, プレビュー=${newPreviewMode}`);
           
           // 親コンポーネントに直接通知
           onEditorStateUpdate(
@@ -1312,8 +1262,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
 
   // --- Effects ---
   useEffect(() => {
-    // ... (初期フォーカス、変更なし) ...
-     const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (viewRef.current) {
         viewRef.current.focus();
         // 初期カーソル位置を設定 (例: 末尾)
@@ -1328,18 +1277,11 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
 
   useAutoSave({ content: markdownContent, fileId: selectedFile?.id });
 
+  // --- ▼ MODIFIED: 重複するuseEffectを削除 ▼ ---
   // ドラフト保存機能は削除し、コンテンツ変更時は親コンポーネント（DocumentManager）に
   // 通知するだけにします。DocumentManagerがmarkdown-app-tabsに保存を行います。
-  useEffect(() => {
-    // 変更があった場合、親コンポーネントに通知
-    if (onContentChange) {
-      // 少し遅延させて連続更新を防止
-      const timeoutId = setTimeout(() => {
-        onContentChange(markdownContent);
-      }, 300);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [markdownContent, onContentChange]);
+  // 既に上部でデバウンス処理付きのuseEffectがあるため、ここは削除
+  // --- ▲ MODIFIED ▲ ---
 
   // --- 音声入力の関数 ---
   const startSpeechRecognition = useCallback(() => {
@@ -1364,7 +1306,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     recognition.onstart = () => {
       setIsListening(true);
       setRecognizedText("");
-      console.log('音声認識開始');
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -1400,7 +1341,6 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     };
 
     recognition.onend = () => {
-      console.log('音声認識終了');
       setIsListening(false);
       setRecognizedText("");
     };
