@@ -105,7 +105,8 @@
     *   **カラー出力:** 色付きの出力が正しく表示されます。
     *   **PTY（疑似端末）ベース:** `node-pty`を使用した真の疑似端末により、完全なターミナル体験を提供します。
     *   **動的サイズ調整:** ターミナルウィンドウのサイズ変更に自動対応します。
-    *   **独立WebSocketサーバー:** ポート3003で動作する専用サーバーにより安定した接続を提供します。
+    *   **専用WebSocketサーバー:** ポート3003で動作する専用サーバーにより安定した接続を提供します。
+    *   **セッション管理:** 複数のターミナルセッションを独立して管理できます。
 
 **V. ユーザビリティとインターフェース**
 
@@ -148,6 +149,7 @@
 - [node-pty](https://github.com/microsoft/node-pty) - PTY（疑似端末）ライブラリ（WebSocketターミナル機能）
 - [xterm.js](https://xtermjs.org/) - ブラウザ内ターミナルエミュレータ
 - [WebSocket (ws)](https://github.com/websockets/ws) - WebSocket通信ライブラリ
+- [concurrently](https://github.com/open-cli-tools/concurrently) - 複数のコマンドを並行実行するツール
 
 ## 🚀 インストール
 
@@ -442,28 +444,43 @@ QUARTO_PATH="/path/to/quarto/bin" # 例: /opt/quarto/bin
 
 2.  **WebSocketターミナル機能について:**
     
-    **統合サーバー（推奨）:**
+    **標準起動方式（推奨）:**
     ```bash
-    # 開発サーバーを起動（WebSocketターミナル機能も同時に起動）
+    # 開発サーバーとWebSocketサーバーを同時に起動
     npm run dev
     # or
     pnpm dev
     ```
     
-    **レガシー方式（別ポート）:**
+    **個別起動方式:**
     ```bash
-    # 別のターミナルでWebSocketサーバーを起動
-    node websocket-server.js
-    
-    # または、package.jsonにスクリプトを追加している場合
-    npm run dev:websocket-legacy
+    # Next.jsサーバーのみを起動（ポート3001）
+    npm run dev:next
     # or
-    pnpm dev:websocket-legacy
+    pnpm dev:next
+    
+    # 別のターミナルでWebSocketサーバーを起動（ポート3003）
+    npm run dev:websocket
+    # or
+    pnpm dev:websocket
+    ```
+    
+    **本番環境での起動:**
+    ```bash
+    # アプリケーションをビルド
+    npm run build
+    # or
+    pnpm build
+    
+    # 本番サーバーとWebSocketサーバーを同時に起動
+    npm run start
+    # or
+    pnpm start
     ```
     
     **注意事項:**
-    - **統合サーバー（推奨）:** WebSocketサーバーがNext.jsサーバーと同じポート（3001）で動作します
-    - **レガシー方式:** WebSocketサーバーが別ポート（3003）で動作します
+    - **標準起動方式（推奨）:** Next.jsサーバー（ポート3001）とWebSocketサーバー（ポート3003）が同時に起動します
+    - **個別起動方式:** 各サーバーを別々に起動できます（デバッグ時などに有用）
     - `node-pty`のビルドが完了していることを確認してください
     - ターミナル機能を無効にするには `.env.local` で `NEXT_PUBLIC_WEBSOCKET_TERMINAL_FLG=OFF` を設定してください
 
