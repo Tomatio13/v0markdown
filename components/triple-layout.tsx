@@ -1,6 +1,7 @@
 "use client"
 
 import { AIChat } from './ai-chat'
+import { XTermTerminal as TerminalComponent } from './xterm-terminal-simple'
 import React, { useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import type { Message, UseChatHelpers } from 'ai/react';
@@ -20,6 +21,7 @@ interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 
   append?: any // aiパッケージの完全な型と互換性を持たせる
   tocVisible?: boolean
   tocComponent?: React.ReactNode
+  terminalVisible?: boolean
 }
 
 export const TripleLayout = React.memo(({ 
@@ -40,7 +42,8 @@ export const TripleLayout = React.memo(({
   setInput,
   append,
   tocVisible = false,
-  tocComponent
+  tocComponent,
+  terminalVisible = false
 }: TripleLayoutProps) => {
   // エディタとプレビューの比率状態
   const [editorPreviewRatio, setEditorPreviewRatio] = useState({
@@ -86,51 +89,80 @@ export const TripleLayout = React.memo(({
         </>
       )}
       
-      {/* エディタとAIチャットを含む内側のResizablePanelGroup */}
+      {/* メインコンテンツエリア */}
       <ResizablePanel 
         defaultSize={driveEnabled ? 85 : (!driveEnabled && tocVisible ? 85 : 100)}
         minSize={75}
       >
         <ResizablePanelGroup 
-          direction="horizontal" 
+          direction="vertical" 
           className="h-full"
-          onLayout={handleResizeEditorPreview}
         >
-          {/* エディタパネル */}
+          {/* 上部: エディタとAIチャット */}
           <ResizablePanel 
-            defaultSize={editorPreviewRatio.editor}
-            minSize={30} 
-            className={isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}
+            defaultSize={terminalVisible ? 70 : 100}
+            minSize={40}
           >
-            {editorComponent}
+            <ResizablePanelGroup 
+              direction="horizontal" 
+              className="h-full"
+              onLayout={handleResizeEditorPreview}
+            >
+              {/* エディタパネル */}
+              <ResizablePanel 
+                defaultSize={editorPreviewRatio.editor}
+                minSize={30} 
+                className={isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}
+              >
+                {editorComponent}
+              </ResizablePanel>
+              
+              <ResizableHandle 
+                withHandle 
+                className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+              />
+              
+              {/* AIチャットパネル */}
+              <ResizablePanel 
+                defaultSize={editorPreviewRatio.preview}
+                minSize={30} 
+                className={isDarkMode ? 'bg-[#2c2c2c]' : 'bg-gray-100'}
+              >
+                <AIChat 
+                  onInsertToEditor={onAIContentInsert}
+                  isDarkMode={isDarkMode}
+                  messages={messages}
+                  input={input}
+                  handleInputChange={handleInputChange}
+                  isLoading={isLoading}
+                  clearMessages={clearMessages}
+                  getEditorContent={getEditorContent}
+                  getSelectedEditorContent={getSelectedEditorContent}
+                  replaceSelectedEditorContent={replaceSelectedEditorContent}
+                  setInput={setInput}
+                  append={append}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
           </ResizablePanel>
           
-          <ResizableHandle 
-            withHandle 
-            className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
-          />
-          
-          {/* AIチャットパネル */}
-          <ResizablePanel 
-            defaultSize={editorPreviewRatio.preview}
-            minSize={30} 
-            className={isDarkMode ? 'bg-[#2c2c2c]' : 'bg-gray-100'}
-          >
-            <AIChat 
-              onInsertToEditor={onAIContentInsert}
-              isDarkMode={isDarkMode}
-              messages={messages}
-              input={input}
-              handleInputChange={handleInputChange}
-              isLoading={isLoading}
-              clearMessages={clearMessages}
-              getEditorContent={getEditorContent}
-              getSelectedEditorContent={getSelectedEditorContent}
-              replaceSelectedEditorContent={replaceSelectedEditorContent}
-              setInput={setInput}
-              append={append}
-            />
-          </ResizablePanel>
+          {/* ターミナルパネル（表示時のみ） */}
+          {terminalVisible && (
+            <>
+              <ResizableHandle 
+                withHandle 
+                className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+              />
+              <ResizablePanel 
+                defaultSize={30}
+                minSize={20}
+                maxSize={60}
+                className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
+              >
+                <TerminalComponent isDarkMode={isDarkMode} />
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       </ResizablePanel>
     </ResizablePanelGroup>

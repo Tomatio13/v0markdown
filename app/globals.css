@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* xterm.js styles */
+@import 'xterm/css/xterm.css';
+
 /* マインドマップのスタイル設定 */
 .markmap {
   position: absolute;

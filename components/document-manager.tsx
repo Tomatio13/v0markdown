@@ -72,12 +72,18 @@ export default function DocumentManager() {
   const [cursorPosition, setCursorPosition] = useState<{ line: number, col: number }>({ line: 1, col: 1 })
   const [outputMode, setOutputMode] = useState<string>('Markdown')
   const [previewMode, setPreviewMode] = useState<string | null>(null)
+  
+  // ターミナル・Vim・音声入力の状態管理
+  const [terminalVisible, setTerminalVisible] = useState(false)
   const [isVimMode, setIsVimMode] = useState<boolean>(false)
-  // 音声入力の状態管理を追加
   const [isListening, setIsListening] = useState<boolean>(false)
   const [toggleVoiceInput, setToggleVoiceInput] = useState<(() => void) | undefined>(undefined)
-  // Vimモードの状態管理を追加
   const [toggleVimMode, setToggleVimMode] = useState<(() => void) | undefined>(undefined)
+
+  // ターミナル切り替え関数
+  const toggleTerminal = useCallback(() => {
+    setTerminalVisible(prev => !prev)
+  }, [])
   
   // エディタへの参照
   const editorRef = useRef<any>(null)
@@ -674,6 +680,9 @@ export default function DocumentManager() {
               chatSetMessages={chatHelpers.setMessages}
               chatSetInput={chatHelpers.setInput}
               chatAppend={chatHelpers.append}
+              // ターミナル関連のpropsを追加
+              terminalVisible={terminalVisible}
+              onTerminalToggle={toggleTerminal}
               onFileSaved={(fileName: string) => {
                 console.log('===== ファイル保存コールバック開始 =====');
                 console.log('保存されたファイル名:', fileName);
