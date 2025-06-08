@@ -107,14 +107,14 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
   }, [xtermRef.current]) // isConnectedではなくxtermRef.currentに依存
 
   // WebSocket接続を確立
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback(async () => {
     try {
       if (wsRef.current) return
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const hostname = window.location.hostname
-      // WebSocketサーバーはポート3003で実行されている
-      const wsUrl = `${protocol}//${hostname}:3003`
+      // APIからWebSocketサーバーの接続情報を取得
+      const response = await fetch('/api/terminal-ws')
+      const connectionInfo = await response.json()
+      const wsUrl = connectionInfo.websocketUrl
       
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
@@ -334,7 +334,7 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
       }
     })
     
-    connectWebSocket()
+    connectWebSocket().catch(console.error)
 
     const handleResize = () => {
       if (fitAddonRef.current && xtermRef.current) {
@@ -388,7 +388,7 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
   const reconnect = useCallback(() => {
     disconnectWebSocket()
     setTimeout(() => {
-      connectWebSocket()
+      connectWebSocket().catch(console.error)
     }, 1000)
   }, []) // 依存関係を削除
 

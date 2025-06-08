@@ -1,13 +1,50 @@
 const { WebSocketServer } = require('ws')
 const pty = require('node-pty')
 const fs = require('fs')
+const path = require('path')
 
-const wss = new WebSocketServer({ port: 3003 })
+// 環境変数ファイルを手動で読み込む関数
+function loadEnvFile(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const envContent = fs.readFileSync(filePath, 'utf8')
+      const lines = envContent.split('\n')
+      
+      lines.forEach(line => {
+        line = line.trim()
+        if (line && !line.startsWith('#')) {
+          const [key, ...valueParts] = line.split('=')
+          if (key && valueParts.length > 0) {
+            const value = valueParts.join('=').trim()
+            // 既存の環境変数を上書きしない
+            if (!process.env[key]) {
+              process.env[key] = value
+            }
+          }
+        }
+      })
+      console.log(`環境変数ファイルを読み込みました: ${filePath}`)
+    }
+  } catch (error) {
+    console.log(`環境変数ファイルの読み込みに失敗: ${filePath}`, error.message)
+  }
+}
+
+// 環境変数ファイルを順番に読み込み（後から読み込んだものが優先）
+loadEnvFile('.env')
+loadEnvFile('.env.local')
+
+// 環境変数からポート番号を取得（デフォルト: 3002）
+const port = process.env.WEBSOCK_LISTEN_PORT || 3002
+
+console.log(`WEBSOCK_LISTEN_PORT: ${process.env.WEBSOCK_LISTEN_PORT}`)  
+
+const wss = new WebSocketServer({ port: port })
 
 // ターミナルセッションを管理するMap
 const terminalSessions = new Map()
 
-console.log('WebSocketターミナルサーバーがポート3003で起動しました')
+console.log(`WebSocketターミナルサーバーがポート${port}で起動しました`)
 
 wss.on('connection', (ws) => {
   console.log('クライアントが接続しました')
