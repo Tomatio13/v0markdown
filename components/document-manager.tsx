@@ -85,10 +85,18 @@ export default function DocumentManager() {
     setTerminalVisible(prev => !prev)
   }, [])
 
+  // エディタからの挿入関数を保存するref
+  const editorInsertFunctionRef = useRef<((text: string) => void) | null>(null)
+
+  // エディタから挿入関数を受け取る
+  const handleReceiveInsertFunction = useCallback((insertFunction: (text: string) => void) => {
+    editorInsertFunctionRef.current = insertFunction
+  }, [])
+
   // ターミナルからエディタへのテキスト挿入機能
   const handleTerminalInsertToEditor = useCallback((text: string) => {
-    if (editorRef.current && editorRef.current.insertText) {
-      editorRef.current.insertText(text)
+    if (editorInsertFunctionRef.current) {
+      editorInsertFunctionRef.current(text)
     }
   }, [])
   
@@ -690,7 +698,7 @@ export default function DocumentManager() {
               // ターミナル関連のpropsを追加
               terminalVisible={terminalVisible}
               onTerminalToggle={toggleTerminal}
-              onTerminalInsertToEditor={handleTerminalInsertToEditor}
+              onTerminalInsertToEditor={handleReceiveInsertFunction}
               onFileSaved={(fileName: string) => {
                 console.log('===== ファイル保存コールバック開始 =====');
                 console.log('保存されたファイル名:', fileName);

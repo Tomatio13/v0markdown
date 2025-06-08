@@ -2274,6 +2274,10 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
 
   // ファイルエクスプローラーの表示/非表示を切り替える関数
   const toggleFileExplorer = useCallback(() => {
+    console.log('toggleFileExplorer called');
+    console.log('NEXT_PUBLIC_FILE_UPLOAD:', process.env.NEXT_PUBLIC_FILE_UPLOAD);
+    console.log('Current isFileExplorerVisible:', isFileExplorerVisible);
+    
     // FILE_UPLOADがOFFの場合は何もしない
     if (process.env.NEXT_PUBLIC_FILE_UPLOAD === 'OFF') {
       console.log('FILE_UPLOAD=OFFのため、ファイルエクスプローラーは使用できません');
@@ -2281,10 +2285,11 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
     }
     
     setIsFileExplorerVisible(prev => {
-      console.log(`ファイルエクスプローラーの表示を切り替えます: ${!prev ? '表示' : '非表示'}`);
-      return !prev;
+      const newValue = !prev;
+      console.log(`ファイルエクスプローラーの表示を切り替えます: ${prev} → ${newValue}`);
+      return newValue;
     });
-  }, []);
+  }, [isFileExplorerVisible]);
   
   // ローカルファイル選択時の処理
   const handleLocalFileSelect = useCallback(async (filePath: string, fileName: string) => {
@@ -2417,14 +2422,21 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           <div className="w-full border-t my-2"></div>
 
           {/* ファイルエクスプローラーボタンを追加 */}
-          {process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' && (
+          {(() => {
+            const shouldShow = process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF';
+            console.log('File Explorer Button - shouldShow:', shouldShow, 'NEXT_PUBLIC_FILE_UPLOAD:', process.env.NEXT_PUBLIC_FILE_UPLOAD);
+            return shouldShow;
+          })() && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
                   variant={isFileExplorerVisible ? 'secondary' : 'ghost'} 
                   size="icon" 
                   className={`h-10 w-10 ${isFileExplorerVisible && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
-                  onClick={toggleFileExplorer}
+                  onClick={() => {
+                    console.log('File Explorer Button clicked');
+                    toggleFileExplorer();
+                  }}
                 >
                   <Folder className="h-6 w-6" />
                 </Button>
@@ -2798,10 +2810,10 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
               clearMessages={clearMessages}
               driveEnabled={driveEnabled && isAuthenticated}
               driveFileListComponent={driveEnabled && isAuthenticated && accessToken ? <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} /> : null}
-              tocVisible={!driveEnabled && isTocVisible}
+              tocVisible={!driveEnabled && !isFileExplorerVisible && isTocVisible}
               // TOCコンポーネントを ScrollArea でラップし custom-scrollbar を追加
               tocComponent={
-                (!driveEnabled && isTocVisible) ?
+                (!driveEnabled && !isFileExplorerVisible && isTocVisible) ?
                 <ScrollArea className="h-full w-full p-4 custom-scrollbar">
                   <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
                 </ScrollArea>
@@ -2813,203 +2825,224 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
               setInput={chatSetInput as any || (() => {})}
               append={chatAppend as any}
               terminalVisible={terminalVisible}
+              onTerminalInsertToEditor={handleTerminalInsert}
+              fileExplorerVisible={isFileExplorerVisible}
+              onFileSelect={handleLocalFileSelect}
             />
           ) : (
              /* 通常のビューモード (triple以外) */
              viewMode.includes('editor') ? (
-                <ResizablePanelGroup direction="vertical" className="h-full">
-                  {/* 上部: 水平レイアウト（サイドバー + エディタ） */}
-                  <ResizablePanel defaultSize={terminalVisible ? 70 : 100} minSize={40}>
-                    <ResizablePanelGroup direction="horizontal" className="h-full">
-                      {/* ファイルエクスプローラーを追加 */}
-                      {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
-                        <>
-                          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                            <FileExplorer 
-                              onFileSelect={handleLocalFileSelect} 
-                              isDarkMode={isDarkMode} 
-                              className="custom-scrollbar"
-                            />
-                          </ResizablePanel>
-                          <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
-                        </>
-                      ) : null}
-                      
-                      {/* 既存のドライブ/TOC条件 */}
-                      {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
-                        <>
-                          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                            {/* ScrollArea に custom-scrollbar を追加 */}
-                            <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                              {driveEnabled && isAuthenticated && accessToken ? (
-                                <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                              ) : (
-                                <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                              )}
-                            </ScrollArea>
-                          </ResizablePanel>
-                          {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                          <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                        </>
-                      ) : null}
-                      <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                        {/* EditorComponent を含む div に custom-scrollbar を追加 */}
-                        <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
-                      </ResizablePanel>
-                    </ResizablePanelGroup>
-                  </ResizablePanel>
-                  
-                  {/* ターミナルパネル（表示時のみ） */}
-                  {terminalVisible && (
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {/* ファイルエクスプローラーを追加 */}
+                  {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
                     <>
-                      <ResizableHandle 
-                        withHandle 
-                        className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
-                      />
-                      <ResizablePanel 
-                        defaultSize={30}
-                        minSize={20}
-                        maxSize={60}
-                        className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
-                      >
-                        <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        <FileExplorer 
+                          onFileSelect={handleLocalFileSelect} 
+                          isDarkMode={isDarkMode} 
+                          className="custom-scrollbar"
+                        />
                       </ResizablePanel>
+                      <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
                     </>
-                  )}
-                </ResizablePanelGroup>
-             ) : viewMode.includes('preview') && !viewMode.includes('split') && !viewMode.includes('markmap') ? (
-                <ResizablePanelGroup direction="vertical" className="h-full">
-                  {/* 上部: 水平レイアウト（サイドバー + プレビュー） */}
-                  <ResizablePanel defaultSize={terminalVisible ? 70 : 100} minSize={40}>
-                    <ResizablePanelGroup direction="horizontal" className="h-full">
-                      {/* ファイルエクスプローラーを追加 */}
-                      {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
-                        <>
-                          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                            <FileExplorer 
-                              onFileSelect={handleLocalFileSelect} 
-                              isDarkMode={isDarkMode} 
-                              className="custom-scrollbar"
-                            />
-                          </ResizablePanel>
-                          <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
-                        </>
-                      ) : null}
-                      
-                      {/* 既存のドライブ/TOC条件 */}
-                      {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
-                        <>
-                          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                            {/* ScrollArea に custom-scrollbar を追加 */}
-                            <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                              {driveEnabled && isAuthenticated && accessToken ? (
-                                <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                              ) : (
-                                <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                              )}
-                            </ScrollArea>
-                          </ResizablePanel>
-                          {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                          <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                        </>
-                      ) : null}
-                      <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 80 : 100}>
-                        {viewMode.includes('marp') ? MarpPreviewComponent :
-                         viewMode.includes('quarto') ? QuartoPreviewComponent :
-                         viewMode.includes('markmap') ? MarkmapPreviewComponent :
-                         PreviewComponent}
-                      </ResizablePanel>
-                    </ResizablePanelGroup>
-                  </ResizablePanel>
+                  ) : null}
                   
-                  {/* ターミナルパネル（表示時のみ） */}
-                  {terminalVisible && (
+                  {/* 既存のドライブ/TOC条件 */}
+                  {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
                     <>
-                      <ResizableHandle 
-                        withHandle 
-                        className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
-                      />
-                      <ResizablePanel 
-                        defaultSize={30}
-                        minSize={20}
-                        maxSize={60}
-                        className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
-                      >
-                        <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
-                      </ResizablePanel>
-                    </>
-                  )}
-                </ResizablePanelGroup>
-             ) : (
-               /* Split View (デフォルト) */
-                <ResizablePanelGroup direction="vertical" className="h-full">
-                  {/* 上部: 水平レイアウト（サイドバー + エディタ + プレビュー） */}
-                  <ResizablePanel defaultSize={terminalVisible ? 70 : 100} minSize={40}>
-                    <ResizablePanelGroup direction="horizontal" className="h-full">
-                      {/* ファイルエクスプローラーを追加 */}
-                      {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
-                        <>
-                          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                            <FileExplorer 
-                              onFileSelect={handleLocalFileSelect} 
-                              isDarkMode={isDarkMode} 
-                              className="custom-scrollbar"
-                            />
-                          </ResizablePanel>
-                          <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
-                        </>
-                      ) : null}
-                      
-                      {/* 既存のドライブ/TOC条件 */}
-                      {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
-                        <>
-                          <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
-                            {/* ScrollArea に custom-scrollbar を追加 */}
-                            <ScrollArea className="h-full w-full p-4 custom-scrollbar">
-                              {driveEnabled && isAuthenticated && accessToken ? (
-                                <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
-                              ) : (
-                                <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
-                              )}
-                            </ScrollArea>
-                          </ResizablePanel>
-                          {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
-                          <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                        </>
-                      ) : null}
-                      
-                      {/* エディターとプレビューのパネルサイズを調整 */}
-                      <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
-                        <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        {/* ScrollArea に custom-scrollbar を追加 */}
+                        <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                          {driveEnabled && isAuthenticated && accessToken ? (
+                            <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                          ) : (
+                            <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                          )}
+                        </ScrollArea>
                       </ResizablePanel>
                       {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
                       <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
-                      <ResizablePanel defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 40 : 50}>
+                    </>
+                  ) : null}
+                  
+                  {/* メインコンテンツエリア（エディタ + ターミナル） */}
+                  <ResizablePanel 
+                    defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 75 : 100}
+                    minSize={75}
+                  >
+                    <ResizablePanelGroup direction="vertical" className="h-full">
+                      {/* エディタ */}
+                      <ResizablePanel defaultSize={terminalVisible ? 70 : 100} minSize={40}>
+                        {/* EditorComponent を含む div に custom-scrollbar を追加 */}
+                        <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
+                      </ResizablePanel>
+                      
+                      {/* ターミナルパネル（表示時のみ） */}
+                      {terminalVisible && (
+                        <>
+                          <ResizableHandle 
+                            withHandle 
+                            className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+                          />
+                          <ResizablePanel 
+                            defaultSize={30}
+                            minSize={20}
+                            maxSize={60}
+                            className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
+                          >
+                            <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
+                          </ResizablePanel>
+                        </>
+                      )}
+                    </ResizablePanelGroup>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+             ) : viewMode.includes('preview') && !viewMode.includes('split') && !viewMode.includes('markmap') ? (
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {/* ファイルエクスプローラーを追加 */}
+                  {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
+                    <>
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        <FileExplorer 
+                          onFileSelect={handleLocalFileSelect} 
+                          isDarkMode={isDarkMode} 
+                          className="custom-scrollbar"
+                        />
+                      </ResizablePanel>
+                      <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
+                    </>
+                  ) : null}
+                  
+                  {/* 既存のドライブ/TOC条件 */}
+                  {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
+                    <>
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        {/* ScrollArea に custom-scrollbar を追加 */}
+                        <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                          {driveEnabled && isAuthenticated && accessToken ? (
+                            <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                          ) : (
+                            <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                          )}
+                        </ScrollArea>
+                      </ResizablePanel>
+                      {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                      <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                    </>
+                  ) : null}
+                  
+                  {/* メインコンテンツエリア（プレビュー + ターミナル） */}
+                  <ResizablePanel 
+                    defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 75 : 100}
+                    minSize={75}
+                  >
+                    <ResizablePanelGroup direction="vertical" className="h-full">
+                      {/* プレビュー */}
+                      <ResizablePanel defaultSize={terminalVisible ? 70 : 100} minSize={40}>
                         {viewMode.includes('marp') ? MarpPreviewComponent :
                          viewMode.includes('quarto') ? QuartoPreviewComponent :
                          viewMode.includes('markmap') ? MarkmapPreviewComponent :
                          PreviewComponent}
                       </ResizablePanel>
+                      
+                      {/* ターミナルパネル（表示時のみ） */}
+                      {terminalVisible && (
+                        <>
+                          <ResizableHandle 
+                            withHandle 
+                            className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+                          />
+                          <ResizablePanel 
+                            defaultSize={30}
+                            minSize={20}
+                            maxSize={60}
+                            className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
+                          >
+                            <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
+                          </ResizablePanel>
+                        </>
+                      )}
                     </ResizablePanelGroup>
                   </ResizablePanel>
-                  
-                  {/* ターミナルパネル（表示時のみ） */}
-                  {terminalVisible && (
+                </ResizablePanelGroup>
+             ) : (
+               /* Split View (デフォルト) */
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {/* ファイルエクスプローラーを追加 */}
+                  {isFileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' ? (
                     <>
-                      <ResizableHandle 
-                        withHandle 
-                        className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
-                      />
-                      <ResizablePanel 
-                        defaultSize={30}
-                        minSize={20}
-                        maxSize={60}
-                        className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
-                      >
-                        <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        <FileExplorer 
+                          onFileSelect={handleLocalFileSelect} 
+                          isDarkMode={isDarkMode} 
+                          className="custom-scrollbar"
+                        />
                       </ResizablePanel>
+                      <ResizableHandle withHandle className={`${isDarkMode ? 'dark:bg-[#171717] dark:border-[#171717]' : ''}`} />
                     </>
-                  )}
+                  ) : null}
+                  
+                  {/* 既存のドライブ/TOC条件 */}
+                  {((driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible)) && !isFileExplorerVisible ? (
+                    <>
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        {/* ScrollArea に custom-scrollbar を追加 */}
+                        <ScrollArea className="h-full w-full p-4 custom-scrollbar">
+                          {driveEnabled && isAuthenticated && accessToken ? (
+                            <GoogleDriveFileList accessToken={accessToken} onFileSelect={handleFileSelect} selectedFileId={selectedFile?.id} />
+                          ) : (
+                            <TableOfContents headings={extractedHeadings} onHeadingClick={handleTocJump} isDarkMode={isDarkMode} />
+                          )}
+                        </ScrollArea>
+                      </ResizablePanel>
+                      {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                      <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                    </>
+                  ) : null}
+                  
+                  {/* メインコンテンツエリア（エディタ + プレビュー + ターミナル） */}
+                  <ResizablePanel 
+                    defaultSize={isFileExplorerVisible || (driveEnabled && isAuthenticated && accessToken) || (!driveEnabled && isTocVisible) ? 75 : 100}
+                    minSize={75}
+                  >
+                    <ResizablePanelGroup direction="vertical" className="h-full">
+                      {/* 上部: エディタとプレビュー */}
+                      <ResizablePanel defaultSize={terminalVisible ? 70 : 100} minSize={40}>
+                        <ResizablePanelGroup direction="horizontal" className="h-full">
+                          {/* エディターとプレビューのパネルサイズを調整 */}
+                          <ResizablePanel defaultSize={50}>
+                            <div className="h-full overflow-auto custom-scrollbar">{EditorComponent}</div>
+                          </ResizablePanel>
+                          {/* ▼ MODIFIED: ResizableHandle にダークモード時の色を指定 */}
+                          <ResizableHandle withHandle className="dark:bg-[#171717] dark:border-[#171717]" />
+                          <ResizablePanel defaultSize={50}>
+                            {viewMode.includes('marp') ? MarpPreviewComponent :
+                             viewMode.includes('quarto') ? QuartoPreviewComponent :
+                             viewMode.includes('markmap') ? MarkmapPreviewComponent :
+                             PreviewComponent}
+                          </ResizablePanel>
+                        </ResizablePanelGroup>
+                      </ResizablePanel>
+                      
+                      {/* ターミナルパネル（表示時のみ） */}
+                      {terminalVisible && (
+                        <>
+                          <ResizableHandle 
+                            withHandle 
+                            className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+                          />
+                          <ResizablePanel 
+                            defaultSize={30}
+                            minSize={20}
+                            maxSize={60}
+                            className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
+                          >
+                            <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
+                          </ResizablePanel>
+                        </>
+                      )}
+                    </ResizablePanelGroup>
+                  </ResizablePanel>
                 </ResizablePanelGroup>
              )
           )}

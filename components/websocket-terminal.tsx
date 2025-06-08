@@ -487,7 +487,7 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
             </ContextMenuItem>
             <ContextMenuItem 
               onClick={handleInsertToEditor}
-              disabled={(!selectedText && !getSelectedTerminalText()) || !onInsertToEditor}
+              disabled={!selectedText && !getSelectedTerminalText()}
             >
               <FileText className="mr-2 h-4 w-4" />
               <span>エディタに挿入</span>

@@ -2,6 +2,7 @@
 
 import { AIChat } from './ai-chat'
 import { WebSocketTerminal as TerminalComponent } from './websocket-terminal'
+import FileExplorer from './file-explorer'
 import React, { useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import type { Message, UseChatHelpers } from 'ai/react';
@@ -22,6 +23,10 @@ interface TripleLayoutProps extends Pick<UseChatHelpers, 'messages' | 'input' | 
   tocVisible?: boolean
   tocComponent?: React.ReactNode
   terminalVisible?: boolean
+  onTerminalInsertToEditor?: (text: string) => void
+  // ファイルエクスプローラー関連
+  fileExplorerVisible?: boolean
+  onFileSelect?: (filePath: string, fileName: string) => void
 }
 
 export const TripleLayout = React.memo(({ 
@@ -43,7 +48,10 @@ export const TripleLayout = React.memo(({
   append,
   tocVisible = false,
   tocComponent,
-  terminalVisible = false
+  terminalVisible = false,
+  onTerminalInsertToEditor,
+  fileExplorerVisible = false,
+  onFileSelect
 }: TripleLayoutProps) => {
   // エディタとプレビューの比率状態
   const [editorPreviewRatio, setEditorPreviewRatio] = useState({
@@ -63,8 +71,25 @@ export const TripleLayout = React.memo(({
 
   return (
     <ResizablePanelGroup direction="horizontal" className={`h-full ${isDarkMode ? 'bg-[#1e1e1e]' : 'bg-white'}`}>
-      {/* Google Driveパネル（有効時のみ表示） */}
-      {driveEnabled && driveFileListComponent && (
+      {/* ファイルエクスプローラーパネル（有効時のみ表示） */}
+      {fileExplorerVisible && process.env.NEXT_PUBLIC_FILE_UPLOAD !== 'OFF' && (
+        <>
+          <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+            <FileExplorer 
+              onFileSelect={onFileSelect || (() => {})} 
+              isDarkMode={isDarkMode} 
+              className="custom-scrollbar"
+            />
+          </ResizablePanel>
+          <ResizableHandle 
+            withHandle 
+            className={isDarkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"} 
+          />
+        </>
+      )}
+      
+      {/* Google Driveパネル（ファイルエクスプローラー無効かつDrive有効時のみ表示） */}
+      {!fileExplorerVisible && driveEnabled && driveFileListComponent && (
         <>
           <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
             {driveFileListComponent}
@@ -76,8 +101,8 @@ export const TripleLayout = React.memo(({
         </>
       )}
       
-      {/* 目次パネル（Drive無効かつToc有効時のみ表示） */}
-      {!driveEnabled && tocVisible && tocComponent && (
+      {/* 目次パネル（ファイルエクスプローラー無効かつDrive無効かつToc有効時のみ表示） */}
+      {!fileExplorerVisible && !driveEnabled && tocVisible && tocComponent && (
         <>
           <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
             {tocComponent}
@@ -91,7 +116,11 @@ export const TripleLayout = React.memo(({
       
       {/* メインコンテンツエリア */}
       <ResizablePanel 
-        defaultSize={driveEnabled ? 85 : (!driveEnabled && tocVisible ? 85 : 100)}
+        defaultSize={
+          fileExplorerVisible ? 75 : 
+          (!fileExplorerVisible && driveEnabled ? 85 : 
+          (!fileExplorerVisible && !driveEnabled && tocVisible ? 85 : 100))
+        }
         minSize={75}
       >
         <ResizablePanelGroup 
@@ -159,7 +188,7 @@ export const TripleLayout = React.memo(({
                 maxSize={60}
                 className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
               >
-                <TerminalComponent isDarkMode={isDarkMode} />
+                <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={onTerminalInsertToEditor} />
               </ResizablePanel>
             </>
           )}
