@@ -20,6 +20,7 @@
   - [✨ 機能](#-機能)
   - [🛠️ 技術スタック](#️-技術スタック)
   - [🚀 インストール](#-インストール)
+    - [node-ptyのビルド（WebSocketターミナル機能を使用する場合）](#node-ptyのビルドwebsocketターミナル機能を使用する場合)
   - [🛠️ 外部ツールのセットアップ](#️-外部ツールのセットアップ)
     - [Jupyterのインストール方法](#jupyterのインストール方法)
     - [Quartoのインストール方法](#quartoのインストール方法)
@@ -95,6 +96,17 @@
         *   その他の文書: Markitdownを使ってマークダウンに変換し、AIに提供
 *   **外部ツール連携 (MCP):** 設定した外部ツール (コマンドラインツールなど) をAIが利用できるようになります (STDIO経由、要設定)。
 
+**IV. 開発・ターミナル機能**
+
+*   **WebSocketターミナル:**
+    *   エディタ内で本格的なターミナル機能を利用できます。
+    *   **インタラクティブコマンド対応:** `vi`、`nano`、`htop`、`less`などのインタラクティブなコマンドが使用可能です。
+    *   **リアルタイム出力:** `ping`、`tail -f`などのストリーミング出力をリアルタイムで表示します。
+    *   **カラー出力:** 色付きの出力が正しく表示されます。
+    *   **PTY（疑似端末）ベース:** `node-pty`を使用した真の疑似端末により、完全なターミナル体験を提供します。
+    *   **動的サイズ調整:** ターミナルウィンドウのサイズ変更に自動対応します。
+    *   **独立WebSocketサーバー:** ポート3003で動作する専用サーバーにより安定した接続を提供します。
+
 **V. ユーザビリティとインターフェース**
 
 *   **柔軟なレイアウト:**
@@ -133,6 +145,9 @@
 - [Quarto](https://quarto.org/) - 科学技術計算向けパブリッシングシステム (PPTX変換で使用)
 - [Vercel AI SDK](https://sdk.vercel.ai/) - AIチャット機能 (オプション)
 - [Ollama AI Provider](https://sdk.vercel.ai/providers/community-providers/ollama) - ローカルまたはリモートのLLMを実行するOllamaサーバーへの接続
+- [node-pty](https://github.com/microsoft/node-pty) - PTY（疑似端末）ライブラリ（WebSocketターミナル機能）
+- [xterm.js](https://xtermjs.org/) - ブラウザ内ターミナルエミュレータ
+- [WebSocket (ws)](https://github.com/websockets/ws) - WebSocket通信ライブラリ
 
 ## 🚀 インストール
 
@@ -150,6 +165,30 @@ yarn install
 # or
 pnpm install
 ```
+
+### node-ptyのビルド（WebSocketターミナル機能を使用する場合）
+
+WebSocketターミナル機能（`vi`などのインタラクティブなコマンドをサポート）を使用する場合、`node-pty`のネイティブモジュールを手動でビルドする必要があります。
+
+```bash
+# 必要な依存関係をインストール（Ubuntu/Debian系の場合）
+sudo apt update && sudo apt install -y build-essential python3-dev make g++
+
+# node-gypをグローバルにインストール
+npm install -g node-gyp
+
+# node-ptyのネイティブモジュールをビルド
+cd node_modules/.pnpm/node-pty@1.0.0/node_modules/node-pty
+node-gyp rebuild
+
+# プロジェクトディレクトリに戻る
+cd /path/to/your/project
+```
+
+**注意事項:**
+- `node-pty`のビルドには、C++コンパイラとPython3が必要です
+- ビルドが成功すると、`build/Release/pty.node`ファイルが作成されます
+- このビルド作業は、WebSocketターミナル機能を使用しない場合は不要です
 
 インストール完了後、[初期設定](#️-初期設定)に進んでください。
 
@@ -305,6 +344,10 @@ FILE_EXPLORER_ROOT_DIR="/path/to/your/documents"  # 例: "/home/user/Documents"
 # OFFにするとファイルエクスプローラー機能が無効になりUIからも非表示になります
 NEXT_PUBLIC_FILE_UPLOAD=ON
 
+# WebSocketターミナル機能の有効/無効フラグ (ON / OFF)
+# OFFにするとターミナル機能が無効になりUIからターミナルアイコンも非表示になります
+NEXT_PUBLIC_WEBSOCKET_TERMINAL_FLG=ON
+
 # AI Provider API Keys (AIチャット機能を利用する場合にいずれか、または複数を設定)
 OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 GROK_API_KEY="YOUR_GROK_API_KEY"
@@ -396,7 +439,35 @@ QUARTO_PATH="/path/to/quarto/bin" # 例: /opt/quarto/bin
     # or
     pnpm dev
     ```
-2.  ブラウザで `http://localhost:3000` (または `.env.local` で指定したポート) を開きます。
+
+2.  **WebSocketターミナル機能について:**
+    
+    **統合サーバー（推奨）:**
+    ```bash
+    # 開発サーバーを起動（WebSocketターミナル機能も同時に起動）
+    npm run dev
+    # or
+    pnpm dev
+    ```
+    
+    **レガシー方式（別ポート）:**
+    ```bash
+    # 別のターミナルでWebSocketサーバーを起動
+    node websocket-server.js
+    
+    # または、package.jsonにスクリプトを追加している場合
+    npm run dev:websocket-legacy
+    # or
+    pnpm dev:websocket-legacy
+    ```
+    
+    **注意事項:**
+    - **統合サーバー（推奨）:** WebSocketサーバーがNext.jsサーバーと同じポート（3001）で動作します
+    - **レガシー方式:** WebSocketサーバーが別ポート（3003）で動作します
+    - `node-pty`のビルドが完了していることを確認してください
+    - ターミナル機能を無効にするには `.env.local` で `NEXT_PUBLIC_WEBSOCKET_TERMINAL_FLG=OFF` を設定してください
+
+3.  ブラウザで `http://localhost:3000` (または `.env.local` で指定したポート) を開きます。
 3.  **エディタ:** マークダウンテキストを入力・編集します。
 4.  **プレビュー:** 分割ビューまたはプレビュータブでレンダリング結果を確認します。
 5.  **ツールバー:** 書式設定、表示モード切り替え、ファイル操作などを行います。

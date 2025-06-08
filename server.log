@@ -1,0 +1,24 @@
+WebSocketサーバーを統合中...
+> Ready on http://localhost:3001
+> Next.js server ready
+> WebSocket server ready on ws://localhost:3001/api/terminal-ws
+WebSocket接続確立
+PTYプロセス作成開始 (セッション: qp82d)
+シェル: /usr/bin/zsh
+作業ディレクトリ: /home/masato
+PTYプロセス作成成功 (セッション: qp82d)
+セッション qp82d に connected メッセージを送信
+PTYプロセス状態確認 (セッション: qp82d):
+- PID: 791345
+- 終了済み: undefined
+PTYデータ受信 (セッション: qp82d): 101 文字
+PTYデータ受信 (セッション: qp82d): 33 文字
+PTYデータ受信 (セッション: qp82d): 38 文字
+PTYデータ受信 (セッション: qp82d): 74 文字
+WebSocket接続終了
+PTYプロセスエラー (セッション: qp82d): [Error: read EIO] { errno: -5, code: 'EIO', syscall: 'read' }
+PTYプロセス終了 (セッション: qp82d): { exitCode: 1, signal: 0 }
+終了理由: exitCode=1, signal=0
+
+サーバーを停止中...
+WebSocketサーバーが停止しました

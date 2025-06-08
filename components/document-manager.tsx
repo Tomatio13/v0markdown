@@ -84,6 +84,13 @@ export default function DocumentManager() {
   const toggleTerminal = useCallback(() => {
     setTerminalVisible(prev => !prev)
   }, [])
+
+  // ターミナルからエディタへのテキスト挿入機能
+  const handleTerminalInsertToEditor = useCallback((text: string) => {
+    if (editorRef.current && editorRef.current.insertText) {
+      editorRef.current.insertText(text)
+    }
+  }, [])
   
   // エディタへの参照
   const editorRef = useRef<any>(null)
@@ -683,6 +690,7 @@ export default function DocumentManager() {
               // ターミナル関連のpropsを追加
               terminalVisible={terminalVisible}
               onTerminalToggle={toggleTerminal}
+              onTerminalInsertToEditor={handleTerminalInsertToEditor}
               onFileSaved={(fileName: string) => {
                 console.log('===== ファイル保存コールバック開始 =====');
                 console.log('保存されたファイル名:', fileName);

@@ -1,7 +1,7 @@
 "use client"
 
 import { AIChat } from './ai-chat'
-import { XTermTerminal as TerminalComponent } from './xterm-terminal-simple'
+import { WebSocketTerminal as TerminalComponent } from './websocket-terminal'
 import React, { useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import type { Message, UseChatHelpers } from 'ai/react';

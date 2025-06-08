@@ -4,10 +4,13 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Terminal as TerminalIcon, X, Trash2, Settings } from 'lucide-react'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { Copy, FileText } from 'lucide-react'
 
 interface XTerminalProps {
   isDarkMode?: boolean
   onClose?: () => void
+  onInsertToEditor?: (text: string) => void
 }
 
 // 動的インポート用のhook
@@ -39,7 +42,11 @@ const useXTerm = () => {
   return xterm
 }
 
-export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, onClose }) => {
+export const XTermTerminal: React.FC<XTerminalProps> = ({ 
+  isDarkMode = false, 
+  onClose,
+  onInsertToEditor 
+}) => {
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<any>(null)
   const fitAddonRef = useRef<any>(null)
@@ -48,6 +55,7 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [currentDirectory, setCurrentDirectory] = useState('~')
   const [isCommandRunning, setIsCommandRunning] = useState(false)
+  const [selectedText, setSelectedText] = useState<string>('')
   
   const xterm = useXTerm()
 
@@ -57,6 +65,48 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
   const homeDirectoryRef = useRef('')
   // 現在のディレクトリを即座に反映するため
   const currentDirectoryRef = useRef(currentDirectory)
+
+  // 選択テキストを取得する関数
+  const getSelectedTerminalText = useCallback(() => {
+    if (xtermRef.current) {
+      const selection = xtermRef.current.getSelection()
+      return selection || ''
+    }
+    return ''
+  }, [])
+
+  // コピー機能
+  const handleCopy = useCallback(() => {
+    const text = getSelectedTerminalText()
+    if (text) {
+      navigator.clipboard.writeText(text)
+      setSelectedText('')
+    }
+  }, [getSelectedTerminalText])
+
+  // エディタに挿入機能
+  const handleInsertToEditor = useCallback(() => {
+    const text = getSelectedTerminalText()
+    if (text && onInsertToEditor) {
+      const codeBlock = `\`\`\`bash\n${text}\n\`\`\``
+      onInsertToEditor(codeBlock)
+      setSelectedText('')
+    }
+  }, [getSelectedTerminalText, onInsertToEditor])
+
+  // 選択テキストの更新を監視
+  useEffect(() => {
+    if (xtermRef.current) {
+      const terminal = xtermRef.current
+      const updateSelection = () => {
+        const selection = terminal.getSelection()
+        setSelectedText(selection || '')
+      }
+      
+      // 選択変更イベントをリスン
+      terminal.onSelectionChange(updateSelection)
+    }
+  }, [isConnected])
 
   // プロンプト生成関数
   const generatePrompt = useCallback((directory: string) => {
@@ -98,6 +148,12 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
 
       if (!response.ok) {
         xtermRef.current?.writeln(`\x1b[31mError: ${result.error || 'Command execution failed'}\x1b[0m`)
+        // 自動スクロールを最下部に
+        setTimeout(() => {
+          if (xtermRef.current) {
+            xtermRef.current.scrollToLine(xtermRef.current.buffer.active.length)
+          }
+        }, 10)
       } else {
         // 現在のディレクトリを更新（常に最新のcwdを使用）
         if (result.cwd) {
@@ -119,6 +175,12 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
               xtermRef.current?.write(formattedOutput)
             }
           }
+          // 出力後に自動スクロールを最下部に
+          setTimeout(() => {
+            if (xtermRef.current) {
+              xtermRef.current.scrollToLine(xtermRef.current.buffer.active.length)
+            }
+          }, 10)
         }
       }
 
@@ -132,6 +194,12 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
         const latestDirectory = result.cwd || currentDirectory
         const prompt = generatePrompt(latestDirectory)
         xtermRef.current?.write(prompt)
+        // プロンプト表示後に自動スクロールを最下部に
+        setTimeout(() => {
+          if (xtermRef.current) {
+            xtermRef.current.scrollToLine(xtermRef.current.buffer.active.length)
+          }
+        }, 10)
       }, 50)
       
 
@@ -142,6 +210,12 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
       // プロンプトを表示
       const prompt = generatePrompt(currentDirectory)
       xtermRef.current?.write(prompt)
+              // 自動スクロールを最下部に
+        setTimeout(() => {
+          if (xtermRef.current) {
+            xtermRef.current.scrollToLine(xtermRef.current.buffer.active.length)
+          }
+        }, 10)
     } finally {
       setIsCommandRunning(false)
     }
@@ -171,6 +245,14 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
     if (!xterm || !terminalRef.current || xtermRef.current) return
 
     const { Terminal, FitAddon, WebLinksAddon } = xterm
+
+    // 動的スクロールバックサイズを計算する関数
+    const calculateScrollback = (rows: number) => {
+      // ターミナルの行数に基づいてスクロールバックサイズを計算
+      // 最小500行、最大5000行、通常は表示行数の10倍
+      const baseScrollback = Math.max(500, Math.min(5000, rows * 10))
+      return baseScrollback
+    }
 
     // ターミナルテーマ設定
     const terminal = new Terminal({
@@ -206,7 +288,7 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
       lineHeight: 1.2,
       cursorBlink: true,
       cursorStyle: 'bar',
-      scrollback: 1000,
+      scrollback: 1000, // 初期値、後で動的に更新
       tabStopWidth: 4
     })
 
@@ -219,8 +301,30 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
 
     // DOMに追加
     terminal.open(terminalRef.current)
-    fitAddon.fit()
     
+    // 初期化完了後にfitとスクロール設定を実行
+    setTimeout(() => {
+      if (fitAddon && terminal) {
+        fitAddon.fit()
+        // 初期スクロールバックサイズを設定
+        const initialScrollback = calculateScrollback(terminal.rows)
+        terminal.options.scrollback = initialScrollback
+        // 初期化後に最下部にスクロール
+        setTimeout(() => {
+          terminal.scrollToLine(terminal.buffer.active.length)
+        }, 10)
+      }
+    }, 100)
+    
+          // 追加の初期化処理（より確実にするため）
+      setTimeout(() => {
+        if (fitAddon && terminal) {
+          fitAddon.fit()
+          setTimeout(() => {
+            terminal.scrollToLine(terminal.buffer.active.length)
+          }, 10)
+        }
+      }, 300)
 
     // 参照を保存
     xtermRef.current = terminal
@@ -232,6 +336,10 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
     terminal.writeln('Type commands and press Enter to execute.')
     const prompt = generatePrompt(currentDirectory)
     terminal.write(prompt)
+    // 初期表示後に自動スクロールを最下部に
+    setTimeout(() => {
+      terminal.scrollToLine(terminal.buffer.active.length)
+    }, 100)
 
     // データ入力処理
     const disposables = [
@@ -247,6 +355,10 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
           } else {
             const prompt = generatePrompt(currentDirectory)
             terminal.write(prompt)
+            // プロンプト表示後に自動スクロール
+            setTimeout(() => {
+              terminal.scrollToLine(terminal.buffer.active.length)
+            }, 10)
           }
         } else if (data === '\u007f') {
           // Backspace
@@ -266,6 +378,10 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
               const prompt = generatePrompt(currentDirectory)
               terminal.write(prompt + cmd)
               currentInputRef.current = cmd
+              // 履歴表示後に自動スクロール
+              setTimeout(() => {
+                terminal.scrollToLine(terminal.buffer.active.length)
+              }, 10)
             }
           }
         } else if (data === '\u001b[B') {
@@ -279,12 +395,20 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
             const prompt = generatePrompt(currentDirectory)
             terminal.write(prompt + cmd)
             currentInputRef.current = cmd
+            // 履歴表示後に自動スクロール
+            setTimeout(() => {
+              terminal.scrollToLine(terminal.buffer.active.length)
+            }, 10)
           } else if (historyIndex === 0) {
             setHistoryIndex(-1)
             terminal.write('\r' + ' '.repeat(terminal.cols) + '\r')
             const prompt = generatePrompt(currentDirectory)
             terminal.write(prompt)
             currentInputRef.current = ''
+            // プロンプト表示後に自動スクロール
+            setTimeout(() => {
+              terminal.scrollToLine(terminal.buffer.active.length)
+            }, 10)
           }
         } else if (data === '\u0009') {
           // Tab: 簡単な補完
@@ -310,6 +434,10 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
           currentInputRef.current = ''
           const prompt = generatePrompt(currentDirectory)
           terminal.write(prompt)
+          // プロンプト表示後に自動スクロール
+          setTimeout(() => {
+            terminal.scrollToLine(terminal.buffer.active.length)
+          }, 10)
         }
         // Ctrl+L: 画面クリア
         else if (domEvent.ctrlKey && domEvent.key === 'l') {
@@ -317,6 +445,10 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
           terminal.clear()
           const prompt = generatePrompt(currentDirectory)
           terminal.write(prompt)
+          // プロンプト表示後に自動スクロール
+          setTimeout(() => {
+            terminal.scrollToLine(terminal.buffer.active.length)
+          }, 10)
         }
       })
     ]
@@ -339,6 +471,19 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
       if (fitAddonRef.current && xtermRef.current) {
         try {
           fitAddonRef.current.fit()
+          // リサイズ後にスクロールバックサイズを更新
+          const calculateScrollback = (rows: number) => {
+            const baseScrollback = Math.max(500, Math.min(5000, rows * 10))
+            return baseScrollback
+          }
+          const newScrollback = calculateScrollback(xtermRef.current.rows)
+          xtermRef.current.options.scrollback = newScrollback
+          // リサイズ後に最下部にスクロール
+          setTimeout(() => {
+            if (xtermRef.current) {
+              xtermRef.current.scrollToLine(xtermRef.current.buffer.active.length)
+            }
+          }, 50)
         } catch (error) {
           console.error('Failed to fit terminal:', error)
         }
@@ -347,10 +492,23 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
 
     window.addEventListener('resize', handleResize)
     const timer = setTimeout(handleResize, 100)
+    
+    // ResizeObserverでターミナルコンテナのサイズ変更を監視
+    let resizeObserver: ResizeObserver | null = null
+    if (terminalRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        // デバウンス処理
+        setTimeout(handleResize, 100)
+      })
+      resizeObserver.observe(terminalRef.current)
+    }
 
     return () => {
       window.removeEventListener('resize', handleResize)
       clearTimeout(timer)
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+      }
     }
   }, [isConnected])
 
@@ -360,6 +518,12 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
       xtermRef.current.clear()
       const prompt = generatePrompt(currentDirectory)
       xtermRef.current.write(prompt)
+      // プロンプト表示後に自動スクロール
+      setTimeout(() => {
+        if (xtermRef.current) {
+          xtermRef.current.scrollToLine(xtermRef.current.buffer.active.length)
+        }
+      }, 10)
     }
   }, [currentDirectory, generatePrompt])
 
@@ -397,17 +561,37 @@ export const XTermTerminal: React.FC<XTerminalProps> = ({ isDarkMode = false, on
         </div>
       </CardHeader>
       <CardContent className="flex-1 p-0">
-        <div 
-          ref={terminalRef}
-          className="h-full w-full"
-          style={{
-            backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
-            position: 'relative',
-            zIndex: 1,
-            overflow: 'hidden'
-          }}
-          onClick={() => xtermRef.current?.focus()}
-        />
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div 
+              ref={terminalRef}
+              className="h-full w-full"
+              style={{
+                backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                position: 'relative',
+                zIndex: 1,
+                overflow: 'hidden'
+              }}
+              onClick={() => xtermRef.current?.focus()}
+            />
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-48">
+            <ContextMenuItem 
+              onClick={handleCopy}
+              disabled={!selectedText}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              <span>コピー</span>
+            </ContextMenuItem>
+            <ContextMenuItem 
+              onClick={handleInsertToEditor}
+              disabled={!selectedText || !onInsertToEditor}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              <span>エディタに挿入</span>
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
         <div className={`px-3 py-1 text-xs ${isDarkMode ? 'text-gray-400 bg-gray-800' : 'text-gray-600 bg-gray-50'} border-t`}>
           Use ↑/↓ for history, Tab for completion, Ctrl+C to interrupt, Ctrl+L to clear
         </div>

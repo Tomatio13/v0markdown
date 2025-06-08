@@ -82,7 +82,7 @@ import {
 import MermaidDiagram from "./mermaid-diagram"
 import { AIChat } from "./ai-chat"
 import { TripleLayout } from "./triple-layout"
-import { XTermTerminal as TerminalComponent } from "./xterm-terminal-simple"
+import { WebSocketTerminal as TerminalComponent } from "./websocket-terminal"
 import { useChat, Message, CreateMessage } from "ai/react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { GoogleFile } from "@/lib/types"
@@ -166,6 +166,7 @@ interface MarkdownEditorProps {
   // ターミナル関連のプロパティ
   terminalVisible?: boolean;
   onTerminalToggle?: () => void;
+  onTerminalInsertToEditor?: (insertFunction: (text: string) => void) => void;
 }
 
 // --- コンポーネント本体 ---
@@ -198,6 +199,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
   // ターミナル関連のプロパティ
   terminalVisible = false,
   onTerminalToggle,
+  onTerminalInsertToEditor,
 }, ref) => {
   // --- State Variables ---
 
@@ -508,6 +510,49 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
       });
     }
   }, [setMarkdownContent]);
+
+  // ターミナルからのテキスト挿入機能
+  const handleTerminalInsert = useCallback((text: string) => {
+    if (viewRef.current) {
+      const view = viewRef.current;
+      const currentPos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: currentPos, to: currentPos, insert: text },
+        selection: { anchor: currentPos + text.length }
+      });
+      view.focus();
+      cursorPosRef.current = currentPos + text.length;
+    } else {
+      setMarkdownContent(prev => {
+        const pos = cursorPosRef.current;
+        const safePos = Math.max(0, Math.min(pos, prev.length));
+        const newContent = prev.substring(0, safePos) + text + prev.substring(safePos);
+        cursorPosRef.current = safePos + text.length;
+        return newContent;
+      });
+    }
+  }, [setMarkdownContent]);
+
+  // ターミナル挿入機能をrefで公開
+  useImperativeHandle(ref, () => ({
+    insertText: handleTerminalInsert,
+    setViewMode: (mode: string) => {
+      setViewMode(mode as any);
+    },
+    getContent: () => markdownContent,
+    focus: () => {
+      if (viewRef.current) {
+        viewRef.current.focus();
+      }
+    }
+  }), [handleTerminalInsert, markdownContent]);
+
+  // ターミナルからの挿入機能をpropsで受け取った場合の処理
+  useEffect(() => {
+    if (onTerminalInsertToEditor) {
+      onTerminalInsertToEditor(handleTerminalInsert);
+    }
+  }, [onTerminalInsertToEditor, handleTerminalInsert]);
 
   // 選択テキストを取得する関数
   const getSelectedEditorContent = useCallback((): string | null => {
@@ -2389,19 +2434,21 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
           )}
 
           {/* ターミナルボタン */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant={terminalVisible ? 'secondary' : 'ghost'} 
-                size="icon" 
-                className={`h-10 w-10 ${terminalVisible && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
-                onClick={onTerminalToggle}
-              >
-                <Terminal className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">ターミナル</TooltipContent>
-          </Tooltip>
+          {process.env.NEXT_PUBLIC_WEBSOCKET_TERMINAL_FLG !== 'OFF' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant={terminalVisible ? 'secondary' : 'ghost'} 
+                  size="icon" 
+                  className={`h-10 w-10 ${terminalVisible && isDarkMode ? 'dark:bg-[#2F2F2F]' : ''}`} 
+                  onClick={onTerminalToggle}
+                >
+                  <Terminal className="h-6 w-6" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">ターミナル</TooltipContent>
+            </Tooltip>
+          )}
 
           {/* ▲ ADDED ▲ */}
         </TooltipProvider>
@@ -2825,7 +2872,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
                         maxSize={60}
                         className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
                       >
-                        <TerminalComponent isDarkMode={isDarkMode} />
+                        <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
                       </ResizablePanel>
                     </>
                   )}
@@ -2888,7 +2935,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
                         maxSize={60}
                         className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
                       >
-                        <TerminalComponent isDarkMode={isDarkMode} />
+                        <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
                       </ResizablePanel>
                     </>
                   )}
@@ -2959,7 +3006,7 @@ const MarkdownEditor = forwardRef<any, MarkdownEditorProps>(({
                         maxSize={60}
                         className={isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}
                       >
-                        <TerminalComponent isDarkMode={isDarkMode} />
+                        <TerminalComponent isDarkMode={isDarkMode} onInsertToEditor={handleTerminalInsert} />
                       </ResizablePanel>
                     </>
                   )}
