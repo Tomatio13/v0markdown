@@ -57,6 +57,20 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
   
   const xterm = useXTerm()
 
+  // ターミナルサイズをサーバーに送信する関数
+  const sendTerminalSize = useCallback(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && xtermRef.current) {
+      const cols = xtermRef.current.cols
+      const rows = xtermRef.current.rows
+      wsRef.current.send(JSON.stringify({
+        type: 'resize',
+        cols: cols,
+        rows: rows
+      }))
+      console.log(`Terminal size sent: ${cols}x${rows}`)
+    }
+  }, [])
+
   // 選択テキストを取得する関数
   const getSelectedTerminalText = useCallback(() => {
     if (xtermRef.current) {
@@ -124,6 +138,10 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
         setIsConnected(true)
         if (xtermRef.current) {
           xtermRef.current.writeln('\r\n\x1b[32mWebSocket接続成功、サーバーからの応答を待っています...\x1b[0m')
+          // 接続後にターミナルサイズを送信
+          setTimeout(() => {
+            sendTerminalSize()
+          }, 100)
           // 自動スクロールを最下部に
           setTimeout(() => {
             if (xtermRef.current) {
@@ -208,8 +226,39 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
       }
 
       ws.onclose = (event) => {
+        const closeMessages: { [key: number]: string } = {
+          1000: '正常な接続終了',
+          1001: 'サーバーが停止中または再起動中',
+          1002: 'プロトコルエラー',
+          1003: 'サポートされていないデータタイプ',
+          1005: '理由なしでの接続終了',
+          1006: '異常な接続終了（通常はサーバーが利用できない状態）',
+          1007: '無効なデータを受信',
+          1008: 'ポリシー違反',
+          1009: 'メッセージが大きすぎる',
+          1010: '拡張の合意に失敗',
+          1011: 'サーバー内部エラー'
+        }
+        
+        const errorMessage = closeMessages[event.code] || `不明なエラー（コード: ${event.code}）`
+        
         if (!event.wasClean) {
-          console.error(`WebSocket接続が異常終了しました。コード: ${event.code}`)
+          console.error(`WebSocket接続が異常終了しました。${errorMessage}`)
+          console.error(`接続先URL: ${wsUrl}`)
+          console.error(`接続状況の詳細:`, {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+            timestamp: new Date().toISOString()
+          })
+          
+          if (xtermRef.current) {
+            xtermRef.current.writeln(`\r\n\x1b[31mWebSocket接続エラー: ${errorMessage}\x1b[0m`)
+            xtermRef.current.writeln(`接続先: ${wsUrl}`)
+            if (event.code === 1006) {
+              xtermRef.current.writeln('サーバーが起動していることを確認してください')
+            }
+          }
         }
         setConnectionStatus('disconnected')
         setIsConnected(false)
@@ -281,7 +330,9 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
       scrollback: 1000, // 初期値、後で動的に更新
       tabStopWidth: 4,
       convertEol: true, // 改行コードの自動変換を有効化
-      allowProposedApi: true // 提案されたAPIを有効化
+      allowProposedApi: true, // 提案されたAPIを有効化
+      minimumContrastRatio: 1, // tmux表示の改善
+      fastScrollModifier: 'alt' // 高速スクロール用
     })
 
     const fitAddon = new FitAddon()
@@ -294,25 +345,37 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
     setTimeout(() => {
       if (fitAddon && terminal) {
         fitAddon.fit()
-        // 初期スクロールバックサイズを設定
-        const initialScrollback = calculateScrollback(terminal.rows)
-        terminal.options.scrollback = initialScrollback
-        // 初期化後に最下部にスクロール
+        // 再度サイズを送信（tmux対応）
+        setTimeout(() => {
+          sendTerminalSize()
+        }, 50)
         setTimeout(() => {
           terminal.scrollToLine(terminal.buffer.active.length)
-        }, 10)
+        }, 100)
       }
     }, 100)
     
-          // 追加の初期化処理（より確実にするため）
-      setTimeout(() => {
-        if (fitAddon && terminal) {
-          fitAddon.fit()
-          setTimeout(() => {
-            terminal.scrollToLine(terminal.buffer.active.length)
-          }, 10)
-        }
-      }, 300)
+    // 追加の初期化処理（より確実にするため）
+    setTimeout(() => {
+      if (fitAddon && terminal) {
+        fitAddon.fit()
+        // 再度サイズを送信（tmux対応）
+        setTimeout(() => {
+          sendTerminalSize()
+        }, 50)
+        setTimeout(() => {
+          terminal.scrollToLine(terminal.buffer.active.length)
+        }, 100)
+      }
+    }, 300)
+    
+    // さらに確実にするための最終調整
+    setTimeout(() => {
+      if (fitAddon && terminal) {
+        fitAddon.fit()
+        sendTerminalSize()
+      }
+    }, 500)
     
     xtermRef.current = terminal
     fitAddonRef.current = fitAddon
@@ -343,6 +406,12 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
           // リサイズ後にスクロールバックサイズを更新
           const newScrollback = calculateScrollback(xtermRef.current.rows)
           xtermRef.current.options.scrollback = newScrollback
+          
+          // ターミナルサイズをサーバーに送信（tmux対応）
+          setTimeout(() => {
+            sendTerminalSize()
+          }, 100)
+          
           // リサイズ後に最下部にスクロール
           setTimeout(() => {
             if (xtermRef.current) {
@@ -358,10 +427,23 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
     
     // ResizeObserverでターミナルコンテナのサイズ変更を監視
     let resizeObserver: ResizeObserver | null = null
+    let resizeTimeout: NodeJS.Timeout | null = null
     if (terminalRef.current) {
       resizeObserver = new ResizeObserver(() => {
-        // デバウンス処理
-        setTimeout(handleResize, 100)
+        // デバウンス処理でパフォーマンス向上
+        if (resizeTimeout) {
+          clearTimeout(resizeTimeout)
+        }
+        resizeTimeout = setTimeout(() => {
+          handleResize()
+          // tmux用の追加リサイズ処理
+          setTimeout(() => {
+            if (fitAddonRef.current && xtermRef.current) {
+              fitAddonRef.current.fit()
+              sendTerminalSize()
+            }
+          }, 50)
+        }, 100)
       })
       resizeObserver.observe(terminalRef.current)
     }
@@ -371,11 +453,14 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
       if (resizeObserver) {
         resizeObserver.disconnect()
       }
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
       terminal.dispose()
       xtermRef.current = null
       disconnectWebSocket()
     }
-  }, [xterm, isDarkMode, connectWebSocket, disconnectWebSocket])
+  }, [xterm, isDarkMode, connectWebSocket, disconnectWebSocket, sendTerminalSize])
 
   // 画面クリア
   const clearScreen = useCallback(() => {
@@ -390,7 +475,7 @@ export const WebSocketTerminal: React.FC<WebSocketTerminalProps> = ({
     setTimeout(() => {
       connectWebSocket().catch(console.error)
     }, 1000)
-  }, []) // 依存関係を削除
+  }, [connectWebSocket, disconnectWebSocket])
 
   // 接続状態の表示
   const getStatusColor = () => {

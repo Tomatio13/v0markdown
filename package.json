@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"node server.js\" \"node websocket-server.js\"",
+    "dev:3001": "PORT=3001 concurrently \"node server.js\" \"node websocket-server.js\"",
+    "dev:3002": "PORT=3002 concurrently \"node server.js\" \"node websocket-server.js\"",
+    "dev:3003": "PORT=3003 concurrently \"node server.js\" \"node websocket-server.js\"",
     "dev:next": "next dev",
     "dev:websocket": "node websocket-server.js",
     "build": "next build",
