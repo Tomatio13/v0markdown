@@ -171,7 +171,36 @@ export default function DocumentManager() {
   }, [activeTabId, ignoreNextPreviewUpdate]);
   
   // AIチャット関連 - グローバルレベルで管理
-  const chatHelpers = useChat()
+  const chatHelpers = useChat({
+    api: '/api/chat',
+    // フロントエンド側のタイムアウトを600秒（10分）に大幅延長
+    fetch: (url, options) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('[Frontend] フロントエンド側タイムアウト発生 (600秒)');
+        controller.abort();
+      }, 600000); // 600秒 = 10分
+      
+      return fetch(url, {
+        ...options,
+        signal: controller.signal,
+      }).then(response => {
+        console.log('[Frontend] レスポンス受信:', response.status, response.statusText);
+        return response;
+      }).catch(error => {
+        console.error('[Frontend] Fetch エラー:', error);
+        throw error;
+      }).finally(() => {
+        clearTimeout(timeoutId);
+      });
+    },
+    onError: (error) => {
+      console.error('[useChat] エラー:', error);
+    },
+    onFinish: (message) => {
+      console.log('[useChat] 完了:', message);
+    },
+  })
   
   // デフォルトタブの初期化 - 初期化プロセスの詳細をログに追加
   const initializeDefaultTab = useCallback(() => {

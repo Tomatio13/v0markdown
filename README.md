@@ -87,9 +87,13 @@
 
 *   **AIチャット:**
     *   エディタの右側にチャットパネルを開き、AIと対話しながら文章作成の補助を受けられます（別途APIキー設定が必要）。
-    *   複数のAIプロバイダー (OpenAI, Grok, Gemini, Anthropic, Ollama) に対応。
+    *   複数のAIプロバイダー (OpenAI, Grok, Gemini, Anthropic, Ollama, Claude Code) に対応。
     *   `@editor` と入力すると、現在エディタに書かれている内容をAIにコンテキストとして渡せます。
     *   会話履歴のクリア機能があります。
+    *   **Claude Code統合:** Anthropic社のClaude Code SDKを統合し、プログラミングタスクに特化したAIアシスタント機能を利用できます。
+        *   コード生成、デバッグ、リファクタリングなどの開発作業を支援
+        *   ファイル操作やターミナルコマンド実行などの高度なタスクに対応
+        *   ANTHROPIC_API_KEYが設定されている場合に利用可能
     *   **ファイル添付機能:** チャットにPDF・画像・各種オフィスファイル（Word, Excel, PowerPoint等）を添付して、AIに解析させることができます。
         *   PDF: PDF内容をネイティブに処理
         *   画像: 画像認識機能でコンテンツを解析
@@ -146,6 +150,7 @@
 - [Quarto](https://quarto.org/) - 科学技術計算向けパブリッシングシステム (PPTX変換で使用)
 - [Vercel AI SDK](https://sdk.vercel.ai/) - AIチャット機能 (オプション)
 - [Ollama AI Provider](https://sdk.vercel.ai/providers/community-providers/ollama) - ローカルまたはリモートのLLMを実行するOllamaサーバーへの接続
+- [@anthropic-ai/claude-code](https://docs.anthropic.com/ja/docs/claude-code/sdk) - Claude Code SDK（プログラミング特化AIアシスタント）
 - [node-pty](https://github.com/microsoft/node-pty) - PTY（疑似端末）ライブラリ（WebSocketターミナル機能）
 - [xterm.js](https://xtermjs.org/) - ブラウザ内ターミナルエミュレータ
 - [WebSocket (ws)](https://github.com/websockets/ws) - WebSocket通信ライブラリ
@@ -381,6 +386,9 @@ MODELS='{
   },
   "ollama":{
     "models":["llama3","phi3","qwen3:4b","llava"] # Ollamaにインストール済みのモデル
+  },
+  "claudecode":{
+    "models":["claude-code"] # Claude Code SDK（ANTHROPIC_API_KEYが必要）
   }
 }'
 

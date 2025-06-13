@@ -7,6 +7,7 @@ import { streamText, CoreMessage, LanguageModel, TextPart, FilePart, ImagePart, 
 import { getMcpTools } from '@/lib/mcp-tools';
 import { memoryTools } from '@/lib/local-tools';
 import { createOllama, OllamaProvider } from 'ollama-ai-provider';
+import { query, type SDKMessage } from "@anthropic-ai/claude-code";
 import fs from 'fs';
 import path from 'path';
 import { convertFileToMarkdown } from '@/lib/server-utils';
@@ -21,6 +22,7 @@ interface ModelConfig {
   gemini?: ProviderModels;
   anthropic?: ProviderModels;
   ollama?: ProviderModels;
+  claudecode?: ProviderModels;
 }
 
 // ファイルアップロード用の拡張型
@@ -98,8 +100,14 @@ const googleApiKey = process.env.GEMINI_API_KEY; // Gemini用の環境変数キ�
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY; // Anthropic用
 const ollamaBaseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/api'; // Ollama用のベースURL
 
+// Claude Code用の特別な型
+interface ClaudeCodeProvider {
+  type: 'claudecode';
+  available: boolean;
+}
+
 // プロバイダーの型を定義
-type AIProvider = OpenAIProvider | XaiProvider | GoogleGenerativeAIProvider | AnthropicProvider | OllamaProvider;
+type AIProvider = OpenAIProvider | XaiProvider | GoogleGenerativeAIProvider | AnthropicProvider | OllamaProvider | ClaudeCodeProvider;
 
 // OpenAIプロバイダーの初期化 - baseURLがあれば設定
 const openai: OpenAIProvider | null = openaiApiKey 
@@ -111,6 +119,22 @@ const xai: XaiProvider | null = grokApiKey ? createXai({ apiKey: grokApiKey }) :
 const google: GoogleGenerativeAIProvider | null = googleApiKey ? createGoogleGenerativeAI({ apiKey: googleApiKey }) : null;
 const anthropic: AnthropicProvider | null = anthropicApiKey ? createAnthropic({ apiKey: anthropicApiKey }) : null;
 const ollama: OllamaProvider | null = createOllama({ baseURL: ollamaBaseURL });
+
+// Claude Code プロバイダーの初期化
+let claudeCode: ClaudeCodeProvider | null = null;
+try {
+  if (anthropicApiKey) {
+    // Claude Code SDKが利用可能かチェック
+    require('@anthropic-ai/claude-code');
+    claudeCode = { type: 'claudecode', available: true };
+    console.log('[Claude Code] ANTHROPIC_API_KEY が設定され、SDK が正常に読み込まれました');
+  } else {
+    console.log('[Claude Code] ANTHROPIC_API_KEY が設定されていません');
+  }
+} catch (error) {
+  console.error('[Claude Code] 初期化エラー:', error);
+  claudeCode = null;
+}
 
 // MODELS環境変数をパース
 const parseModelConfig = (): ModelConfig => {
@@ -167,6 +191,12 @@ const getAvailableModels = (): { id: string; name: string }[] => {
       availableModels.push({ id: modelId, name: `Ollama ${modelId}` });
     });
   }
+  // Claude Code
+  if (claudeCode && modelConfig.claudecode?.models) {
+    modelConfig.claudecode.models.forEach(modelId => {
+      availableModels.push({ id: modelId, name: `Claude Code ${modelId}` });
+    });
+  }
 
   if (availableModels.length === 0) {
     console.warn("警告: 利用可能なAIモデルが見つかりませんでした。MODELS環境変数とAPIキーを確認してください。");
@@ -175,7 +205,7 @@ const getAvailableModels = (): { id: string; name: string }[] => {
 };
 
 // モデルIDからプロバイダーインスタンスとモデルIDを返すヘルパー関数
-const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId: string; modelSettings?: any } | null => {
+const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId: string; modelSettings?: any; isClaudeCode?: boolean } | null => {
   if (modelConfig.openai?.models.includes(modelId)) {
     if (!openai) throw new Error(`OpenAI APIキーが設定されていませんが、モデル ${modelId} が要求されました。`);
     return { provider: openai, modelId: modelId };
@@ -198,6 +228,10 @@ const getProviderAndModelId = (modelId: string): { provider: AIProvider; modelId
       modelId: modelId,
       // Ollama はネイティブストリーミングをサポートするため simulateStreaming は設定しない
     };
+  }
+  if (modelConfig.claudecode?.models.includes(modelId)) {
+    if (!claudeCode) throw new Error(`Anthropic APIキーが設定されていませんが、Claude Code モデル ${modelId} が要求されました。`);
+    return { provider: claudeCode, modelId: modelId, isClaudeCode: true };
   }
   console.warn(`設定に存在しない、またはAPIキーが設定されていないモデルIDが指定されました: ${modelId}`);
   return null; // 見つからない場合はnullを返す
@@ -343,13 +377,188 @@ export async function POST(req: Request) {
         providerInfo = fallbackProviderInfo; // letなので再代入可能
     }
 
+    // Claude Code の場合は特別な処理
+    if (providerInfo.isClaudeCode) {
+      console.log('[Claude Code] 処理開始');
+      
+      // APIキーの確認
+      if (!anthropicApiKey) {
+        console.error('[Claude Code] ANTHROPIC_API_KEY が設定されていません');
+        throw new Error('Claude Code を使用するには ANTHROPIC_API_KEY の設定が必要です。');
+      }
+      
+      // メッセージを処理してテキストのみ抽出
+      const processedMessages = await processMessages(messages);
+      
+      // 最後のユーザーメッセージからプロンプトを抽出
+      const lastUserMessage = processedMessages.filter(m => m.role === 'user').pop();
+      let prompt = '';
+      
+      if (lastUserMessage) {
+        if (typeof lastUserMessage.content === 'string') {
+          prompt = lastUserMessage.content;
+        } else if (Array.isArray(lastUserMessage.content)) {
+          prompt = lastUserMessage.content
+            .filter(part => part.type === 'text')
+            .map(part => (part as TextPart).text)
+            .join(' ');
+        }
+      }
+
+      console.log('[Claude Code] プロンプト:', prompt.substring(0, 100) + '...');
+
+      // Claude Codeの結果を収集
+      let claudeCodeResponse = '';
+      let hasError = false;
+      let errorMessage = '';
+
+      try {
+        console.log('[Claude Code] クエリ実行開始');
+        
+        // タイムアウト設定
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => {
+          console.log('[Claude Code] サーバー側タイムアウト発生 (480秒)');
+          abortController.abort();
+        }, 480000);
+
+        let messageCount = 0;
+        
+        try {
+          for await (const message of query({
+            prompt: prompt,
+            abortController: abortController,
+            options: {
+              maxTurns: 30,
+              systemPrompt: "You are a helpful AI assistant for general conversation and questions. You should NOT access, read, or reference any local files or code. Do not use any file system tools. Focus on providing helpful responses based on your training knowledge and web information when needed. If you need current information, you may use WebFetch to search the internet, but avoid accessing local files or code repositories.",
+              cwd: process.cwd(),
+              permissionMode: "bypassPermissions",
+              allowedTools: ["WebFetch"],
+              disallowedTools: ["Write", "Read", "Execute", "Edit", "Create", "Delete", "Run", "File", "Directory", "Git"],
+            },
+          })) {
+            messageCount++;
+            console.log(`[Claude Code] メッセージ ${messageCount} 受信:`, message.type);
+            
+            // 初期化メッセージをスキップ
+            if (message.type === 'system' && message.subtype === 'init') {
+              console.log('[Claude Code] 初期化メッセージをスキップ');
+              continue;
+            }
+            
+            if (message.type === 'assistant' && message.message?.content) {
+              let responseText = '';
+              
+              if (Array.isArray(message.message.content)) {
+                responseText = message.message.content
+                  .filter((part: any) => part.type === 'text')
+                  .map((part: any) => part.text)
+                  .join('');
+              } else if (typeof message.message.content === 'string') {
+                responseText = message.message.content;
+              }
+              
+              if (responseText && !claudeCodeResponse.includes(responseText)) {
+                claudeCodeResponse += responseText;
+                console.log('[Claude Code] レスポンス受信:', responseText.substring(0, 100) + '...');
+              }
+            } else if (message.type === 'result') {
+              console.log('[Claude Code] 結果メッセージ受信');
+              
+              if (message.subtype === 'success' && message.result) {
+                const resultText = typeof message.result === 'string' ? message.result : JSON.stringify(message.result);
+                if (resultText && !claudeCodeResponse.includes(resultText)) {
+                  claudeCodeResponse += resultText;
+                  console.log('[Claude Code] 結果受信:', resultText.substring(0, 100) + '...');
+                }
+              }
+              
+              break;
+            }
+            
+            if (messageCount > 50) {
+              console.log('[Claude Code] メッセージ数上限に達しました');
+              break;
+            }
+          }
+        } catch (iteratorError) {
+          console.error('[Claude Code] イテレーターエラー:', iteratorError);
+          hasError = true;
+          if (iteratorError instanceof Error) {
+            if (iteratorError.message.includes('exited with code 143')) {
+              errorMessage = 'Claude Codeの処理が中断されました。より簡潔な質問で再度お試しください。';
+            } else if (iteratorError.message.includes('exited with code')) {
+              errorMessage = 'Claude Codeプロセスが異常終了しました。APIキーを確認してください。';
+            } else {
+              errorMessage = `Claude Code エラー: ${iteratorError.message}`;
+            }
+          } else {
+            errorMessage = 'Claude Codeの処理中にエラーが発生しました。';
+          }
+        }
+
+        clearTimeout(timeoutId);
+        
+        if (!hasError && (!claudeCodeResponse || claudeCodeResponse.trim() === '')) {
+          hasError = true;
+          errorMessage = 'Claude Codeからの応答を取得できませんでした。より簡潔な質問で再度お試しください。';
+        }
+        
+        console.log('[Claude Code] 処理完了');
+
+      } catch (error) {
+        console.error('[Claude Code] エラー:', error);
+        hasError = true;
+        
+        if (error instanceof Error) {
+          if (error.message.includes('abort')) {
+            errorMessage = 'Claude Codeの処理がタイムアウトしました。より簡潔な質問で再度お試しください。';
+          } else if (error.message.includes('exited with code 1')) {
+            errorMessage = 'Claude Codeの初期化に失敗しました。APIキーを確認してください。';
+          } else {
+            errorMessage = `Claude Code エラー: ${error.message}`;
+          }
+        } else {
+          errorMessage = 'Claude Codeでエラーが発生しました。';
+        }
+      }
+
+      // 結果をAI SDKのstreamTextで処理
+      const finalResponse = hasError ? errorMessage : claudeCodeResponse;
+      
+      // 仮想的なAnthropicプロバイダーを使用してストリーミング
+      if (!anthropic) {
+        throw new Error('Anthropic プロバイダーが利用できません。');
+      }
+      
+      const result = await streamText({
+        model: anthropic('claude-3-haiku-20240307'),
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant. Simply return the provided response exactly as given, without any modifications or additions.'
+          },
+          {
+            role: 'user',
+            content: `Please return this response exactly: ${finalResponse}`
+          }
+        ],
+        onFinish: async () => {
+          await closeAll();
+        },
+      });
+      
+      return result.toDataStreamResponse();
+    }
+
+    // 通常のプロバイダーの処理
     // メッセージを処理してファイルパーツがあれば変換
     const processedMessages = await processMessages(messages);
 
     // streamText に渡す LanguageModel インスタンスを生成
     const modelInstance: LanguageModel = providerInfo.modelSettings 
-      ? providerInfo.provider(providerInfo.modelId as any, providerInfo.modelSettings)
-      : providerInfo.provider(providerInfo.modelId as any);
+      ? (providerInfo.provider as any)(providerInfo.modelId as any, providerInfo.modelSettings)
+      : (providerInfo.provider as any)(providerInfo.modelId as any);
 
     // Ollama で画像や PDF が添付されている場合はツール呼び出しを省く
     const hasFileAttachment = processedMessages.some(m =>
